@@ -4,24 +4,27 @@
 
 {% block content %}
 <div class="row g-3 mb-3">
-  <div class="col-6 col-md-4 col-xl-2">
+{% set tile_col = "col-6 col-md-4 col-xl-2" if is_admin else "col-6 col-md-3" %}
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histTotal">{{ summary.total }}</div><div class="metric-label">Fuel Requests</div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histPending">{{ summary.pending }}</div><div class="metric-label">Pending Approval</div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histWithActual">{{ summary.with_actual }}</div><div class="metric-label">With Actual Fuel</div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histOutside">{{ summary.outside }}</div><div class="metric-label">Outside Predicted Range</div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  {% if is_admin %}{# model accuracy figures: the administrator's Model Performance view #}
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value"><span id="histMae">{{ summary.mae }}</span> L</div><div class="metric-label">Average Error</div></div>
   </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histWithin2">{{ summary.within2 }}</div><div class="metric-label">Within ±2 L</div></div>
   </div>
+  {% endif %}
 </div>
 
 <div class="card-surface">
@@ -65,7 +68,7 @@
       <thead>
         <tr>
           <th>No.</th><th>Date</th><th>Vehicle</th><th>Distance</th><th>Predicted Fuel</th>
-          <th>Status</th><th>Actual Fuel</th><th>Difference</th><th>Requested By</th><th class="no-print">Actions</th>
+          <th>Status</th><th>Actual Fuel</th><th>Difference</th>{% if is_admin %}<th>Requested By</th>{% endif %}<th class="no-print">Actions</th>
         </tr>
       </thead>
       <tbody id="histBody"></tbody>
@@ -203,7 +206,7 @@ function histRow(p) {
       (p.approved_fuel ? '<div class="small text-muted mt-1">' + escapeHtml(p.approved_fuel) + ' L released</div>' : '') + '</td>' +
     '<td>' + (p.actual_fuel ? escapeHtml(p.actual_fuel) + ' L' +
       (p.actual_from_trip ? '<div class="small text-muted" title="Recorded automatically from the matching trip record">from trip record</div>' : '') : '—') + '</td>' +
-    '<td>' + diff + '</td><td>' + escapeHtml(p.user) + '</td>' +
+    '<td>' + diff + '</td>' + (IS_ADMIN ? '<td>' + escapeHtml(p.user) + '</td>' : '') +
     '<td class="no-print">' + actions.join(' ') + '</td>';
   return tr;
 }

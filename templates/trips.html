@@ -60,9 +60,11 @@
       <span class="live-badge" id="tripLive"><span class="live-dot"></span><span id="tripLiveText">Live</span></span>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      {% if is_admin %}
       <button class="btn btn-outline-navy" data-bs-toggle="modal" data-bs-target="#importTripModal">
         <i class="fa-solid fa-file-import me-1"></i> Import CSV
       </button>
+      {% endif %}
       <button class="btn btn-blue" data-bs-toggle="modal" data-bs-target="#addTripModal">
         <i class="fa-solid fa-plus me-1"></i> Add Trip Record
       </button>

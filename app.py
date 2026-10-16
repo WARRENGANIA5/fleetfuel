@@ -1885,7 +1885,7 @@ def _trip_key(vehicle_id, trip_date, departure_time, odometer, distance):
 
 
 @app.route("/trips/import-template.csv")
-@login_required
+@admin_required
 def trip_import_template():
     output = io.StringIO()
     output.write("\ufeff")
@@ -1898,7 +1898,7 @@ def trip_import_template():
 
 
 @app.route("/trips/import", methods=["POST"])
-@login_required
+@admin_required
 def import_trips():
     """Bulk-import trip tickets from a CSV (e.g. saved from Excel). All rows
     are validated first; nothing is saved unless every row is valid."""
