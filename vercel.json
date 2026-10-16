@@ -1,13 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
+  "buildCommand": "mkdir -p public && rm -rf public/static && cp -r static public/static",
   "outputDirectory": "public",
+  "regions": ["hnd1"],
   "functions": {
     "api/index.py": {
       "maxDuration": 30,
       "includeFiles": "{templates,static,model,data,database}/**"
     }
   },
+  "headers": [
+    {
+      "source": "/static/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+    }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
