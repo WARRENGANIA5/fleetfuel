@@ -7,8 +7,11 @@ __pycache__/
 .vscode/
 flask_session/
 backups/
-.vercel_build/
 static/images/avatars/*
 !static/images/avatars/.gitkeep
 model/*.tmp
 .claude/
+.vercel/
+
+.vercel
+.env*

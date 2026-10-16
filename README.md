@@ -25,7 +25,8 @@ gov-fleets/
 ├── config.py                  Configuration (reads .env)
 ├── db.py                      MySQL connection helper (PyMySQL)
 ├── seed_data.py                Seeds admin account + demo fleet data
-├── requirements.txt
+├── requirements.txt          Web app libraries (what Vercel installs)
+├── requirements-train.txt    + training, diagnostics and Waitress (office server)
 ├── model/
 │   ├── preprocess.py           Shared preprocessing (train + predict)
 │   ├── train_model.py          Trains & saves the Linear Regression pipeline
@@ -77,7 +78,7 @@ real, digitized trip/fuel export, keeping the same column names, then re-run
 ```bash
 python -m venv venv
 venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-train.txt
 ```
 
 ### 4.3 Create the database
