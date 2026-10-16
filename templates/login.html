@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login | {{ org.org_short }} Fleet Fuel Prediction System</title>
+<link rel="icon" href="{{ url_for('static', filename='images/favicon.svg', v=2) }}" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=9) }}" rel="stylesheet">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo"><img src="{{ url_for('static', filename='images/logo.svg', v=2) }}" alt="{{ org.system_short }} logo"></div>
+    <div class="login-title">Government Fleet Fuel Prediction System</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category in ['danger','error'] else category }} py-2" role="alert">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}" class="needs-validation" novalidate data-loading="Signing in...">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="mb-3">
+        <div class="form-floating">
+          <input type="text" class="form-control" id="username" name="username" value="{{ request.form.get('username', '') }}" placeholder="Username" required autocomplete="off">
+          <label for="username">Username</label>
+          <div class="invalid-feedback">Username is required.</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <div class="password-field-wrap">
+          <div class="form-floating">
+            <input type="password" class="form-control" id="password" name="password" value="" placeholder="Password" required>
+            <label for="password">Password</label>
+          </div>
+          <i class="fa-regular fa-eye password-toggle" data-target="password"></i>
+          <div class="invalid-feedback">Password is required.</div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-navy w-100 py-2">
+        <i class="fa-solid fa-right-to-bracket me-1"></i> Login
+      </button>
+    </form>
+    <div class="auth-switch">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=8) }}"></script>
+</body>
+</html>

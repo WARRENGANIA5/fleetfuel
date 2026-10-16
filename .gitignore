@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+*.log
+.vscode/
+flask_session/
+backups/
+.vercel_build/
+static/images/avatars/*
+!static/images/avatars/.gitkeep
+model/*.tmp
+.claude/

@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.git/
+.vscode/
+*.log
+*.bat
+backups/
+notebooks/
+reports/
+static/images/avatars/*
+model/*.joblib
+model/*.tmp
+model/metrics.json

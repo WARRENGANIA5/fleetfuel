@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}{{ 'Fleet Overview Dashboard' if is_admin else 'My Dashboard' }}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  {% if is_admin %}
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon navy"><i class="fa-solid fa-truck"></i></div>
+      <div>
+        <div class="stat-value" id="statTotalVehicles">{{ stats.total_vehicles }}</div>
+        <div class="stat-label">Total Vehicles</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="fa-solid fa-road"></i></div>
+      <div>
+        <div class="stat-value" id="statTotalTrips">{{ stats.total_trips }}</div>
+        <div class="stat-label">Total Trip Records</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="stat-card stat-card-link" href="{{ url_for('prediction_history', status='pending') }}" title="Review the fuel requests waiting for approval">
+      <div class="stat-icon green"><i class="fa-solid fa-hourglass-half"></i></div>
+      <div>
+        <div class="stat-value" id="statPending">{{ stats.pending }}</div>
+        <div class="stat-label">Fuel Requests Waiting for Approval</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon amber"><i class="fa-solid fa-chart-simple"></i></div>
+      <div>
+        <div class="stat-value"><span id="statAvgFuel">{{ stats.avg_fuel }}</span> L</div>
+        <div class="stat-label">Avg. Fuel Consumption / Trip</div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-6 col-lg-3">
+    <a class="stat-card stat-card-link" href="{{ url_for('prediction_history') }}">
+      <div class="stat-icon blue"><i class="fa-solid fa-gas-pump"></i></div>
+      <div>
+        <div class="stat-value" id="statTotalPredictions">{{ stats.total_predictions }}</div>
+        <div class="stat-label">My Fuel Requests</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="stat-card stat-card-link" href="{{ url_for('prediction_history', status='pending') }}">
+      <div class="stat-icon amber"><i class="fa-solid fa-hourglass-half"></i></div>
+      <div>
+        <div class="stat-value" id="statPending">{{ stats.pending }}</div>
+        <div class="stat-label">Waiting for Approval</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="stat-card stat-card-link" href="{{ url_for('prediction_history', status='approved') }}">
+      <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+      <div>
+        <div class="stat-value" id="statApproved">{{ stats.approved }}</div>
+        <div class="stat-label">Approved</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="stat-card stat-card-link" href="{{ url_for('prediction_history', status='rejected') }}">
+      <div class="stat-icon navy"><i class="fa-solid fa-circle-xmark"></i></div>
+      <div>
+        <div class="stat-value" id="statRejected">{{ stats.rejected }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-area text-primary"></i> Monthly Fuel Consumption Trend</div>
+      <div id="fuelTrendWrap" {{ 'hidden' if not fuel_trend_labels }}><canvas id="fuelTrendChart" height="110"></canvas></div>
+      <p class="text-muted mb-0" id="fuelTrendEmpty" {{ 'hidden' if fuel_trend_labels }}>No fuel records yet. Add fuel records to see the consumption trend.</p>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card-surface h-100 d-flex flex-column">
+      <div class="section-title"><i class="fa-solid fa-bolt text-primary"></i> Quick Actions</div>
+      {% if is_admin %}
+      <a href="{{ url_for('prediction_history', status='pending') }}" class="btn btn-blue mb-2"><i class="fa-solid fa-clipboard-check me-1"></i> Review Fuel Requests
+        <span class="badge text-bg-light ms-1" id="qaPending">{{ stats.pending }}</span></a>
+      <a href="{{ url_for('prediction') }}" class="btn btn-outline-navy mb-2"><i class="fa-solid fa-gas-pump me-1"></i> New Fuel Prediction</a>
+      <a href="{{ url_for('vehicles') }}" class="btn btn-outline-navy mb-2"><i class="fa-solid fa-truck me-1"></i> Manage Vehicles</a>
+      <a href="{{ url_for('reports') }}" class="btn btn-outline-navy"><i class="fa-solid fa-file-lines me-1"></i> Generate Report</a>
+      <hr>
+      <div class="section-title d-flex align-items-center gap-2" style="font-size:14px;"><i class="fa-solid fa-brain text-primary"></i> Model Status
+        <a href="{{ url_for('model_performance') }}" class="ms-auto small fw-normal">Details</a></div>
+      <div id="modelSummaryBox" {{ 'hidden' if not model_summary }}>
+        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">R&sup2; Score</span><strong id="modelR2">{{ model_summary.r2_score if model_summary }}</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">MAE</span><strong><span id="modelMae">{{ model_summary.mae if model_summary }}</span> L</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
+        <div class="d-flex justify-content-between small"><span class="text-muted">Status</span><span class="badge-status {{ 'badge-active' if model_summary and model_summary.status == 'active' else 'badge-maintenance' }}" id="modelStatusBadge">{{ model_summary.status|capitalize if model_summary }}</span></div>
+      </div>
+      <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>The model is trained automatically; its scores appear here as soon as training finishes.</p>
+      {% else %}
+      <a href="{{ url_for('prediction') }}" class="btn btn-blue mb-2"><i class="fa-solid fa-gas-pump me-1"></i> Request Fuel (New Prediction)</a>
+      <a href="{{ url_for('prediction_history') }}" class="btn btn-outline-navy mb-2"><i class="fa-solid fa-clock-rotate-left me-1"></i> My Fuel Requests</a>
+      <a href="{{ url_for('trips') }}" class="btn btn-outline-navy"><i class="fa-solid fa-road me-1"></i> Add Trip Record</a>
+      <hr>
+      <p class="text-muted small mb-0">After your trip, encode the trip ticket in <strong>Trip Records</strong> &mdash; the actual
+        fuel of your request is then recorded automatically.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-bullseye text-primary"></i> {{ 'Actual vs Predicted Fuel Consumption' if is_admin else 'My Requests: Actual vs Predicted Fuel' }}</div>
+      <div id="avpWrap" {{ 'hidden' if not avp_predicted }}><canvas id="avpChart" height="140"></canvas></div>
+      <p class="text-muted small mb-0 mt-2" id="avpMissing" {{ 'hidden' if not avp_missing }}>
+        <span id="avpMissingCount">{{ avp_missing }}</span> of these predictions have no actual fuel yet &mdash; after the trip, record it with
+        the <i class="fa-solid fa-gas-pump"></i> button in <a href="{{ url_for('prediction_history') }}">Prediction History</a> to see the Actual line.</p>
+      <p class="text-muted mb-0" id="avpEmpty" {{ 'hidden' if avp_predicted }}>No predictions yet. Make one in <a href="{{ url_for('prediction') }}">Prediction</a>;
+        after the trip, record the actual fuel used in <a href="{{ url_for('prediction_history') }}">Prediction History</a>.</p>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-pie text-primary"></i> Fleet Usage Composition</div>
+      <div id="usageWrap" {{ 'hidden' if not vehicle_usage }}>
+      <div class="insight-chart-wrap mb-3">
+        <canvas id="usageChart" width="220" height="220"></canvas>
+        <div class="insight-chart-center">
+          <div class="insight-total" id="usageTotalValue">{{ vehicle_usage_values|sum }}</div>
+          <div class="insight-total-label">Total Trips</div>
+        </div>
+      </div>
+      <div id="usageLegendList">
+        {% for u in vehicle_usage %}
+        <div class="legend-row">
+          <span class="legend-dot" style="background: {{ usage_colors[loop.index0 % usage_colors|length] }}"></span>
+          <span class="legend-label">{{ u.plate_number }}</span>
+          <span class="legend-value">{{ u.trip_count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      </div>
+      <p class="text-muted mb-0" id="usageEmpty" {{ 'hidden' if vehicle_usage }}>No trip records yet.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card-surface">
+  <div class="page-toolbar">
+    <div class="section-title mb-0"><i class="fa-solid fa-clock-rotate-left text-primary"></i> {{ 'Recent Fuel Requests' if is_admin else 'My Recent Fuel Requests' }}</div>
+    <a href="{{ url_for('prediction_history') }}" class="btn btn-outline-navy btn-sm">View All</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table-fleet">
+      <thead>
+        <tr>
+          <th>Date</th><th>Vehicle</th><th>Distance</th><th>Fuel Type</th><th>Predicted Fuel</th><th>Request</th>{% if is_admin %}<th>Requested By</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="recentPredictionsBody">
+        {% for p in recent_predictions %}
+        <tr class="row-link" data-href="{{ p.url }}" title="Open this prediction">
+          <td><a href="{{ p.url }}">{{ p.created_at_display }}</a></td>
+          <td>{{ p.plate_number }} &middot; {{ p.vehicle_type }}</td>
+          <td>{{ p.distance_km }} km</td>
+          <td>{{ p.fuel_type }}</td>
+          <td><strong>{{ p.predicted_fuel }} L</strong></td>
+          <td><span class="badge-status {{ {'approved': 'badge-active', 'rejected': 'badge-inactive'}.get(p.status, 'badge-maintenance') }}">{{ {'approved': 'Approved', 'rejected': 'Rejected'}.get(p.status, 'Pending') }}</span></td>
+          {% if is_admin %}<td>{{ p.full_name }}</td>{% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 7 if is_admin else 6 }}" class="text-center text-muted py-4">{{ 'No fuel requests yet.' if is_admin else 'You have not requested fuel yet.' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Declared before the Chart.js CDN tag so live auto-refresh (stats, model
+// status, recent predictions) keeps working even if the chart library is
+// slow to load; charts are (re)created as soon as Chart is available.
+const usageColors = {{ usage_colors|tojson }};
+const IS_ADMIN = {{ is_admin|tojson }};
+const gridColor = "rgba(255,255,255,0.06)";
+let fuelTrendChartInstance = null;
+let avpChartInstance = null;
+let usageChartInstance = null;
+let lastDashboardData = {{ {
+  "fuel_trend_labels": fuel_trend_labels, "fuel_trend_values": fuel_trend_values,
+  "avp_labels": avp_labels, "avp_actual": avp_actual, "avp_predicted": avp_predicted, "avp_missing": avp_missing,
+  "vehicle_usage_labels": vehicle_usage_labels, "vehicle_usage_values": vehicle_usage_values
+}|tojson }};
+const lastSeen = {};
+
+function show(id, visible) { const el = document.getElementById(id); if (el) el.hidden = !visible; }
+// Only touch a widget when its data actually changed (no 5-second flicker).
+function changed(key, value) {
+  const json = JSON.stringify(value);
+  if (lastSeen[key] === json) return false;
+  lastSeen[key] = json;
+  return true;
+}
+
+function renderFuelTrend(d) {
+  const has = d.fuel_trend_labels.length > 0;
+  show('fuelTrendWrap', has); show('fuelTrendEmpty', !has);
+  if (!has || !window.Chart) return;
+  if (!fuelTrendChartInstance) {
+    fuelTrendChartInstance = new Chart(document.getElementById('fuelTrendChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Liters Consumed', data: [], borderColor: '#2697ff',
+        backgroundColor: 'rgba(38,151,255,0.12)', fill: true, tension: 0.35, pointRadius: 3 }] },
+      options: {
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: function (item) { return ' ' + item.parsed.y.toFixed(2) + ' L consumed'; } } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
+          x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
+        }
+      }
+    });
+  }
+  fuelTrendChartInstance.data.labels = d.fuel_trend_labels;
+  fuelTrendChartInstance.data.datasets[0].data = d.fuel_trend_values;
+  fuelTrendChartInstance.update();
+}
+
+function renderAvp(d) {
+  // Shown as soon as there is a prediction; the Actual line fills in (gaps
+  // until then) as actual fuel is recorded in Prediction History.
+  const has = d.avp_predicted.length > 0;
+  show('avpWrap', has); show('avpEmpty', !has);
+  show('avpMissing', has && d.avp_missing > 0);
+  document.getElementById('avpMissingCount').textContent = d.avp_missing;
+  if (!has || !window.Chart) return;
+  if (!avpChartInstance) {
+    avpChartInstance = new Chart(document.getElementById('avpChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Actual (L)', data: [], borderColor: '#2697ff', backgroundColor: 'rgba(38,151,255,0.12)', fill: true, tension: 0.35, pointRadius: 3 },
+        { label: 'Predicted (L)', data: [], borderColor: '#26e5c5', backgroundColor: 'rgba(38,229,197,0.12)', fill: true, tension: 0.35, pointRadius: 3 }
+      ] },
+      options: {
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: true } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
+          x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
+        }
+      }
+    });
+  }
+  avpChartInstance.data.labels = d.avp_labels;
+  avpChartInstance.data.datasets[0].data = d.avp_actual;
+  avpChartInstance.data.datasets[1].data = d.avp_predicted;
+  avpChartInstance.update();
+}
+
+function renderUsage(d) {
+  const has = d.vehicle_usage_labels.length > 0;
+  show('usageWrap', has); show('usageEmpty', !has);
+  const total = d.vehicle_usage_values.reduce(function (a, b) { return a + b; }, 0);
+  const totalEl = document.getElementById('usageTotalValue');
+  if (totalEl) totalEl.textContent = total;
+  const legendList = document.getElementById('usageLegendList');
+  if (legendList) {
+    legendList.innerHTML = d.vehicle_usage_labels.map(function (label, i) {
+      return '<div class="legend-row">' +
+        '<span class="legend-dot" style="background: ' + usageColors[i % usageColors.length] + '"></span>' +
+        '<span class="legend-label">' + escapeHtml(label) + '</span>' +
+        '<span class="legend-value">' + d.vehicle_usage_values[i] + '</span>' +
+        '</div>';
+    }).join('');
+  }
+  if (!has || !window.Chart) return;
+  if (!usageChartInstance) {
+    usageChartInstance = new Chart(document.getElementById('usageChart'), {
+      type: 'doughnut',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: usageColors, borderColor: '#2a2d3e', borderWidth: 3 }] },
+      options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+    });
+  }
+  usageChartInstance.data.labels = d.vehicle_usage_labels;
+  usageChartInstance.data.datasets[0].data = d.vehicle_usage_values;
+  usageChartInstance.update();
+}
+
+function renderCharts(d, force) {
+  if (force || changed('trend', [d.fuel_trend_labels, d.fuel_trend_values])) renderFuelTrend(d);
+  if (force || changed('avp', [d.avp_labels, d.avp_actual, d.avp_predicted, d.avp_missing])) renderAvp(d);
+  if (force || changed('usage', [d.vehicle_usage_labels, d.vehicle_usage_values])) renderUsage(d);
+}
+
+// ---- Live auto-refresh: re-fetch dashboard data every 5s and update in place ----
+function refreshDashboard() {
+  return fetch('/api/dashboard-data')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      const setText = function (id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      };
+      setText('statTotalVehicles', data.stats.total_vehicles);
+      setText('statTotalTrips', data.stats.total_trips);
+      setText('statTotalPredictions', data.stats.total_predictions);
+      setText('statAvgFuel', data.stats.avg_fuel);
+      setText('statPending', data.stats.pending);
+      setText('statApproved', data.stats.approved);
+      setText('statRejected', data.stats.rejected);
+      setText('qaPending', data.stats.pending);
+
+      const summaryBox = document.getElementById('modelSummaryBox');   // administrator only
+      if (summaryBox) { summaryBox.hidden = !data.model_summary; document.getElementById('modelNone').hidden = !!data.model_summary; }
+      if (summaryBox && data.model_summary) {
+        setText('modelR2', data.model_summary.r2_score);
+        setText('modelMae', data.model_summary.mae);
+        setText('modelRmse', data.model_summary.rmse);
+        const badge = document.getElementById('modelStatusBadge');
+        if (badge && data.model_summary.status) {
+          badge.textContent = data.model_summary.status.charAt(0).toUpperCase() + data.model_summary.status.slice(1);
+          badge.className = 'badge-status ' + (data.model_summary.status === 'active' ? 'badge-active' : 'badge-maintenance');
+        }
+      }
+
+      lastDashboardData = data;
+      renderCharts(data, false);
+
+      const body = document.getElementById('recentPredictionsBody');
+      if (body && changed('recent', data.recent_predictions)) {
+        if (data.recent_predictions.length === 0) {
+          body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 7 : 6) + '" class="text-center text-muted py-4">' +
+            (IS_ADMIN ? 'No fuel requests yet.' : 'You have not requested fuel yet.') + '</td></tr>';
+        } else {
+          const ST = { approved: ['badge-active', 'Approved'], rejected: ['badge-inactive', 'Rejected'] };
+          body.innerHTML = data.recent_predictions.map(function (p) {
+            const st = ST[p.status] || ['badge-maintenance', 'Pending'];
+            return '<tr class="row-link" data-href="' + escapeHtml(p.url) + '" title="Open this prediction">' +
+              '<td><a href="' + escapeHtml(p.url) + '">' + escapeHtml(p.created_at_display) + '</a></td>' +
+              '<td>' + escapeHtml(p.plate_number) + ' &middot; ' + escapeHtml(p.vehicle_type) + '</td>' +
+              '<td>' + p.distance_km + ' km</td>' +
+              '<td>' + escapeHtml(p.fuel_type) + '</td>' +
+              '<td><strong>' + p.predicted_fuel + ' L</strong></td>' +
+              '<td><span class="badge-status ' + st[0] + '">' + st[1] + '</span></td>' +
+              (IS_ADMIN ? '<td>' + escapeHtml(p.full_name) + '</td>' : '') +
+              '</tr>';
+          }).join('');
+        }
+      }
+    })
+    .catch(function () { /* silent retry on next interval */ });
+}
+setInterval(refreshDashboard, 5000);
+// Clicking anywhere on a recent prediction opens it.
+document.getElementById('recentPredictionsBody').addEventListener('click', function (e) {
+  const tr = e.target.closest('tr[data-href]');
+  if (tr && !e.target.closest('a')) window.location.href = tr.dataset.href;
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.font.family = "Poppins, sans-serif";
+Chart.defaults.color = "#9698a9";
+renderCharts(lastDashboardData, true);
+// Seed the change-tracker with what is on screen so the first poll doesn't redraw.
+changed('trend', [lastDashboardData.fuel_trend_labels, lastDashboardData.fuel_trend_values]);
+changed('avp', [lastDashboardData.avp_labels, lastDashboardData.avp_actual, lastDashboardData.avp_predicted, lastDashboardData.avp_missing]);
+changed('usage', [lastDashboardData.vehicle_usage_labels, lastDashboardData.vehicle_usage_values]);
+</script>
+{% endblock %}

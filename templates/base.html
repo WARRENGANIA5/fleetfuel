@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}Dashboard{% endblock %} | {{ org.org_short }} Fleet Fuel Prediction System</title>
+<link rel="icon" href="{{ url_for('static', filename='images/favicon.svg', v=2) }}" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=9) }}" rel="stylesheet">
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><img src="{{ url_for('static', filename='images/logo.svg', v=2) }}" alt="{{ org.system_short }} logo"></div>
+      <div class="brand-text">
+        <span class="brand-title">{{ org.system_short }}</span>
+        <span class="brand-sub">Fuel Prediction System</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('dashboard') }}" class="nav-link {{ 'active' if active=='dashboard' }}">
+        <i class="fa-solid fa-chart-line"></i><span>Dashboard</span>
+      </a>
+      <a href="{{ url_for('prediction') }}" class="nav-link {{ 'active' if active=='prediction' }}">
+        <i class="fa-solid fa-gas-pump"></i><span>Prediction</span>
+      </a>
+      <a href="{{ url_for('vehicles') }}" class="nav-link {{ 'active' if active=='vehicles' }}">
+        <i class="fa-solid fa-truck"></i><span>Vehicles</span>
+      </a>
+      <a href="{{ url_for('trips') }}" class="nav-link {{ 'active' if active=='trips' }}">
+        <i class="fa-solid fa-road"></i><span>Trip Records</span>
+      </a>
+      <a href="{{ url_for('fuel_records') }}" class="nav-link {{ 'active' if active=='fuel_records' }}">
+        <i class="fa-solid fa-droplet"></i><span>Fuel Records</span>
+      </a>
+      {% if is_admin %}
+      <a href="{{ url_for('model_performance') }}" class="nav-link {{ 'active' if active=='model_performance' }}">
+        <i class="fa-solid fa-brain"></i><span>Model Performance</span>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('prediction_history') }}" class="nav-link {{ 'active' if active=='prediction_history' }}">
+        <i class="fa-solid fa-clock-rotate-left"></i><span>{{ 'Prediction History' if is_admin else 'My Fuel Requests' }}</span>
+        {% if is_admin %}<span class="nav-badge" id="pendingReqBadge" title="Fuel requests waiting for approval" {{ 'hidden' if not pending_requests }}>{{ pending_requests }}</span>{% endif %}
+      </a>
+      {% if is_admin %}
+      <a href="{{ url_for('reports') }}" class="nav-link {{ 'active' if active=='reports' }}">
+        <i class="fa-solid fa-file-lines"></i><span>Reports</span>
+      </a>
+      {% endif %}
+      {% if session.get('role') == 'admin' %}
+      <a href="{{ url_for('users') }}" class="nav-link {{ 'active' if active=='users' }}">
+        <i class="fa-solid fa-users-gear"></i><span>User Accounts</span>
+        <span class="nav-badge" id="pendingBadge" title="Sign-ups waiting for approval" {{ 'hidden' if not pending_accounts }}>{{ pending_accounts }}</span>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('settings') }}" class="nav-link {{ 'active' if active=='settings' }}">
+        <i class="fa-solid fa-gear"></i><span>Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <form method="POST" action="{{ url_for('logout') }}" class="m-0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="nav-link logout-link w-100 border-0 bg-transparent text-start">
+          <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="topbar-title">
+        <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+      </div>
+      <div class="topbar-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="quickJump" placeholder="Quick search: vehicles, trips, reports..." autocomplete="off">
+      </div>
+      <div class="topbar-actions">
+        <div class="live-clock" id="liveClock" title="Philippine time (updates every second)">
+          <span class="live-clock-time" id="liveClockTime"></span>
+          <span class="live-clock-date" id="liveClockDate"></span>
+        </div>
+        <div class="dropdown notif-dropdown">
+          <button class="icon-btn" id="notifBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Notifications">
+            <i class="fa-regular fa-bell"></i>
+            {% if notif_count and notif_count > 0 %}<span class="notif-dot" id="notifDot">{{ notif_count }}</span>{% endif %}
+          </button>
+          <div class="dropdown-menu dropdown-menu-end notif-panel" aria-labelledby="notifBtn">
+            <div class="notif-panel-header d-flex justify-content-between align-items-center">
+              <span>Notifications</span>
+              <button type="button" class="notif-clear" id="notifClearAll" hidden title="Remove all notifications">Clear all</button>
+            </div>
+            <div id="notifList" class="notif-list">
+              <div class="notif-empty text-muted small">Loading...</div>
+            </div>
+            <div class="notif-panel-footer d-flex justify-content-between">
+              <a href="{{ url_for('prediction_history', status='pending' if is_admin else '', mine='' if is_admin else '1') }}">{{ 'Pending fuel requests' if is_admin else 'My fuel requests' }}</a>
+              <a href="{{ url_for('vehicles', status='Maintenance') }}">Maintenance</a>
+            </div>
+          </div>
+        </div>
+        <a href="{{ url_for('settings') }}" class="user-chip" title="Account Settings">
+          {% if session.get('profile_photo') %}
+            <img class="user-avatar user-avatar-img" id="topbarAvatarImg" src="{{ session_avatar_url }}" alt="Profile photo">
+          {% else %}
+            <div class="user-avatar" id="topbarAvatarInitial">{{ (session.get('full_name') or 'U')[0]|upper }}</div>
+          {% endif %}
+          <div class="user-meta">
+            <span class="user-name">{{ session.get('full_name', 'User') }}</span>
+            <span class="user-role">{{ session.get('role', 'staff')|capitalize }}</span>
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <main class="content-area">
+      <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
+      {# Shown only on paper: what was printed, when and by whom. #}
+      <div class="print-header">
+        <div class="print-org">{{ org.org_name }} &middot; {{ org.office_name }} &middot; Fleet Fuel Prediction System</div>
+        <div class="print-title">{{ self.page_title() }}</div>
+        <div class="print-meta">Printed <span id="printTime"></span> by {{ session.get('full_name', '') }}</div>
+      </div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div id="flashData" class="d-none"
+               data-messages='{{ messages|tojson }}'></div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=8) }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

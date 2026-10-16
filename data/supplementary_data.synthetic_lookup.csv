@@ -1,0 +1,8 @@
+vehicle_type,rated_fuel_type,rated_efficiency_l_per_100km
+Sedan,Gasoline,6.3
+SUV,Diesel,8.7
+Van,Diesel,9.5
+Pickup Truck,Diesel,8.6
+Service Bus,Diesel,16.5
+Dump Truck,Diesel,15.2
+Motorcycle,Gasoline,2.1

@@ -1,0 +1,11 @@
+{% extends "base.html" if session.get("user_id") else "error_bare.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card-surface text-center py-5">
+  <div class="display-5 fw-bold mb-2" style="color: var(--blue-500);">{{ code }}</div>
+  <h2 class="h5 mb-2">{{ title }}</h2>
+  <p class="text-muted mb-4">{{ message }}</p>
+  <a href="{{ url_for('index') }}" class="btn btn-blue"><i class="fa-solid fa-house me-1"></i> Back to Dashboard</a>
+</div>
+{% endblock %}

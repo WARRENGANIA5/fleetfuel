@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Prediction History' if is_admin else 'My Fuel Requests' }}{% endblock %}
+{% block page_title %}{{ 'Prediction History &amp; Fuel Requests'|safe if is_admin else 'My Fuel Requests' }}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value" id="histTotal">{{ summary.total }}</div><div class="metric-label">Fuel Requests</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value" id="histPending">{{ summary.pending }}</div><div class="metric-label">Pending Approval</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value" id="histWithActual">{{ summary.with_actual }}</div><div class="metric-label">With Actual Fuel</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value" id="histOutside">{{ summary.outside }}</div><div class="metric-label">Outside Predicted Range</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value"><span id="histMae">{{ summary.mae }}</span> L</div><div class="metric-label">Average Error</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="metric-tile card-surface"><div class="metric-value" id="histWithin2">{{ summary.within2 }}</div><div class="metric-label">Within ±2 L</div></div>
+  </div>
+</div>
+
+<div class="card-surface">
+  <div class="page-toolbar">
+    <form method="GET" class="d-flex gap-2 flex-wrap align-items-center" id="histFilter">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Search vehicle, route, type...">
+      </div>
+      <select name="status" class="form-select" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        <option value="pending" {{ 'selected' if status=='pending' }}>Pending approval</option>
+        <option value="approved" {{ 'selected' if status=='approved' }}>Approved</option>
+        <option value="rejected" {{ 'selected' if status=='rejected' }}>Rejected</option>
+      </select>
+      {% if is_admin %}
+      <select name="mine" class="form-select" onchange="this.form.submit()">
+        <option value="">Requested by everyone</option>
+        <option value="1" {{ 'selected' if mine }}>My requests</option>
+      </select>
+      {% endif %}
+      <select name="fuel_type" class="form-select" onchange="this.form.submit()">
+        <option value="">All Fuel Types</option>
+        <option value="Diesel" {{ 'selected' if fuel_type=='Diesel' }}>Diesel</option>
+        <option value="Gasoline" {{ 'selected' if fuel_type=='Gasoline' }}>Gasoline</option>
+      </select>
+      <button class="btn btn-outline-navy" type="submit"><i class="fa-solid fa-filter"></i> Filter</button>
+      <span class="live-badge no-print" id="histLive"><span class="live-dot"></span><span id="histLiveText">Live</span></span>
+    </form>
+    <button type="button" data-print class="btn btn-outline-navy no-print"><i class="fa-solid fa-print me-1"></i> Print</button>
+  </div>
+  <p class="diag-note no-print">
+    Every prediction is a <strong>fuel request</strong>: staff enter the trip, the model gives the predicted fuel, and
+    {{ 'you approve or reject it using that figure as the reference.' if is_admin else 'an administrator approves or rejects it using that figure as the reference.' }}
+    After the trip, record the actual fuel used; it is flagged <span class="text-danger fw-semibold">outside the predicted range</span>
+    when it differs from the prediction by more than the model's typical error (RMSE ±<span id="histTol">{{ summary.tolerance }}</span> L).
+  </p>
+
+  <div class="table-wrap">
+    <table class="table-fleet">
+      <thead>
+        <tr>
+          <th>No.</th><th>Date</th><th>Vehicle</th><th>Distance</th><th>Predicted Fuel</th>
+          <th>Status</th><th>Actual Fuel</th><th>Difference</th><th>Requested By</th><th class="no-print">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </div>
+
+  <nav class="mt-3" id="histPager"></nav>
+
+  {# Shared modals, filled from the clicked row's data-record (see script.js). #}
+  <div class="modal fade" id="viewPredModal" tabindex="-1" data-record-modal>
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Fuel Request #<span data-field="id"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-6"><div class="summary-item"><div class="label">Vehicle</div><div class="value" data-field="vehicle_label"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Fuel Type</div><div class="value" data-field="fuel_type"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Route</div><div class="value" data-field="route"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Distance</div><div class="value" data-field="distance_km" data-suffix=" km"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Predicted Fuel</div><div class="value" data-field="predicted_fuel" data-suffix=" L"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Predicted Range</div><div class="value" data-field="range" data-suffix=" L"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Actual Fuel</div><div class="value" data-field="actual_fuel" data-suffix=" L" data-empty="Not recorded"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Status</div><div class="value" data-field="status_label"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Fuel Released</div><div class="value" data-field="approved_fuel" data-suffix=" L" data-empty="—"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Requested By</div><div class="value" data-field="user"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Requested On</div><div class="value" data-field="created_at_long"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Reviewed By</div><div class="value" data-field="reviewer" data-empty="Not reviewed yet"></div></div></div>
+            <div class="col-6"><div class="summary-item"><div class="label">Reviewed On</div><div class="value" data-field="reviewed_at" data-empty="—"></div></div></div>
+            <div class="col-12"><div class="summary-item"><div class="label">Review Note</div><div class="value" data-field="review_note" data-empty="—"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="actualFuelModal" tabindex="-1" data-record-modal>
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="POST" action="" data-action-template="{{ url_for('record_actual_fuel', prediction_id=0) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="modal-header"><h5 class="modal-title">Record Actual Fuel · Request #<span data-field="id"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <div class="row g-2 mb-3">
+              <div class="col-6"><div class="summary-item"><div class="label">Vehicle</div><div class="value" data-field="vehicle"></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Predicted Range</div><div class="value" data-field="range" data-suffix=" L"></div></div></div>
+            </div>
+            <label class="form-label">Actual Fuel Used (L)</label>
+            <input type="number" step="0.01" min="0.01" max="1000" class="form-control" name="actual_fuel" placeholder="e.g. 12.50">
+            <div class="form-text">Leave empty to clear a previously recorded value.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-blue">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% if is_admin %}
+  <div class="modal fade" id="reviewModal" tabindex="-1" data-record-modal>
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="POST" action="" data-action-template="{{ url_for('review_fuel_request', prediction_id=0) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="modal-header"><h5 class="modal-title">Review Fuel Request #<span data-field="id"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <div class="row g-2 mb-3">
+              <div class="col-6"><div class="summary-item"><div class="label">Vehicle</div><div class="value" data-field="vehicle_label"></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Route / Distance</div><div class="value"><span data-field="route"></span> · <span data-field="distance_km" data-suffix=" km"></span></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Predicted Fuel</div><div class="value" data-field="predicted_fuel" data-suffix=" L"></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Predicted Range</div><div class="value" data-field="range" data-suffix=" L"></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Requested By</div><div class="value" data-field="user"></div></div></div>
+              <div class="col-6"><div class="summary-item"><div class="label">Current Status</div><div class="value" data-field="status_label"></div></div></div>
+            </div>
+            <label class="form-label">Fuel to release if approved (L)</label>
+            <input type="number" step="0.01" min="0.01" max="1000" class="form-control mb-1" name="approved_fuel" id="approvedFuelInput">
+            <div class="form-text mb-3">Starts at the predicted figure; adjust if needed. The predicted range is the reference.</div>
+            <label class="form-label">Note (optional)</label>
+            <input class="form-control" name="review_note" maxlength="255" placeholder="e.g. Approved for the RASUC/RCAF trip">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" name="decision" value="rejected" class="btn btn-outline-navy text-danger"><i class="fa-solid fa-xmark me-1"></i> Reject</button>
+            <button type="submit" name="decision" value="approved" class="btn btn-blue"><i class="fa-solid fa-check me-1"></i> Approve</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const IS_ADMIN = {{ is_admin|tojson }};
+const DELETE_PRED_URL = {{ url_for('delete_prediction', prediction_id=0)|tojson }};
+const HIST_CSRF = {{ csrf_token()|tojson }};
+const STATUS_LABELS = { pending: 'Pending approval', approved: 'Approved', rejected: 'Rejected' };
+const STATUS_CLASS = { pending: 'badge-maintenance', approved: 'badge-active', rejected: 'badge-inactive' };
+let histPage = {{ page }};
+let histTotalPages = {{ total_pages }};
+const histParams = new URLSearchParams(window.location.search);
+
+function pageUrl(n) { const p = new URLSearchParams(histParams); p.set('page', n); return '?' + p.toString(); }
+function renderPager() {
+  const nav = document.getElementById('histPager');
+  if (histTotalPages <= 1) { nav.innerHTML = ''; return; }
+  let html = '<ul class="pagination justify-content-center">';
+  for (let n = 1; n <= histTotalPages; n++) {
+    html += '<li class="page-item ' + (n === histPage ? 'active' : '') + '"><a class="page-link" href="' + pageUrl(n) + '">' + n + '</a></li>';
+  }
+  nav.innerHTML = html + '</ul>';
+}
+
+function histRow(p) {
+  p.status_label = STATUS_LABELS[p.status] || p.status;
+  const tr = document.createElement('tr');
+  tr.dataset.record = JSON.stringify(p);
+  let diff = '—';
+  if (p.difference) {
+    diff = '<span class="' + (p.outside_range ? 'text-danger' : 'text-success') + '">' + escapeHtml(p.difference) + ' L</span>' +
+      (p.outside_range ? '<div class="small text-danger">Outside predicted range</div>' : '');
+  }
+  const actions = ['<button class="action-btn" data-bs-toggle="modal" data-bs-target="#viewPredModal" title="View"><i class="fa-solid fa-eye"></i></button>'];
+  if (IS_ADMIN) actions.push('<button class="action-btn" data-bs-toggle="modal" data-bs-target="#reviewModal" title="Review (approve / reject)"><i class="fa-solid fa-gavel"></i></button>');
+  if (p.status !== 'rejected') actions.push('<button class="action-btn" data-bs-toggle="modal" data-bs-target="#actualFuelModal" title="Record Actual Fuel"><i class="fa-solid fa-gas-pump"></i></button>');
+  if (IS_ADMIN) actions.push('<form method="POST" action="' + DELETE_PRED_URL.replace('/0/', '/' + p.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this fuel request?\')">' +
+    '<input type="hidden" name="csrf_token" value="' + escapeHtml(HIST_CSRF) + '"><button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button></form>');
+  tr.innerHTML =
+    '<td>#' + p.num + '</td><td>' + escapeHtml(p.created_at) + '</td><td>' + escapeHtml(p.vehicle) + '</td>' +
+    '<td>' + escapeHtml(p.distance_km) + ' km</td><td><strong>' + escapeHtml(p.predicted_fuel) + ' L</strong></td>' +
+    '<td><span class="badge-status ' + (STATUS_CLASS[p.status] || '') + '">' + escapeHtml(p.status_label) + '</span>' +
+      (p.approved_fuel ? '<div class="small text-muted mt-1">' + escapeHtml(p.approved_fuel) + ' L released</div>' : '') + '</td>' +
+    '<td>' + (p.actual_fuel ? escapeHtml(p.actual_fuel) + ' L' +
+      (p.actual_from_trip ? '<div class="small text-muted" title="Recorded automatically from the matching trip record">from trip record</div>' : '') : '—') + '</td>' +
+    '<td>' + diff + '</td><td>' + escapeHtml(p.user) + '</td>' +
+    '<td class="no-print">' + actions.join(' ') + '</td>';
+  return tr;
+}
+function renderRows(list) {
+  const body = document.getElementById('histBody');
+  body.innerHTML = '';
+  if (!list.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No fuel requests found.</td></tr>'; return; }
+  list.forEach(function (p) { body.appendChild(histRow(p)); });
+}
+function renderSummary(s) {
+  const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('histTotal', s.total); set('histPending', s.pending); set('histWithActual', s.with_actual);
+  set('histOutside', s.outside); set('histMae', s.mae); set('histWithin2', s.within2); set('histTol', s.tolerance);
+}
+
+// Review: the fuel to release starts at the predicted figure (or the value already approved).
+const reviewModalEl = document.getElementById('reviewModal');
+if (reviewModalEl) reviewModalEl.addEventListener('shown.bs.modal', function (e) {
+  const input = document.getElementById('approvedFuelInput');
+  if (input && !input.value) {
+    const row = e.relatedTarget && e.relatedTarget.closest('[data-record]');
+    if (row) input.value = JSON.parse(row.dataset.record).predicted_fuel;
+  }
+});
+const initialData = {{ predictions|tojson }};
+renderRows(initialData);
+renderPager();
+
+// ---- Real-time: refresh the current page (same search, filters and page) every 5s ----
+let lastHistJson = JSON.stringify(initialData);
+function refreshHistory() {
+  const params = new URLSearchParams(histParams); params.set('page', histPage);
+  return fetch('/api/prediction-history?' + params.toString())
+    .then(function (res) { return res.json(); })
+    .then(function (d) {
+      document.getElementById('histLive').className = 'live-badge no-print';
+      document.getElementById('histLiveText').textContent = 'Live';
+      renderSummary(d.summary);
+      if (d.page !== histPage || d.total_pages !== histTotalPages) { histPage = d.page; histTotalPages = d.total_pages; renderPager(); }
+      if (document.querySelector('.modal.show')) return;  // don't swap rows under an open modal
+      const json = JSON.stringify(d.predictions);
+      if (json === lastHistJson) return;
+      lastHistJson = json;
+      renderRows(d.predictions);
+    })
+    .catch(function () {
+      document.getElementById('histLive').className = 'live-badge is-offline no-print';
+      document.getElementById('histLiveText').textContent = 'Reconnecting…';
+    });
+}
+setInterval(refreshHistory, 5000);
+// Print: pull the latest rows first so the paper copy is current.
+window.refreshBeforePrint = function () { lastHistJson = null; return refreshHistory(); };
+</script>
+{% endblock %}

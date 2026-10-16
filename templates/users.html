@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}User Accounts{% endblock %}
+{% block page_title %}User Accounts{% endblock %}
+
+{% macro status_badge(u) -%}
+  <span class="badge-status {{ {'active': 'badge-active', 'pending': 'badge-maintenance'}.get(u.status, 'badge-inactive') }}">{{ 'Pending approval' if u.status == 'pending' else u.status|capitalize }}</span>
+{%- endmacro %}
+
+{% block content %}
+<div class="card-surface">
+  <div class="page-toolbar">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" class="form-control" id="userSearch" data-search-input="usersTable" placeholder="Search name, username, role...">
+      </div>
+      <span class="live-badge" id="userLive"><span class="live-dot"></span><span id="userLiveText">Live</span></span>
+    </div>
+    <button class="btn btn-blue" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      <i class="fa-solid fa-user-plus me-1"></i> Create Account
+    </button>
+  </div>
+  <p class="diag-note">Staff can also register themselves on the <strong>Sign up</strong> page; those requests appear here as <strong>Pending approval</strong> until you approve (<i class="fa-solid fa-check"></i>) or reject (<i class="fa-solid fa-xmark"></i>) them.
+  Accounts for General Services Office and motorpool staff. <strong>Admins</strong> can also manage accounts; <strong>staff</strong> use the rest of the system. Deactivate an account instead of deleting it, so its prediction history is kept.</p>
+
+  <div class="table-wrap">
+    <table class="table-fleet" id="usersTable">
+      <thead><tr><th>No.</th><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+      <tbody id="usersBody">
+        {% for u in users %}
+        <tr data-record='{{ u|tojson }}'>
+          <td>#{{ u.num }}</td>
+          <td><strong>{{ u.full_name }}</strong>{% if u.is_self %} <span class="text-muted small">(you)</span>{% endif %}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ u.email or '—' }}</td>
+          <td>{{ u.role|capitalize }}</td>
+          <td>{{ status_badge(u) }}</td>
+          <td>{{ u.created_at }}</td>
+          <td>
+            {% if u.status == 'pending' %}
+            <form method="POST" action="{{ url_for('approve_user', user_id=u.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button>
+            </form>
+            <form method="POST" action="{{ url_for('reject_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirmDelete('Reject and remove this sign-up request?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+            </form>
+            {% else %}
+            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
+            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#resetPwModal" title="Reset Password"><i class="fa-solid fa-key"></i></button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('add_user') }}" class="needs-validation" novalidate autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header"><h5 class="modal-title">Create Account</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Full Name</label><input class="form-control" name="full_name" minlength="2" maxlength="100" required></div>
+          <div class="mb-2"><label class="form-label">Username</label><input class="form-control" name="username" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
+            <div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore.</div></div>
+          <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
+          <div class="row g-2 mb-2">
+            <div class="col-6"><label class="form-label">Role</label>
+              <select class="form-select" name="role" required>{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == 'staff' }}>{{ r|capitalize }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Status</label>
+              <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
+          </div>
+          <div class="mb-2"><label class="form-label">Password</label><input type="password" class="form-control" name="password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" autocomplete="new-password" required>
+            <div class="form-text">8–128 characters with at least one letter and one number.</div></div>
+          <div class="mb-2"><label class="form-label">Confirm Password</label><input type="password" class="form-control" name="confirm_password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-blue">Create Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editUserModal" tabindex="-1" data-record-modal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="" data-action-template="{{ url_for('edit_user', user_id=0) }}" class="needs-validation" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header"><h5 class="modal-title">Edit Account &mdash; <span data-field="username"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">Full Name</label><input class="form-control" name="full_name" minlength="2" maxlength="100" required></div>
+          <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
+          <div class="row g-2">
+            <div class="col-6"><label class="form-label">Role</label>
+              <select class="form-select" name="role" required>{% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Status</label>
+              <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
+          </div>
+          <div class="form-text mt-2">Inactive accounts are signed out immediately and cannot log in.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-blue">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="resetPwModal" tabindex="-1" data-record-modal>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="" data-action-template="{{ url_for('reset_user_password', user_id=0) }}" class="needs-validation" novalidate autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header"><h5 class="modal-title">Reset Password &mdash; <span data-field="username"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2"><label class="form-label">New Password</label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="password" id="resetPw" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" autocomplete="new-password" required>
+              <button type="button" class="btn btn-outline-navy" id="resetPwShow" title="Show / hide"><i class="fa-solid fa-eye"></i></button>
+              <button type="button" class="btn btn-outline-navy" id="resetPwGen" title="Generate a strong password"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate</button>
+              <button type="button" class="btn btn-outline-navy" id="resetPwCopy" title="Copy"><i class="fa-solid fa-copy"></i></button>
+            </div>
+            <div class="form-text">8–128 characters with at least one letter and one number.</div></div>
+          <div class="mb-2"><label class="form-label">Confirm New Password</label><input type="password" class="form-control" name="confirm_password" id="resetPwConfirm" minlength="8" maxlength="128" autocomplete="new-password" required>
+            <div class="invalid-feedback">Passwords do not match.</div></div>
+          <div class="form-text">The user is signed out of any open sessions right away and must log in with the new password.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-blue">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const APPROVE_URL = {{ url_for('approve_user', user_id=0)|tojson }};
+const REJECT_URL = {{ url_for('reject_user', user_id=0)|tojson }};
+const USERS_CSRF = {{ csrf_token()|tojson }};
+
+// The reset-password form must start empty (the shared modal would otherwise try to fill it).
+const resetPw = document.getElementById('resetPw'), resetPwConfirm = document.getElementById('resetPwConfirm');
+function checkResetMatch() {
+  resetPwConfirm.setCustomValidity(resetPwConfirm.value && resetPwConfirm.value !== resetPw.value ? 'Passwords do not match.' : '');
+}
+resetPw.addEventListener('input', checkResetMatch);
+resetPwConfirm.addEventListener('input', checkResetMatch);
+document.getElementById('resetPwModal').addEventListener('shown.bs.modal', function () {
+  [resetPw, resetPwConfirm].forEach(function (i) { i.value = ''; i.type = 'password'; i.setCustomValidity(''); });
+  resetPw.focus();
+});
+document.getElementById('resetPwModal').querySelector('form').addEventListener('submit', checkResetMatch, true);
+document.getElementById('resetPwShow').addEventListener('click', function () {
+  const show = resetPw.type === 'password';
+  [resetPw, resetPwConfirm].forEach(function (i) { i.type = show ? 'text' : 'password'; });
+});
+// Generate: 12 random characters without look-alikes (0/O, 1/l/I), always with letters and digits.
+document.getElementById('resetPwGen').addEventListener('click', function () {
+  const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ', digits = '23456789', all = letters + digits;
+  const rnd = function (set) { const a = new Uint32Array(1); crypto.getRandomValues(a); return set[a[0] % set.length]; };
+  let pw;
+  do { pw = Array.from({ length: 12 }, function () { return rnd(all); }).join(''); } while (!/[A-Za-z]/.test(pw) || !/\d/.test(pw));
+  resetPw.value = resetPwConfirm.value = pw;
+  [resetPw, resetPwConfirm].forEach(function (i) { i.type = 'text'; });
+  checkResetMatch();
+});
+document.getElementById('resetPwCopy').addEventListener('click', function () {
+  const btn = this;
+  if (!resetPw.value) return;
+  const done = function () { btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(function () { btn.innerHTML = '<i class="fa-solid fa-copy"></i>'; }, 1500); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(resetPw.value).then(done, function () {});
+  else { resetPw.type = 'text'; resetPw.select(); document.execCommand('copy'); done(); }  // LAN (http) fallback
+});
+
+// ---- Real-time: refresh the account list every 5s ----
+function userRow(u) {
+  const tr = document.createElement('tr');
+  tr.dataset.record = JSON.stringify(u);
+  tr.innerHTML = '<td>#' + u.num + '</td><td><strong>' + escapeHtml(u.full_name) + '</strong>' + (u.is_self ? ' <span class="text-muted small">(you)</span>' : '') + '</td>' +
+    '<td>' + escapeHtml(u.username) + '</td><td>' + escapeHtml(u.email || '—') + '</td>' +
+    '<td>' + escapeHtml(u.role.charAt(0).toUpperCase() + u.role.slice(1)) + '</td>' +
+    '<td><span class="badge-status ' + ({ active: 'badge-active', pending: 'badge-maintenance' }[u.status] || 'badge-inactive') + '">' +
+      escapeHtml(u.status === 'pending' ? 'Pending approval' : u.status.charAt(0).toUpperCase() + u.status.slice(1)) + '</span></td>' +
+    '<td>' + escapeHtml(u.created_at) + '</td>' +
+    '<td>' + (u.status === 'pending'
+      ? '<form method="POST" action="' + APPROVE_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button></form> ' +
+        '<form method="POST" action="' + REJECT_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Reject and remove this sign-up request?\')"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button></form>'
+      : '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
+        '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#resetPwModal" title="Reset Password"><i class="fa-solid fa-key"></i></button>') + '</td>';
+  return tr;
+}
+let lastUsersJson = JSON.stringify([...document.querySelectorAll('#usersBody tr[data-record]')].map(function (tr) { return JSON.parse(tr.dataset.record); }));
+setInterval(function () {
+  if (document.querySelector('.modal.show')) return;
+  fetch('/api/users').then(function (r) {
+    if (r.status === 403) { window.location.href = '/dashboard'; return null; }
+    return r.json();
+  }).then(function (d) {
+    if (!d) return;
+    document.getElementById('userLive').className = 'live-badge';
+    document.getElementById('userLiveText').textContent = 'Live';
+    const badge = document.getElementById('pendingBadge');
+    if (badge) { badge.textContent = d.pending; badge.hidden = !d.pending; }
+    const json = JSON.stringify(d.users);
+    if (json === lastUsersJson) return;
+    lastUsersJson = json;
+    const body = document.getElementById('usersBody');
+    body.innerHTML = '';
+    d.users.forEach(function (u) { body.appendChild(userRow(u)); });
+    document.getElementById('userSearch').dispatchEvent(new Event('keyup'));
+  }).catch(function () {
+    document.getElementById('userLive').className = 'live-badge is-offline';
+    document.getElementById('userLiveText').textContent = 'Reconnecting…';
+  });
+}, 5000);
+</script>
+{% endblock %}

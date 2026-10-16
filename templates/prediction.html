@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Fuel Consumption Prediction{% endblock %}
+{% block page_title %}Fuel Consumption Prediction{% endblock %}
+
+{% macro opt(field, value, label=None) -%}
+  <option value="{{ value }}" {{ 'selected' if form.get(field) == value|string }}>{{ label or value }}</option>
+{%- endmacro %}
+
+{# Fields the current model does not use (dropped in merging or removed by
+   variable selection) are still recorded with the request. #}
+{% macro recorded_only(field) -%}
+  {% if model_fields is not none and field not in model_fields %}<span class="badge-recorded" title="Saved with the request for the records, but the current model does not use it (not in the supplementary dataset, or removed during variable selection).">recorded only</span>{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="alert alert-danger" id="modelUnavailable" {{ 'hidden' if model_available }}>
+  <i class="fa-solid fa-triangle-exclamation me-1"></i>
+  <strong>Model unavailable.</strong> The system trains the model automatically from the
+  trip records with actual fuel consumption. Predictions turn on here by themselves as soon as training finishes.
+</div>
+
+{% if errors %}
+<div class="alert alert-danger" role="alert">
+  <div class="fw-semibold mb-1"><i class="fa-solid fa-circle-exclamation me-1"></i> Please correct the following:</div>
+  <ul class="mb-0 ps-3">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="card-surface">
+  <div class="model-info-line" id="modelInfo">
+    <span class="live-badge" id="predLive"><span class="live-dot"></span><span id="predLiveText">Live</span></span>
+    Using model <strong id="predModelVersion">{{ model_metrics.model_version if model_metrics else '—' }}</strong>
+    &middot; R&sup2; <strong id="predModelR2">{{ model_metrics.r2_score if model_metrics else '—' }}</strong>
+    &middot; typical error ±<strong id="predModelMae">{{ model_metrics.mae if model_metrics else '—' }}</strong> L
+  </div>
+
+  <form method="POST" action="{{ url_for('prediction') }}" class="needs-validation" novalidate data-loading="Running Linear Regression model...">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-3">
+      <label class="form-label">Select Registered Vehicle (auto-fills vehicle details)</label>
+      <select class="form-select" id="vehicleSelect">
+        <option value="">-- Manual entry / no specific vehicle --</option>
+        {% for v in vehicles %}
+        <option value="{{ v.id }}" {{ 'selected' if form.get('vehicle_id') == v.id|string }}
+          data-type="{{ v.vehicle_type }}"
+          data-displacement="{{ v.engine_displacement }}"
+          data-fuel="{{ v.fuel_type }}"
+          data-year="{{ v.year_model }}"
+          data-odometer="{{ '%.2f'|format(v.latest_odometer|float) }}">
+          {{ v.plate_number }} &mdash; {{ v.brand_model }}
+        </option>
+        {% endfor %}
+      </select>
+      <input type="hidden" name="vehicle_id" id="vehicle_id" value="{{ form.get('vehicle_id', '') }}">
+    </div>
+
+    <div class="form-section-title"><i class="fa-solid fa-road"></i> Section A &mdash; Trip Information</div>
+    <p class="text-muted small mb-2">Only <strong>Distance Traveled</strong> (<span class="text-danger">*</span>) is required. Any field left blank is filled in for you &mdash; from the selected vehicle, from the other trip values, or with a standard default &mdash; and the result lists every value that was assumed.
+      {% if model_fields is not none %}Fields marked <span class="badge-recorded">recorded only</span> are saved with the request but are not used by the current model.{% endif %}</p>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Odometer Reading (km) {{ recorded_only('odometer_reading') }}</label>
+        <input type="number" step="0.01" min="0" max="2000000" class="form-control" name="odometer_reading" id="odometer_reading" value="{{ form.get('odometer_reading', '') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Distance Traveled (km) <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" min="0.1" max="999" class="form-control" name="distance_km" value="{{ form.get('distance_km', '') }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Trip Duration (minutes) {{ recorded_only('duration_minutes') }}</label>
+        <input type="number" step="0.1" min="1" max="1439" class="form-control" name="duration_minutes" value="{{ form.get('duration_minutes', '') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Average Speed (km/h) {{ recorded_only('avg_speed_kmh') }}</label>
+        <input type="number" step="0.1" min="1" max="159" class="form-control" name="avg_speed_kmh" value="{{ form.get('avg_speed_kmh', '') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Trip Type {{ recorded_only('trip_type') }}</label>
+        <select class="form-select" name="trip_type">
+          <option value="" disabled {{ 'selected' if not form.get('trip_type') }}>Select trip type</option>
+          {% for t in trip_types %}{{ opt('trip_type', t) }}{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Departure Time {{ recorded_only('departure_time') }}</label>
+        <input type="text" class="form-control" name="departure_time" placeholder="HH:MM (24-hour, e.g. 08:30)"
+               pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" value="{{ form.get('departure_time', '') }}">
+        <div class="invalid-feedback">Enter a valid 24-hour time, e.g. 08:30 or 17:15.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Passenger / Cargo Load (kg) {{ recorded_only('passenger_cargo_load_kg') }}</label>
+        <input type="number" step="0.1" min="0" max="20000" class="form-control" name="passenger_cargo_load_kg" value="{{ form.get('passenger_cargo_load_kg', '0') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Route {{ recorded_only('route') }}</label>
+        <input type="text" class="form-control" name="route" list="routeList" maxlength="150" placeholder="e.g. RASUC/RCAF" value="{{ form.get('route', '') }}">
+        <datalist id="routeList">
+          {% for r in routes %}<option value="{{ r }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Road Type {{ recorded_only('road_type') }}</label>
+        <select class="form-select" name="road_type">
+          <option value="" disabled {{ 'selected' if not form.get('road_type') }}>Select road type</option>
+          {% for r in road_types %}{{ opt('road_type', r) }}{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Terrain Classification {{ recorded_only('terrain_classification') }}</label>
+        <select class="form-select" name="terrain_classification">
+          <option value="" disabled {{ 'selected' if not form.get('terrain_classification') }}>Select terrain</option>
+          {% for t in terrains %}{{ opt('terrain_classification', t) }}{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section-title"><i class="fa-solid fa-truck"></i> Section B &mdash; Vehicle Information</div>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Vehicle Type {{ recorded_only('vehicle_type') }}</label>
+        <select class="form-select" name="vehicle_type" id="vehicle_type">
+          <option value="" disabled {{ 'selected' if not form.get('vehicle_type') }}>Select vehicle type</option>
+          {% for v in vehicle_types %}{{ opt('vehicle_type', v) }}{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Engine Displacement (L) {{ recorded_only('engine_displacement') }}</label>
+        <input type="number" step="0.1" min="0.1" max="20" class="form-control" name="engine_displacement" id="engine_displacement" value="{{ form.get('engine_displacement', '') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Fuel Type {{ recorded_only('fuel_type') }}</label>
+        <select class="form-select" name="fuel_type" id="fuel_type">
+          <option value="" disabled {{ 'selected' if not form.get('fuel_type') }}>Select fuel type</option>
+          {{ opt('fuel_type', 'Diesel') }}
+          {{ opt('fuel_type', 'Gasoline') }}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Year Model {{ recorded_only('year_model') }}</label>
+        <input type="number" min="1980" max="{{ max_year }}" class="form-control" name="year_model" id="year_model" value="{{ form.get('year_model', '') }}">
+      </div>
+    </div>
+
+    <div class="form-section-title"><i class="fa-solid fa-gas-pump"></i> Section C &mdash; Prediction</div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-blue px-4 py-2" id="predictBtn" {{ 'disabled' if not model_available }}>
+        <i class="fa-solid fa-calculator me-1"></i> Predict Fuel Consumption
+      </button>
+      <button type="reset" class="btn btn-outline-navy px-4">Clear Form</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const vehicleSelect = document.getElementById('vehicleSelect');
+const vehicleIdInput = document.getElementById('vehicle_id');
+const predForm = vehicleSelect.closest('form');
+
+function fillFromVehicle(opt) {
+  document.getElementById('vehicle_type').value = opt.dataset.type;
+  document.getElementById('engine_displacement').value = opt.dataset.displacement;
+  document.getElementById('fuel_type').value = opt.dataset.fuel;
+  document.getElementById('year_model').value = opt.dataset.year;
+  document.getElementById('odometer_reading').value = opt.dataset.odometer;
+}
+vehicleSelect.addEventListener('change', function () {
+  vehicleIdInput.value = this.value || '';
+  if (this.value) fillFromVehicle(this.options[this.selectedIndex]);
+});
+// "Clear Form" must also forget the chosen vehicle (hidden inputs are not
+// reset by the browser), otherwise a manual entry is saved against it.
+predForm.addEventListener('reset', function () {
+  setTimeout(function () {
+    vehicleIdInput.value = '';
+    vehicleSelect.value = '';
+    predForm.classList.remove('was-validated');
+    // After a validation error the fields are prefilled by the server, and a
+    // plain reset would restore those values; clear them for real instead.
+    predForm.querySelectorAll('input:not([type=hidden])').forEach(function (i) {
+      i.value = i.name === 'passenger_cargo_load_kg' ? '0' : '';
+    });
+    predForm.querySelectorAll('select').forEach(function (s) {
+      const placeholder = s.querySelector('option[disabled]');
+      if (placeholder) s.value = '';
+    });
+  });
+});
+
+// ---- Real-time: vehicles, routes and model status refresh every 5s ----
+let lastOptionsJson = null;
+function setPredLive(state, text) {
+  const b = document.getElementById('predLive');
+  b.className = 'live-badge' + (state ? ' ' + state : '');
+  document.getElementById('predLiveText').textContent = text;
+}
+function refreshPredictionOptions() {
+  fetch('/api/prediction-options')
+    .then(function (res) { return res.json(); })
+    .then(function (d) {
+      const m = d.model;
+      document.getElementById('predModelVersion').textContent = m.version || '—';
+      document.getElementById('predModelR2').textContent = m.r2 != null ? m.r2 : '—';
+      document.getElementById('predModelMae').textContent = m.mae != null ? m.mae : '—';
+      document.getElementById('modelUnavailable').hidden = m.available;
+      document.getElementById('predictBtn').disabled = !m.available;
+      setPredLive(m.retraining ? 'is-updating' : '', m.retraining ? 'Updating model…' : 'Live');
+
+      const json = JSON.stringify([d.vehicles, d.routes]);
+      if (json === lastOptionsJson) return;
+      lastOptionsJson = json;
+
+      // Rebuild the vehicle list, keeping the current choice when it still exists.
+      const current = vehicleSelect.value;
+      vehicleSelect.innerHTML = '<option value="">-- Manual entry / no specific vehicle --</option>' +
+        d.vehicles.map(function (v) {
+          return '<option value="' + v.id + '" data-type="' + escapeHtml(v.type) + '" data-displacement="' + escapeHtml(v.displacement) +
+            '" data-fuel="' + escapeHtml(v.fuel) + '" data-year="' + v.year + '" data-odometer="' + escapeHtml(v.odometer) + '">' +
+            escapeHtml(v.label) + '</option>';
+        }).join('');
+      if (current && d.vehicles.some(function (v) { return String(v.id) === current; })) {
+        vehicleSelect.value = current;
+      } else if (current) {
+        vehicleSelect.value = '';
+        vehicleIdInput.value = '';  // the chosen vehicle was removed or set inactive
+      }
+      document.getElementById('routeList').innerHTML = d.routes.map(function (r) {
+        return '<option value="' + escapeHtml(r) + '">';
+      }).join('');
+    })
+    .catch(function () { setPredLive('is-offline', 'Reconnecting…'); });
+}
+refreshPredictionOptions();
+setInterval(refreshPredictionOptions, 5000);
+</script>
+{% endblock %}

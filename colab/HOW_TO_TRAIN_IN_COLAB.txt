@@ -1,0 +1,22 @@
+TRAIN THE MODEL IN GOOGLE COLAB
+
+Files in this folder:
+  fuel_consumption_linear_regression_AUTO.ipynb   EASIEST: the data is built in, no file upload
+  fuel_consumption_linear_regression.ipynb        asks you to upload the 2 CSV files
+  historical_fleet_data.csv                       the fleet trip records the model trains on
+  supplementary_data.csv                          the supplementary dataset
+
+EASIEST WAY (AUTO version):
+  1. Open https://colab.research.google.com (signed in to your Google account).
+  2. File > Upload notebook > Browse > Desktop > gov-fleets > colab >
+     fuel_consumption_linear_regression_AUTO.ipynb > Open.
+  3. Runtime > Run all. If a warning appears, click "Run anyway".
+  4. Wait 1-2 minutes until every cell has a green check mark.
+  5. Section 8 shows R2, MAE, RMSE and the 5-fold CV - the same as the
+     Model Performance page of the web app.
+  6. Optional: folder icon on the left > right-click linear_regression_pipeline.joblib > Download.
+
+The AUTO version contains the data from the day it was made. For newer records,
+download both CSV files again from the web app (Model Performance > Training Details)
+and use fuel_consumption_linear_regression.ipynb: Run all, then Choose Files and
+select both CSV files.

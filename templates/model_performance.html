@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+{% block title %}Model Performance{% endblock %}
+{% block page_title %}Linear Regression Model Performance{% endblock %}
+
+{% block content %}
+{% if not metrics %}
+<div class="alert alert-warning">
+  <i class="fa-solid fa-triangle-exclamation me-1"></i>
+  <span id="noModelText">No trained model yet. The system trains it automatically from the trip records with actual
+  fuel consumption; this page opens the results by itself as soon as training finishes.</span>
+</div>
+{% else %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface"><div class="metric-value" id="mpR2">{{ metrics.r2_score }}</div><div class="metric-label">R&sup2; Score</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface"><div class="metric-value" id="mpMae">{{ metrics.mae }} L</div><div class="metric-label">Mean Absolute Error</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface"><div class="metric-value" id="mpRmse">{{ metrics.rmse }} L</div><div class="metric-label">Root Mean Squared Error</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface"><div class="metric-value" id="mpCv">{{ metrics.cv_mean_r2 }}</div><div class="metric-label"><span class="mpFolds">{{ metrics.cv_folds }}</span>-Fold CV Mean R&sup2;</div></div>
+  </div>
+</div>
+
+<div class="card-surface mb-3">
+  <div class="section-title"><i class="fa-solid fa-circle-info text-primary"></i> Training Details</div>
+  <p class="text-muted mb-3" style="font-size:12.5px;">
+    <span class="live-badge" id="mpLive"><span class="live-dot"></span><span id="mpLiveText">Live</span></span>
+    Retrains automatically when trip records or vehicles change. Includes
+    <strong id="mpSystem">{{ metrics.system_records|default(0) }}</strong> trip records from the system<span id="mpCleanNote"></span>.
+  </p>
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
+    <span class="text-muted">Train in Google Colab (<code>notebooks/fuel_consumption_linear_regression.ipynb</code>) with the same data:</span>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='historical_fleet_data') }}">
+      <i class="fa-solid fa-download me-1"></i> historical_fleet_data.csv</a>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='supplementary_data') }}">
+      <i class="fa-solid fa-download me-1"></i> supplementary_data.csv</a>
+  </div>
+  <div class="row g-2">
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Set Size</div><div class="value"><span id="mpTrain">{{ metrics.train_size }}</span> records</div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Testing Set Size</div><div class="value"><span id="mpTest">{{ metrics.test_size }}</span> records</div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Cross-Validation Folds</div><div class="value"><span class="mpFolds">{{ metrics.cv_folds }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">CV Std. Deviation</div><div class="value">±<span id="mpCvStd">{{ metrics.cv_std_r2 }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Date</div><div class="value"><span id="mpTrained">{{ metrics.trained_at_display }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Model Version</div><div class="value"><span id="mpVersion">{{ metrics.model_version }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Total Dataset Records</div><div class="value"><span id="mpTotal">{{ metrics.total_records }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Model Status</div><div class="value"><span class="badge-status badge-active" id="mpStatus">{{ metrics.status|capitalize }}</span></div></div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-filter text-primary"></i> Variable Selection (VIF)</div>
+      <p class="diag-note">Two steps before training: <strong>(1)</strong> predictors with no measurable link to fuel use
+        (|r| &lt; <strong id="corrThreshold">0.1</strong> with fuel consumption) are removed; <strong>(2)</strong> predictors with a
+        Variance Inflation Factor above <strong id="vifThreshold">5</strong> carry the same information as others and are removed one at a time.</p>
+      <p class="diag-note" id="mergeNote"></p>
+      <div class="table-wrap"><table class="table-fleet diag-table">
+        <thead><tr><th>Predictor</th><th>r with Fuel</th><th>Initial VIF</th><th>Final VIF</th><th>Result</th></tr></thead>
+        <tbody id="vifBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Regression Assumption Checks</div>
+      <p class="diag-note">LINE conditions tested on the training residuals (statsmodels, α = <span id="diagAlpha">0.05</span>).</p>
+      <div class="table-wrap"><table class="table-fleet diag-table">
+        <thead><tr><th>Assumption</th><th>Test</th><th>Statistic</th><th>p-value</th><th>Rule</th><th>Result</th></tr></thead>
+        <tbody id="diagBody"></tbody>
+      </table></div>
+      <p class="diag-note mb-0" id="diagSummary"></p>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card-surface">
+      <div class="section-title"><i class="fa-solid fa-square-root-variable text-primary"></i> Regression Coefficients (numeric predictors)</div>
+      <p class="diag-note">Average change in fuel consumption (L) per one-unit change in a predictor, holding the others constant. OLS fit on the training set with categorical predictors dummy-coded (R² <span id="olsR2">—</span>, adjusted R² <span id="olsAdjR2">—</span>).</p>
+      <div class="table-wrap"><table class="table-fleet diag-table">
+        <thead><tr><th>Term</th><th>Coefficient</th><th>Std. Error</th><th>p-value</th><th>Significant (p &lt; 0.05)</th></tr></thead>
+        <tbody id="coefBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-line text-primary"></i> Actual vs Predicted</div>
+      <canvas id="avpScatterChart" height="240"></canvas>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-braille text-primary"></i> Residual Plot</div>
+      <canvas id="residualChart" height="240"></canvas>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-column text-primary"></i> Fuel Consumption Distribution</div>
+      <canvas id="distChart" height="240"></canvas>
+      <div class="dist-stats" id="distStats"></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-table-cells text-primary"></i> Feature Correlation Heatmap</div>
+      <div id="corrHeatmap" class="corr-heatmap"></div>
+      <div class="corr-legend">
+        <span>−1 Negative</span><div class="corr-legend-bar"></div><span>+1 Positive</span>
+      </div>
+      <div class="corr-insights" id="corrInsights"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not metrics %}
+<script>
+// No model yet: watch for the first training to finish, then show the results.
+setInterval(function () {
+  fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
+    if (st.retraining) document.getElementById('noModelText').textContent = 'Training the Linear Regression model now…';
+    else if (st.model_version) window.location.reload();
+  }).catch(function () {});
+}, 2000);
+</script>
+{% endif %}
+{% if metrics %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.font.family = "Poppins, sans-serif";
+Chart.defaults.color = "#9698a9";
+const gridColor = "rgba(255,255,255,0.06)";
+const axis = function (title) {
+  return { grid: { color: gridColor }, ticks: { color: '#9698a9' },
+           title: { display: true, text: title, color: '#9698a9' } };
+};
+let avpChart = null, residualChart = null, distChart = null;
+// Tooltips describe the data points only (not the reference lines).
+function onlyPoints(item) { return item.datasetIndex === 0; }
+function signed(v) { return (v > 0 ? '+' : '') + Number(v).toFixed(2); }
+
+const FEATURE_NAMES = {
+  odometer_reading: 'Odometer (km)', distance_km: 'Distance (km)', duration_minutes: 'Duration (min)',
+  avg_speed_kmh: 'Avg Speed (km/h)', passenger_cargo_load_kg: 'Load (kg)', engine_displacement: 'Engine Size (L)',
+  year_model: 'Year Model', rated_efficiency_l_per_100km: 'Rated Eff. (L/100km)', actual_fuel_consumption: 'Fuel Used (L)'
+};
+const TARGET = 'actual_fuel_consumption';
+function featureName(key) { return FEATURE_NAMES[key] || key.replace(/_/g, ' '); }
+function strength(v) {
+  const a = Math.abs(v);
+  const level = a >= 0.7 ? 'Strong' : a >= 0.4 ? 'Moderate' : a >= 0.2 ? 'Weak' : 'Very weak / none';
+  return a < 0.2 ? level : level + (v > 0 ? ' positive' : ' negative');
+}
+// Diverging scale: blue = positive, orange = negative, card colour = no relationship.
+function corrColor(v) {
+  const a = Math.min(Math.abs(v), 1);
+  const base = [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
+  const t = v >= 0 ? pos : neg;
+  return 'rgb(' + base.map(function (b, i) { return Math.round(b + (t[i] - b) * a); }).join(',') + ')';
+}
+
+function renderHeatmap(c) {
+  const el = document.getElementById('corrHeatmap');
+  if (!el) return;
+  const labels = c.corr_labels, matrix = c.corr_matrix;
+  const ti = labels.indexOf(TARGET);
+  el.innerHTML = '<table><thead><tr><th></th>' +
+    labels.map(function (l, j) {
+      return '<th class="' + (j === ti ? 'is-target' : '') + '"><span>' + escapeHtml(featureName(l)) + '</span></th>';
+    }).join('') +
+    '</tr></thead><tbody>' +
+    matrix.map(function (row, i) {
+      return '<tr><th class="' + (i === ti ? 'is-target' : '') + '">' + escapeHtml(featureName(labels[i])) + '</th>' +
+        row.map(function (v, j) {
+          const tip = featureName(labels[i]) + ' vs ' + featureName(labels[j]) + ': ' + v.toFixed(2) +
+            (i === j ? ' (same feature)' : ' (' + strength(v) + ')');
+          const cls = [i === j ? 'is-diag' : '', (i === ti || j === ti) && i !== j ? 'is-target' : ''].join(' ');
+          return '<td class="' + cls + '" style="background:' + (i === j ? '' : corrColor(v)) + '" title="' +
+            escapeHtml(tip) + '">' + v.toFixed(2) + '</td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody></table>';
+
+  const ins = document.getElementById('corrInsights');
+  if (ins && ti >= 0) {
+    const ranked = labels.map(function (l, j) { return { l: l, v: matrix[ti][j] }; })
+      .filter(function (x) { return x.l !== TARGET; })
+      .sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
+    ins.innerHTML = '<div class="corr-insights-title">What affects fuel use the most</div>' +
+      ranked.slice(0, 4).map(function (x) {
+        return '<div class="corr-insight-row"><span class="legend-dot" style="background:' + corrColor(x.v) + '"></span>' +
+          '<span class="legend-label">' + escapeHtml(featureName(x.l)) + '</span>' +
+          '<span class="corr-insight-strength">' + strength(x.v) + '</span>' +
+          '<span class="legend-value">' + x.v.toFixed(2) + '</span></div>';
+      }).join('');
+  }
+}
+
+function renderDistSummary(c) {
+  const st = c.dist_stats;
+  if (!st) return;
+  const box = document.getElementById('distStats');
+  if (box) {
+    const tile = function (label, value) {
+      return '<div class="dist-stat"><div class="dist-stat-value">' + value + '</div><div class="dist-stat-label">' + label + '</div></div>';
+    };
+    box.innerHTML =
+      tile('Average per Trip', st.mean + ' L') +
+      tile('Median per Trip', st.median + ' L') +
+      tile('Most Common Range', escapeHtml(st.mode_range) + ' L<small>' + st.mode_count + ' trips</small>') +
+      tile('Lowest – Highest', st.min + ' – ' + st.max + ' L') +
+      tile('Std. Deviation', '±' + st.std + ' L') +
+      tile('Trips Counted', st.records);
+  }
+}
+
+function drawCharts(c) {
+  if (!c) return;
+  if (!avpChart) {
+    avpChart = new Chart(document.getElementById('avpScatterChart'), {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'Test Records', data: c.avp_points, borderColor: '#2697ff',
+          backgroundColor: 'rgba(38,151,255,0.45)', pointRadius: 3 },
+        { label: 'Perfect Prediction', type: 'line', data: c.avp_line, borderColor: '#26e5c5',
+          borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+      ] },
+      options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+                 plugins: { legend: { display: true }, tooltip: { filter: onlyPoints, callbacks: { label: function (item) {
+                   const p = item.raw;
+                   return ['Actual: ' + p.x + ' L', 'Predicted: ' + p.y + ' L', 'Error: ' + signed(p.x - p.y) + ' L'];
+                 } } } },
+                 scales: { x: axis('Actual Fuel Consumption (L)'), y: axis('Predicted Fuel Consumption (L)') } }
+    });
+    residualChart = new Chart(document.getElementById('residualChart'), {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'Residuals', data: c.residual_points, borderColor: '#2697ff',
+          backgroundColor: 'rgba(38,151,255,0.45)', pointRadius: 3 },
+        { label: 'Zero Error', type: 'line',
+          data: [{ x: c.residual_range[0], y: 0 }, { x: c.residual_range[1], y: 0 }],
+          borderColor: '#26e5c5', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+      ] },
+      options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+                 plugins: { legend: { display: true }, tooltip: { filter: onlyPoints, callbacks: { label: function (item) {
+                   const p = item.raw;
+                   return ['Predicted: ' + p.x + ' L', 'Actual: ' + (p.x + p.y).toFixed(2) + ' L',
+                           'Residual: ' + signed(p.y) + ' L (' + (p.y > 0 ? 'under-predicted' : p.y < 0 ? 'over-predicted' : 'exact') + ')'];
+                 } } } },
+                 scales: { x: axis('Predicted Fuel Consumption (L)'), y: axis('Residual (Actual − Predicted)') } }
+    });
+    distChart = new Chart(document.getElementById('distChart'), {
+      type: 'bar',
+      data: { labels: c.dist_labels, datasets: [
+        { type: 'line', label: 'Shape', data: c.dist_counts, borderColor: '#26e5c5',
+          backgroundColor: 'rgba(38,229,197,0.12)', fill: true, tension: 0.35, pointRadius: 0 },
+        { label: 'Trips', data: c.dist_counts, backgroundColor: 'rgba(38,151,255,0.55)',
+          borderColor: '#2697ff', borderWidth: 1, borderRadius: 4 }
+      ] },
+      options: {
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            filter: function (item) { return item.dataset.label === 'Trips'; },
+            callbacks: {
+              title: function (items) { return items[0].label + ' L'; },
+              label: function (item) {
+                const total = distChart.data.datasets[1].data.reduce(function (a, b) { return a + b; }, 0) || 1;
+                return ' ' + item.parsed.y + ' trips (' + (item.parsed.y / total * 100).toFixed(1) + '%)';
+              }
+            }
+          }
+        },
+        scales: { x: axis('Fuel Used per Trip (L)'), y: Object.assign(axis('Number of Trips'), { beginAtZero: true }) }
+      }
+    });
+  } else {
+    avpChart.data.datasets[0].data = c.avp_points;
+    avpChart.data.datasets[1].data = c.avp_line;
+    avpChart.update();
+    residualChart.data.datasets[0].data = c.residual_points;
+    residualChart.data.datasets[1].data = [{ x: c.residual_range[0], y: 0 }, { x: c.residual_range[1], y: 0 }];
+    residualChart.update();
+    distChart.data.labels = c.dist_labels;
+    distChart.data.datasets[0].data = c.dist_counts;
+    distChart.data.datasets[1].data = c.dist_counts;
+    distChart.update();
+  }
+  renderDistSummary(c);
+  renderHeatmap(c);
+}
+
+function renderDiagnostics(m) {
+  const name = function (k) { return typeof featureName === 'function' ? featureName(k) : k; };
+  const badge = function (ok, yes, no) { return '<span class="badge-status ' + (ok ? 'badge-active' : 'badge-maintenance') + '">' + (ok ? yes : no) + '</span>'; };
+  // Very small coefficients (e.g. per km of odometer) in scientific notation instead of "0".
+  const num = function (v) { const a = Math.abs(v); return (a !== 0 && a < 0.001) ? Number(v).toExponential(3) : String(v); };
+  const fmtVif = function (v) { return v == null ? '—' : (v >= 1000 ? '&gt;1000' : Number(v).toFixed(2)); };
+  const vifBody = document.getElementById('vifBody');
+  if (vifBody && m.vif_initial) {
+    document.getElementById('vifThreshold').textContent = m.vif_threshold;
+    if (m.corr_threshold != null) document.getElementById('corrThreshold').textContent = m.corr_threshold;
+    const removed = {}; (m.removed_features || []).forEach(function (r) { removed[r.feature] = r; });
+    const corr = m.correlations || {};
+    // Predictors with the same value in every record never get a VIF, so list them separately.
+    const constant = (m.removed_features || []).filter(function (r) { return r.reason === 'constant value'; })
+      .map(function (r) { return r.feature; }).filter(function (f) { return !(f in m.vif_initial); });
+    vifBody.innerHTML = Object.keys(m.vif_initial).concat(constant).map(function (f) {
+      const r = removed[f];
+      let result = badge(true, 'Kept', '');
+      if (r) result = badge(false, '', r.reason === 'constant value' ? 'Removed (same value in every record)'
+        : r.reason && r.reason.indexOf('weak') === 0 ? 'Removed (weak link to fuel)' : 'Removed (VIF ' + fmtVif(r.vif) + ')');
+      return '<tr><td>' + escapeHtml(name(f)) + '</td><td>' + (corr[f] == null ? '—' : Number(corr[f]).toFixed(3)) + '</td><td>' +
+        fmtVif(m.vif_initial[f]) + '</td><td>' + (r ? '—' : fmtVif((m.vif_final || {})[f])) + '</td><td>' + result + '</td></tr>';
+    }).join('');
+  } else if (vifBody) {
+    vifBody.innerHTML = '<tr><td colspan="5" class="text-muted">VIF is computed at the next automatic retrain.</td></tr>';
+  }
+  const mergeNote = document.getElementById('mergeNote');
+  if (mergeNote) {
+    const src = m.data_sources || {};
+    const sourceName = { system: 'trip records from the system', historical: 'historical dataset records',
+                         supplementary: 'supplementary dataset records' };
+    const parts = Object.keys(src).map(function (k) { return src[k] + ' ' + (sourceName[k] || k + ' records'); });
+    let text = parts.length ? 'Training data: ' + parts.join(', ') + ' (after cleaning). ' : '';
+    text += m.supplementary_kind === 'trips'
+      ? 'Supplementary dataset: online trip records merged into the training data. '
+      : 'Supplementary dataset: rated fuel efficiency per vehicle type. ';
+    text += (m.dropped_in_merge && m.dropped_in_merge.length)
+      ? 'Dropped during merging (absent from the online dataset): ' + m.dropped_in_merge.map(name).join(', ') + '.'
+      : 'No predictors were dropped during merging.';
+    mergeNote.textContent = text;
+  }
+  const d = m.diagnostics;
+  const diagBody = document.getElementById('diagBody');
+  if (diagBody && d) {
+    document.getElementById('diagAlpha').textContent = d.alpha;
+    diagBody.innerHTML = d.tests.map(function (t) {
+      return '<tr title="' + escapeHtml(t.meaning) + '"><td>' + escapeHtml(t.assumption) + '</td><td>' + escapeHtml(t.test) + '</td><td>' + t.statistic +
+        '</td><td>' + (t.p_value == null ? '—' : (t.p_value < 0.0001 ? '&lt;0.0001' : t.p_value)) + '</td><td>' + escapeHtml(t.rule) + '</td><td>' +
+        badge(t.passed, 'Met', 'Not met') + '</td></tr>';
+    }).join('');
+    const met = d.tests.filter(function (t) { return t.passed; }).length;
+    document.getElementById('diagSummary').textContent = met + ' of ' + d.tests.length + ' assumptions met. ' +
+      (met < d.tests.length ? 'Unmet conditions are a known limitation of a straight-line model (see Scope and Limitations); report them with the results.' : '');
+    document.getElementById('olsR2').textContent = d.ols_r2;
+    document.getElementById('olsAdjR2').textContent = d.ols_adj_r2;
+    document.getElementById('coefBody').innerHTML = d.coefficients.map(function (c) {
+      return '<tr><td>' + escapeHtml(c.feature === 'Intercept' ? 'Intercept' : name(c.feature)) + '</td><td>' + num(c.coef) + '</td><td>' + num(c.std_err) +
+        '</td><td>' + (c.p_value == null ? '—' : (c.p_value < 0.0001 ? '&lt;0.0001' : c.p_value)) + '</td><td>' + badge(c.significant, 'Yes', 'No') + '</td></tr>';
+    }).join('');
+  } else if (diagBody) {
+    diagBody.innerHTML = '<tr><td colspan="6" class="text-muted">Assumption checks run at the next automatic retrain.</td></tr>';
+  }
+}
+
+// ---- Live auto-refresh: re-fetch every 10s; charts redraw when the model is retrained ----
+let lastChartsKey = null;
+function refreshModelPerformance() {
+  return fetch('/api/model-performance-data')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      const m = data.metrics;
+      const setText = function (id, v) { const el = document.getElementById(id); if (el && v !== undefined) el.textContent = v; };
+      if (m) {
+        setText('mpR2', m.r2_score); setText('mpMae', m.mae + ' L'); setText('mpRmse', m.rmse + ' L');
+        setText('mpCv', m.cv_mean_r2); setText('mpTrained', m.trained_at_display); setText('mpVersion', m.model_version);
+        setText('mpTrain', m.train_size); setText('mpTest', m.test_size); setText('mpCvStd', m.cv_std_r2);
+        setText('mpTotal', m.total_records); setText('mpSystem', m.system_records || 0);
+        // Explain why fewer records were trained on than were entered (invalid rows / outliers removed).
+        const used = (m.data_sources || {}).system;
+        const setAside = (m.system_records || 0) - (used || 0);
+        setText('mpCleanNote', used != null && setAside > 0
+          ? ' (' + used + ' used; ' + setAside + ' set aside as outliers or incomplete during cleaning)' : '');
+        if (m.status) {
+          setText('mpStatus', m.status.charAt(0).toUpperCase() + m.status.slice(1));
+          document.getElementById('mpStatus').className = 'badge-status ' + (m.status === 'active' ? 'badge-active' : 'badge-maintenance');
+        }
+        document.querySelectorAll('.mpFolds').forEach(function (el) { el.textContent = m.cv_folds; });
+        renderDiagnostics(m);
+      }
+      const key = JSON.stringify(data.charts);
+      if (key !== lastChartsKey) { lastChartsKey = key; drawCharts(data.charts); }
+    })
+    .catch(function () { /* silent retry on next interval */ });
+}
+refreshModelPerformance();
+
+// ---- Real-time: poll the tiny status endpoint every 2s; pull the full data
+// only when the model was retrained. A 30s full refresh is a safety net. ----
+let knownVersion = {{ metrics.model_version|tojson }};
+function setLive(state, text) {
+  const badge = document.getElementById('mpLive');
+  if (!badge) return;
+  badge.className = 'live-badge' + (state ? ' ' + state : '');
+  document.getElementById('mpLiveText').textContent = text;
+}
+function checkModelStatus() {
+  fetch('/api/model-status')
+    .then(function (res) { return res.json(); })
+    .then(function (st) {
+      if (st.retraining) { setLive('is-updating', 'Updating model…'); return; }
+      if (st.model_version && st.model_version !== knownVersion) {
+        knownVersion = st.model_version;
+        setLive('is-updating', 'Updating charts…');
+        refreshModelPerformance().then(function () {
+          setLive('', 'Live · updated ' + new Date().toLocaleTimeString());
+        });
+      } else if (document.getElementById('mpLive').className !== 'live-badge') {
+        setLive('', 'Live');  // recovered from "Updating…" / "Reconnecting…"
+      }
+    })
+    .catch(function () { setLive('is-offline', 'Reconnecting…'); });
+}
+setInterval(checkModelStatus, 2000);
+setInterval(refreshModelPerformance, 30000);
+</script>
+{% endif %}
+{% endblock %}
