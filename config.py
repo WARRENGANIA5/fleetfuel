@@ -34,6 +34,9 @@ class Config:
     # Vercel runs the app as short-lived serverless functions on a read-only
     # disk: no background threads, no retraining, no saved photos or backups.
     SERVERLESS = bool(os.environ.get("VERCEL"))
+    # Online, let browsers keep CSS/JS/images for a week (their URLs carry a
+    # ?v= version, so a changed file is still fetched again).
+    SEND_FILE_MAX_AGE_DEFAULT = 7 * 24 * 60 * 60 if ONLINE else None
 
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # reject request bodies over 5 MB before reading them
 

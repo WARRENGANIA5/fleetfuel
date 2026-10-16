@@ -15,4 +15,3 @@ model/*.tmp
 
 .vercel
 .env*
-public/static/
