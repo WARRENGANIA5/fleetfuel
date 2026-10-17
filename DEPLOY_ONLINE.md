@@ -11,12 +11,6 @@ nga mabuksan sa bisan ano nga phone, tablet, ukon computer nga may internet.
 > ICT office sang agency (RA 10173, Data Privacy Act). Ang Railway nagabutang sang data sa servers sa gwa
 > sang Pilipinas.
 
-## Kada agency, isa ka Railway project
-
-Ang kada agency (GSU, LGU, DepEd, kag iban pa) may kaugalingon nga **project** sa Railway nga may
-kaugalingon nga database, gani indi makita sang isa ka agency ang data sang iban. Ulita lang ini nga
-mga steps para sa kada agency.
-
 ## Mga steps
 
 ### 1. Himo sang account
@@ -69,10 +63,9 @@ Buksan ini sa phone.
 ### 8. Pagkatapos sang una nga login
 1. Mag-login gamit ang `ADMIN_USERNAME` kag `ADMIN_PASSWORD`.
 2. **Panason ang `ADMIN_PASSWORD`** sa Variables (indi na ini kinahanglan).
-3. **Settings → Organization**: isulat ang pangalan sang agency kag opisina.
-4. Dugangi ang mga vehicle, dayon i-import ang trip records (Trip Records → Import CSV). Ang model
-   magatrain sa iya lang gamit ang data sang agency.
-5. Ang staff mag-sign up sa link, kag ang admin ang mag-approve sa **User Accounts**.
+3. Dugangi ang mga vehicle, dayon i-import ang trip records (Trip Records → Import CSV). Ang model
+   magatrain sa iya lang gamit ang data sang GSU fleet.
+4. Ang staff mag-sign up sa link, kag ang admin ang mag-approve sa **User Accounts**.
 
 ## Mga automatic nga nagadalagan online
 - **HTTPS**: ginahatag sang Railway. Secure-only man ang login cookie.

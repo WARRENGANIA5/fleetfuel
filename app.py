@@ -3,7 +3,6 @@ import io
 import json
 import os
 import re
-import sys
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -23,7 +22,7 @@ from werkzeug.utils import secure_filename
 import db
 from config import Config
 from timeutil import now_local, today_local
-from model.preprocess import attach_rated_efficiency, build_prediction_frame
+from model.preprocess import build_prediction_frame
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -52,16 +51,11 @@ try:
 except OSError:
     pass  # read-only disk (serverless hosting): photos cannot be saved there
 
-VEHICLE_TYPES = ["Sedan", "SUV", "Van", "Pickup Truck", "Service Bus", "Dump Truck", "Motorcycle"]
-TRIP_TYPES = ["Official Business", "Errand", "Hauling", "Airport Transfer", "Field Visit", "Other"]
-ROAD_TYPES = ["Paved", "Unpaved", "Mixed"]
-TERRAINS = ["Flat", "Hilly", "Mountainous"]
 FUEL_TYPES = ["Diesel", "Gasoline"]
 
 REPORT_TYPES = {
     "vehicle": "Vehicle Report",
     "trip": "Trip Report",
-    "fuel": "Fuel Consumption Report",
     "prediction": "Prediction Report",
     "model": "Model Performance Report",
 }
@@ -161,22 +155,6 @@ def format_time(value):
     return value
 
 
-def get_known_routes():
-    """Routes from the historical dataset plus every route already used in
-    the system's trip records, so new routes show up as suggestions."""
-    routes = set()
-    try:
-        df = pd.read_csv(app.config["HISTORICAL_DATA_PATH"])
-        routes.update(df["route"].dropna().astype(str).str.strip())
-    except Exception:
-        pass
-    try:
-        routes.update(r["route"].strip() for r in db.query_all("SELECT DISTINCT route FROM trip_records") if r["route"])
-    except Exception:
-        pass
-    return sorted(r for r in routes if r)
-
-
 def avatar_url(path):
     """Static URL for a profile photo, versioned by file time so a new photo
     shows immediately everywhere instead of a cached old one."""
@@ -271,77 +249,38 @@ def admin_required(view):
     return wrapped
 
 
-def _pending_requests():
+def _pending_counts():
+    """Sidebar badges (administrator only): both counts in one database round trip."""
     if session.get("role") != "admin":
-        return 0
+        return {"requests": 0, "accounts": 0}
     try:
-        return db.query_one("SELECT COUNT(*) AS c FROM predictions WHERE approval_status = 'pending'")["c"]
+        return db.query_one("""
+            SELECT (SELECT COUNT(*) FROM predictions WHERE approval_status = 'pending') AS requests,
+                   (SELECT COUNT(*) FROM users WHERE status = 'pending') AS accounts
+        """)
     except Exception:
-        return 0
-
-
-def _pending_accounts():
-    if session.get("role") != "admin":
-        return 0
-    try:
-        return db.query_one("SELECT COUNT(*) AS c FROM users WHERE status = 'pending'")["c"]
-    except Exception:
-        return 0
+        return {"requests": 0, "accounts": 0}
 
 
 # ------------------------------------------------------------------
-# ORGANIZATION (lets any government office run its own copy of the
-# system under its own name; set by an administrator in Settings)
+# ORGANIZATION (the study covers the Guimaras State University fleet only)
 # ------------------------------------------------------------------
-ORG_DEFAULTS = {
+ORG = {
     "org_name": "Guimaras State University",
     "org_short": "GSU",
     "office_name": "General Services Office",
     "office_short": "GSO",
+    "system_short": "GSU FleetFuel",
 }
-ORG_LIMITS = {"org_name": 120, "org_short": 15, "office_name": 120, "office_short": 15}
-_ORG_TABLE_READY = {"ok": False}
-# The names rarely change, so each page doesn't ask the (cloud) database again.
-_ORG_CACHE = {"value": None, "at": 0.0}
-ORG_CACHE_SECONDS = 60
-
-
-def _ensure_org_table():
-    if _ORG_TABLE_READY["ok"]:
-        return
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS app_settings (
-            setting_key VARCHAR(50) NOT NULL PRIMARY KEY,
-            setting_value VARCHAR(255) NOT NULL
-        ) ENGINE=InnoDB
-    """)
-    _ORG_TABLE_READY["ok"] = True
 
 
 def get_org():
-    """The organization's names (defaults until an administrator sets them).
-    Never fails: error pages render even when the database is down."""
-    if "org" in g:
-        return g.org
-    if _ORG_CACHE["value"] is not None and time.time() - _ORG_CACHE["at"] < ORG_CACHE_SECONDS:
-        g.org = dict(_ORG_CACHE["value"])
-        return g.org
-    org = dict(ORG_DEFAULTS)
-    try:
-        _ensure_org_table()
-        for row in db.query_all("SELECT setting_key, setting_value FROM app_settings"):
-            if row["setting_key"] in org and row["setting_value"].strip():
-                org[row["setting_key"]] = row["setting_value"]
-        _ORG_CACHE.update(value=dict(org, system_short=f"{org['org_short']} FleetFuel"), at=time.time())
-    except Exception:
-        app.logger.exception("Could not load organization settings; using defaults")
-    org["system_short"] = f"{org['org_short']} FleetFuel"
-    g.org = org
-    return org
+    return dict(ORG)
 
 
 @app.context_processor
 def inject_globals():
+    pending = _pending_counts()
     return {
         "org": get_org(),
         "today": today_local().isoformat(),
@@ -350,8 +289,8 @@ def inject_globals():
         "notif_count": g.get("notif_count", 0),
         "session_avatar_url": avatar_url(session.get("profile_photo")),
         "dataset": dataset_status() if session.get("user_id") else {"demo": False, "synthetic_files": []},
-        "pending_accounts": _pending_accounts(),
-        "pending_requests": _pending_requests(),
+        "pending_accounts": pending["accounts"],
+        "pending_requests": pending["requests"],
     }
 
 
@@ -379,7 +318,6 @@ def _ensure_notif_table():
 def build_notifications(limit=8):
     """Bell notifications for the current user, minus the ones they removed.
 
-    * everyone: vehicles under maintenance;
     * administrators: fuel requests waiting for approval (actionable);
     * staff: approvals / rejections of their own fuel requests, counted as
       new until they open the bell.
@@ -426,24 +364,6 @@ def build_notifications(limit=8):
                           "time": r["reviewed_at"].strftime("%b %d, %I:%M %p"),
                           "url": url_for("prediction_result", prediction_id=r["id"]), "new": is_new,
                           "status": r["approval_status"]})
-    maintenance = db.query_all("""
-        SELECT id, plate_number, vehicle_type, brand_model, updated_at
-        FROM vehicles WHERE status = 'Maintenance' ORDER BY updated_at DESC
-    """)
-    shown = 0
-    for r in maintenance:
-        # The timestamp is part of the key: a vehicle sent back to maintenance later alerts again.
-        key = f"maintenance:{r['id']}:{r['updated_at']:%Y%m%d%H%M%S}" if r["updated_at"] else f"maintenance:{r['id']}"
-        if key in removed:
-            continue
-        count += 1
-        if shown < 10:
-            shown += 1
-            items.append({"kind": "maintenance", "id": r["id"], "key": key, "icon": "fa-triangle-exclamation",
-                          "text": f"{r['plate_number']} needs maintenance",
-                          "sub": f"{r['vehicle_type']} · {r['brand_model']}",
-                          "time": r["updated_at"].strftime("%b %d, %Y") if r["updated_at"] else "",
-                          "url": url_for("vehicles", status="Maintenance"), "new": False})
     return {"count": count, "notifications": items}
 
 
@@ -457,7 +377,8 @@ def build_notifications(limit=8):
 def api_notifications():
     data = build_notifications()
     if session.get("role") == "admin":
-        data.update(pending_requests=_pending_requests(), pending_accounts=_pending_accounts())
+        pending = _pending_counts()
+        data.update(pending_requests=pending["requests"], pending_accounts=pending["accounts"])
     return data
 
 
@@ -661,8 +582,10 @@ def build_dashboard_context():
                (SELECT AVG(actual_fuel_consumption) FROM trip_records
                  WHERE actual_fuel_consumption IS NOT NULL) AS avg_actual,
                (SELECT AVG(predicted_fuel) FROM predictions) AS avg_predicted,
-               (SELECT MAX(fuel_date) FROM fuel_records) AS latest_fuel_date,
-               (SELECT COUNT(*) FROM fuel_records) AS fuel_records""")
+               (SELECT MAX(trip_date) FROM trip_records
+                 WHERE actual_fuel_consumption IS NOT NULL) AS latest_fuel_date,
+               (SELECT COUNT(*) FROM trip_records
+                 WHERE actual_fuel_consumption IS NOT NULL) AS fuel_trips""")
     total_vehicles, total_trips = fleet["total_vehicles"], fleet["total_trips"]
     req = db.query_one(f"""
         SELECT COUNT(*) AS total, SUM(p.approval_status = 'pending') AS pending,
@@ -676,7 +599,7 @@ def build_dashboard_context():
 
     # The 10 latest requests serve both the Recent list (first 5) and the chart.
     latest_rows = db.query_all(f"""
-        SELECT p.*, v.plate_number, u.full_name
+        SELECT p.*, v.plate_number, v.brand_model, u.full_name
         FROM predictions p
         LEFT JOIN vehicles v ON p.vehicle_id = v.id
         LEFT JOIN users u ON p.user_id = u.id
@@ -688,17 +611,17 @@ def build_dashboard_context():
         "id": r["id"], "status": r["approval_status"],
         "url": url_for("prediction_result", prediction_id=r["id"]),
         "created_at_display": r["created_at"].strftime("%b %d, %Y %I:%M %p"),
-        "plate_number": r["plate_number"] or "N/A",
-        "vehicle_type": r["vehicle_type"],
+        "plate_number": r["plate_number"] or "Manual Entry",
+        "vehicle_model": r["brand_model"] or "",
         "distance_km": f"{float(r['distance_km']):.2f}",
         "fuel_type": r["fuel_type"],
         "predicted_fuel": f"{float(r['predicted_fuel']):.2f}",
         "full_name": r["full_name"] or "System",
     } for r in recent_predictions_rows]
 
-    # Last 6 calendar months up to the latest month with fuel records (the
-    # logs are often encoded months later), with months that have no fuel
-    # records shown as 0 instead of silently skipped.
+    # Fuel consumed per month from the trip records (Monthly Report of Official
+    # Travel): the last 6 calendar months up to the latest month with records
+    # (the reports are often encoded months later), empty months shown as 0.
     latest = fleet["latest_fuel_date"] or today_local()
     months = []
     y, m = latest.year, latest.month
@@ -708,14 +631,15 @@ def build_dashboard_context():
     months.reverse()
     first_month = date(months[0][0], months[0][1], 1)
     trend_rows = db.query_all("""
-        SELECT DATE_FORMAT(fuel_date, '%%Y-%%m') AS ym, SUM(liters_consumed) AS total
-        FROM fuel_records WHERE fuel_date >= %s
+        SELECT DATE_FORMAT(trip_date, '%%Y-%%m') AS ym, SUM(actual_fuel_consumption) AS total
+        FROM trip_records WHERE trip_date >= %s AND actual_fuel_consumption IS NOT NULL
         GROUP BY ym
     """, (first_month,))
     totals = {r["ym"]: float(r["total"]) for r in trend_rows}
-    has_fuel_records = fleet["fuel_records"] > 0
+    has_fuel_records = fleet["fuel_trips"] > 0
     fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months] if has_fuel_records else []
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
+    fuel_trend_months = [f"{y:04d}-{m:02d}" for y, m in months] if has_fuel_records else []  # click -> that month's trips
 
     # The 10 latest predictions: the predicted liters show as soon as a
     # prediction is made, the actual liters once they are recorded in
@@ -725,6 +649,7 @@ def build_dashboard_context():
     avp_actual = [float(r["actual_fuel"]) if r["actual_fuel"] is not None else None for r in avp_rows]
     avp_predicted = [float(r["predicted_fuel"]) for r in avp_rows]
     avp_missing = sum(a is None for a in avp_actual)
+    avp_urls = [url_for("prediction_result", prediction_id=r["id"]) for r in avp_rows]  # click a point -> that request
 
     usage_rows = db.query_all("""
         SELECT v.plate_number, COUNT(t.id) AS trip_count
@@ -744,7 +669,9 @@ def build_dashboard_context():
                   "total_predictions": total_predictions, "avg_fuel": avg_fuel, **requests_summary},
         "recent_predictions": recent_predictions,
         "fuel_trend_labels": fuel_trend_labels, "fuel_trend_values": fuel_trend_values,
+        "fuel_trend_months": fuel_trend_months,
         "avp_labels": avp_labels, "avp_actual": avp_actual, "avp_predicted": avp_predicted, "avp_missing": avp_missing,
+        "avp_urls": avp_urls,
         "vehicle_usage_labels": [r["plate_number"] for r in usage_rows],
         "vehicle_usage_values": [r["trip_count"] for r in usage_rows],
         "usage_colors": usage_colors,
@@ -775,192 +702,83 @@ def api_dashboard_data():
 # ------------------------------------------------------------------
 # PREDICTION
 # ------------------------------------------------------------------
-PREDICTION_NUMERIC_LIMITS = {
-    # field: (label, min, max, allow_min_equal)
-    "odometer_reading": ("Odometer reading", 0, 2_000_000, True),
-    "distance_km": ("Distance traveled", 0, 1000, False),
-    "duration_minutes": ("Trip duration", 0, 1440, False),
-    "avg_speed_kmh": ("Average speed", 0, 160, False),
-    "passenger_cargo_load_kg": ("Passenger / cargo load", 0, 20_000, True),
-    "engine_displacement": ("Engine displacement", 0, 20, False),
-}
-PREDICTION_FEATURE_LABELS = {
-    "odometer_reading": ("Odometer", "km"), "distance_km": ("Distance", "km"),
-    "duration_minutes": ("Duration", "min"), "avg_speed_kmh": ("Average speed", "km/h"),
-    "passenger_cargo_load_kg": ("Load", "kg"), "engine_displacement": ("Engine displacement", "L"),
-    "year_model": ("Year model", ""),
-}
-PREDICTION_CATEGORY_LABELS = {
-    "vehicle_type": "vehicle type", "fuel_type": "fuel type",
-    "road_type": "road type", "terrain_classification": "terrain",
-}
+PREDICTION_FEATURE_LABELS = {"distance_km": ("Distance", "km"), "engine_power_kw": ("Engine power", "kW")}
 
 
 def get_prediction_vehicles():
-    """Active vehicles with the latest known odometer: the higher of the
-    vehicle's recorded odometer and the end of its most recent trip."""
+    """Every registered vehicle with what the model needs from its record:
+    engine power (kW) and fuel type."""
+    _ensure_vehicle_columns()
     return db.query_all("""
-        SELECT v.id, v.plate_number, v.brand_model, v.vehicle_type, v.engine_displacement,
-               v.fuel_type, v.year_model,
-               GREATEST(COALESCE(v.current_odometer, 0),
-                        COALESCE(MAX(t.odometer_reading + t.distance_km), 0)) AS latest_odometer
-        FROM vehicles v LEFT JOIN trip_records t ON t.vehicle_id = v.id
-        WHERE v.status = 'Active'
-        GROUP BY v.id ORDER BY v.plate_number
+        SELECT id, plate_number, brand_model, fuel_type, engine_power_kw
+        FROM vehicles ORDER BY plate_number
     """)
 
 
-PREDICTION_DEFAULTS = {
-    "trip_type": ("Official Business", "trip type"), "departure_time": ("08:00", "departure time"),
-    "passenger_cargo_load_kg": ("0", "load (kg)"), "route": ("Not specified", "route"),
-    "road_type": ("Paved", "road type"), "terrain_classification": ("Flat", "terrain"),
-}
-
-
-def fill_prediction_defaults(form):
-    """Only the distance is required to predict. Every other blank field is
-    filled in: vehicle details from the selected vehicle (or the fleet's most
-    common vehicle), duration/speed from each other (or the fleet's typical
-    average speed), and standard values for the rest. Returns the completed
-    form and a list of the values that were assumed."""
-    f = {k: (v.strip() if isinstance(v, str) else v) for k, v in form.items()}
-    assumed = []
-
-    def blank(field):
-        return not (f.get(field) or "").strip()
-
-    def assume(field, value, label):
-        f[field] = str(value)
-        assumed.append(f"{label}: {value}")
-
-    vehicle = None
-    if (f.get("vehicle_id") or "").isdigit():
-        vehicle = next((v for v in get_prediction_vehicles() if str(v["id"]) == f["vehicle_id"]), None)
-    if vehicle is None and any(blank(k) for k in ("vehicle_type", "engine_displacement", "fuel_type", "year_model")):
-        vehicle = db.query_one("""
-            SELECT vehicle_type, engine_displacement, fuel_type, year_model, 0 AS latest_odometer
-            FROM vehicles GROUP BY vehicle_type, engine_displacement, fuel_type, year_model
-            ORDER BY COUNT(*) DESC LIMIT 1""")
-    fallback = vehicle or {"vehicle_type": "Van", "engine_displacement": 2.5, "fuel_type": "Diesel",
-                           "year_model": today_local().year, "latest_odometer": 0}
-    for field, label in (("vehicle_type", "vehicle type"), ("engine_displacement", "engine displacement (L)"),
-                         ("fuel_type", "fuel type"), ("year_model", "year model")):
-        if blank(field):
-            value = fallback[field]
-            assume(field, f"{float(value):g}" if field == "engine_displacement" else value, label)
-    if blank("odometer_reading"):
-        assume("odometer_reading", f"{float(fallback.get('latest_odometer') or 0):.0f}", "odometer (km)")
-
-    try:
-        distance = float(f.get("distance_km") or "")
-    except ValueError:
-        distance = None
-    if distance and distance > 0:
-        def num(field):
-            try:
-                v = float(f.get(field) or "")
-                return v if v > 0 else None
-            except ValueError:
-                return None
-        duration, speed = num("duration_minutes"), num("avg_speed_kmh")
-        if duration is None and speed is None:
-            typical = db.query_one("SELECT AVG(avg_speed_kmh) AS s FROM trip_records")["s"]
-            speed = round(float(typical), 1) if typical else 40.0
-            assume("avg_speed_kmh", f"{speed:g}", "average speed (km/h, fleet typical)")
-        if duration is None:
-            assume("duration_minutes", f"{min(max(distance / speed * 60, 1), 1439):.1f}", "duration (min, from distance and speed)")
-        elif speed is None:
-            assume("avg_speed_kmh", f"{min(max(distance / (duration / 60), 0.1), 159):.1f}", "average speed (km/h, from distance and duration)")
-
-    for field, (value, label) in PREDICTION_DEFAULTS.items():
-        if blank(field):
-            assume(field, value, label)
-    return f, assumed
-
-
 def validate_prediction_form(form):
-    """Server-side validation (the browser checks can be bypassed).
-    Returns a list of error messages; empty means the input is usable."""
-    errors = []
-    if not (form.get("distance_km") or "").strip():
-        return ["Please enter the Distance Traveled (km) — it is the only required field."]
-
-    for field, (label, lo, hi, allow_lo) in PREDICTION_NUMERIC_LIMITS.items():
-        raw = form.get(field, "0" if field == "passenger_cargo_load_kg" else "")
-        try:
-            value = float(raw or 0)
-        except ValueError:
-            errors.append(f"{label} must be a number.")
-            continue
-        if value != value or value > hi or value < lo or (value == lo and not allow_lo):
-            errors.append(f"{label} must be {'at least' if allow_lo else 'greater than'} {lo:,} and at most {hi:,}.")
+    """Server-side validation (the browser checks can be bypassed). The staff
+    select a vehicle and enter the trip distance; the vehicle's engine power and
+    fuel type come from its record. Returns (errors, vehicle)."""
+    vehicle_id = (form.get("vehicle_id") or "").strip()
+    vehicle = None
+    if not vehicle_id:
+        return ["Please select the vehicle for the trip."], None
+    if vehicle_id.isdigit():
+        vehicle = next((v for v in get_prediction_vehicles() if v["id"] == int(vehicle_id)), None)
+    if vehicle is None:
+        return ["The selected vehicle no longer exists. Please choose another vehicle."], None
+    raw = (form.get("distance_km") or "").strip()
+    if not raw:
+        return ["Please enter the Distance Traveled (km) of the planned trip."], vehicle
     try:
-        year = int(form["year_model"])
-        if not 1980 <= year <= today_local().year + 1:
-            errors.append(f"Year model must be between 1980 and {today_local().year + 1}.")
+        distance = float(raw)
     except ValueError:
-        errors.append("Year model must be a whole number.")
-    if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", form["departure_time"].strip()):
-        errors.append("Departure time must be a valid 24-hour time, e.g. 08:30.")
-    for field, options, label in (("trip_type", TRIP_TYPES, "trip type"), ("road_type", ROAD_TYPES, "road type"),
-                                  ("terrain_classification", TERRAINS, "terrain"),
-                                  ("vehicle_type", VEHICLE_TYPES, "vehicle type"), ("fuel_type", FUEL_TYPES, "fuel type")):
-        if form[field] not in options:
-            errors.append(f"Please choose a valid {label}.")
-    if len(form["route"].strip()) > 150:
-        errors.append("Route must be at most 150 characters.")
-    vehicle_id = form.get("vehicle_id") or ""
-    if vehicle_id and not (vehicle_id.isdigit() and db.query_one("SELECT id FROM vehicles WHERE id = %s", (vehicle_id,))):
-        errors.append("The selected vehicle no longer exists. Please choose another vehicle.")
-    return errors
+        return ["Distance traveled must be a number."], vehicle
+    if distance != distance or not 0 < distance <= 1000:
+        return ["Distance traveled must be greater than 0 and at most 1,000 km."], vehicle
+    errors = []
+    if vehicle["engine_power_kw"] is None or float(vehicle["engine_power_kw"]) <= 0:
+        errors.append(f"{vehicle['plate_number']} has no engine power (kW) in its vehicle record yet. "
+                      "Please add it in Vehicle Management first.")
+    if vehicle["fuel_type"] not in FUEL_TYPES:
+        errors.append(f"{vehicle['plate_number']} has no valid fuel type in its vehicle record.")
+    return errors, vehicle
 
 
 def prediction_warnings(values, metrics, raw_prediction=None):
     """Plain-language cautions shown with a result: inputs outside what the
-    model was trained on, or a non-positive raw model output."""
+    model was trained on, a fuel type it has no trips for, or a non-positive
+    raw model output."""
     warnings = []
     ranges = (metrics or {}).get("feature_ranges") or {}
-    # Only predictors the model actually uses: a value the variable selection
-    # removed (e.g. odometer) cannot make the estimate less reliable.
-    used = (metrics or {}).get("selected_numeric_features")
     for field, (label, unit) in PREDICTION_FEATURE_LABELS.items():
-        if field not in ranges or values.get(field) in (None, "") or (used is not None and field not in used):
+        if field not in ranges or values.get(field) in (None, ""):
             continue
         lo, hi = ranges[field]
         v = float(values[field])
         if v < lo or v > hi:
-            warnings.append(f"{label} ({v:g} {unit}".rstrip() + f") is outside the range the model was trained on "
-                            f"({lo:g}–{hi:g} {unit}".rstrip() + ").")
-    # Categories with no training trips at all: the model cannot know how they
-    # change fuel use, so the estimate falls back to what it learned elsewhere.
-    seen = (metrics or {}).get("category_values") or {}
-    for field, label in PREDICTION_CATEGORY_LABELS.items():
-        value = str(values.get(field) or "")
-        if value and field in seen and value not in seen[field]:
-            warnings.append(f"The model has no trip records yet for {label} \"{value}\" (it was trained on "
-                            f"{', '.join(seen[field])}), so this estimate does not reflect how it changes fuel use.")
-    try:
-        d, t, sp = float(values["distance_km"]), float(values["duration_minutes"]), float(values["avg_speed_kmh"])
-        implied = d / (t / 60) if t else 0
-        if implied and abs(implied - sp) / sp > 0.5:
-            warnings.append(f"Distance and duration imply about {implied:.0f} km/h, but the average speed entered is {sp:g} km/h. "
-                            "Please double-check these values.")
-    except (KeyError, ValueError, TypeError, ZeroDivisionError):
-        pass
+            warnings.append(f"{label} ({v:g} {unit}) is outside the range the model was trained on ({lo:g}–{hi:g} {unit}).")
+    # The ranges of the trips of this fuel type: the diesel trips may cover far
+    # fewer vehicles and distances than the gasoline trips.
+    fuel_ranges = ((metrics or {}).get("ranges_by_fuel") or {}).get(str(values.get("fuel_type") or ""))
+    if fuel_ranges and not warnings:
+        for field, (label, unit) in PREDICTION_FEATURE_LABELS.items():
+            if field not in fuel_ranges or values.get(field) in (None, ""):
+                continue
+            lo, hi = fuel_ranges[field]
+            v = float(values[field])
+            if v < lo or v > hi:
+                span = f"{lo:g} {unit}" if lo == hi else f"{lo:g}–{hi:g} {unit}"
+                warnings.append(f"{label} ({v:g} {unit}) is outside the {values['fuel_type']} trips the model was trained on "
+                                f"({span}, {fuel_ranges.get('records', 0)} trips), so this estimate is an extrapolation.")
+    seen = ((metrics or {}).get("category_values") or {}).get("fuel_type")
+    fuel = str(values.get("fuel_type") or "")
+    if seen and fuel and fuel not in seen:
+        warnings.append(f"The model has no trip records yet for fuel type \"{fuel}\" (it was trained on "
+                        f"{', '.join(seen)}), so this estimate does not reflect how it changes fuel use.")
     if raw_prediction is not None and raw_prediction <= 0:
         warnings.append("The model's estimate for this trip was at or below zero, so the minimum of 0.1 L is shown.")
     return warnings
-
-
-def model_input_fields(metrics):
-    """Form fields the current model actually uses after merging and variable
-    selection; the others are only recorded with the request. None when unknown."""
-    if not metrics or metrics.get("selected_numeric_features") is None:
-        return None
-    used = set(metrics["selected_numeric_features"]) | set(metrics.get("selected_categorical_features") or [])
-    if "departure_period" in used:  # derived from the departure time
-        used.add("departure_time")
-    return used
 
 
 def render_prediction_page(form=None, errors=None, status=200):
@@ -968,10 +786,8 @@ def render_prediction_page(form=None, errors=None, status=200):
     metrics = get_metrics()
     return render_template(
         "prediction.html", active="prediction",
-        model_available=model is not None, model_metrics=metrics, model_fields=model_input_fields(metrics),
-        vehicles=get_prediction_vehicles(), vehicle_types=VEHICLE_TYPES, trip_types=TRIP_TYPES,
-        road_types=ROAD_TYPES, terrains=TERRAINS, routes=get_known_routes(),
-        form=form or {}, errors=errors or [], max_year=today_local().year + 1,
+        model_available=model is not None, model_metrics=metrics,
+        vehicles=get_prediction_vehicles(), form=form or {}, errors=errors or [],
     ), status
 
 
@@ -984,54 +800,41 @@ def prediction():
     model = get_model()
     if model is None:
         return render_prediction_page(request.form, ["Model unavailable. Please train the model before making predictions."])
-    form, assumed = fill_prediction_defaults(request.form)
-    errors = validate_prediction_form(form)
+    errors, vehicle = validate_prediction_form(request.form)
     if errors:
         return render_prediction_page(request.form, errors)
 
+    # The system retrieves the engine power and fuel type of the selected vehicle
+    # from its records and passes them to the model with the trip distance.
+    values = {"distance_km": float(request.form["distance_km"]),
+              "engine_power_kw": float(vehicle["engine_power_kw"]), "fuel_type": vehicle["fuel_type"]}
     try:
-        row = build_prediction_frame(form)
-        row = attach_rated_efficiency(row, app.config["SUPPLEMENTARY_DATA_PATH"])
-        raw_prediction = float(model.predict(row)[0])
+        raw_prediction = float(model.predict(build_prediction_frame(values))[0])
     except (ValueError, KeyError) as e:
         return render_prediction_page(request.form, [f"Invalid input values: {e}"])
     predicted_fuel = max(round(raw_prediction, 2), 0.1)
 
-    f = form
     pred_id = db.execute("""
-        INSERT INTO predictions (
-            user_id, vehicle_id, odometer_reading, distance_km, duration_minutes,
-            avg_speed_kmh, trip_type, departure_time, passenger_cargo_load_kg, route,
-            road_type, terrain_classification, vehicle_type, engine_displacement,
-            fuel_type, year_model, predicted_fuel
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        session["user_id"], f.get("vehicle_id") or None, f["odometer_reading"], f["distance_km"],
-        f["duration_minutes"], f["avg_speed_kmh"], f["trip_type"], f["departure_time"].strip(),
-        f.get("passenger_cargo_load_kg", 0) or 0, f["route"].strip(), f["road_type"],
-        f["terrain_classification"], f["vehicle_type"], f["engine_displacement"], f["fuel_type"],
-        f["year_model"], predicted_fuel,
-    ))
+        INSERT INTO predictions (user_id, vehicle_id, distance_km, engine_power_kw, fuel_type, predicted_fuel)
+        VALUES (%s,%s,%s,%s,%s,%s)
+    """, (session["user_id"], vehicle["id"], values["distance_km"], values["engine_power_kw"],
+          values["fuel_type"], predicted_fuel))
     flash("Prediction saved and submitted as a fuel request for administrator approval.", "success")
-    if assumed:
-        flash("Blank fields were filled in with: " + "; ".join(assumed) + ".", "info")
-    _link_actuals_quietly()  # the trip ticket may already be encoded
+    _link_actuals_quietly()  # the trip may already be encoded
     return redirect(url_for("prediction_result", prediction_id=pred_id))
 
 
 @app.route("/api/prediction-options")
 @login_required
 def api_prediction_options():
-    """Live data for the prediction form: vehicles, route suggestions and
-    the model currently used for predictions."""
+    """Live data for the prediction form: vehicles and the model currently
+    used for predictions."""
     metrics = get_metrics() or {}
     return {
         "vehicles": [{
-            "id": v["id"], "label": f"{v['plate_number']} — {v['brand_model']}", "type": v["vehicle_type"],
-            "displacement": str(v["engine_displacement"]), "fuel": v["fuel_type"], "year": v["year_model"],
-            "odometer": f"{float(v['latest_odometer']):.2f}",
+            "id": v["id"], "label": f"{v['plate_number']} — {v['brand_model']}", "fuel": v["fuel_type"],
+            "power": "" if v["engine_power_kw"] is None else f"{float(v['engine_power_kw']):g}",
         } for v in get_prediction_vehicles()],
-        "routes": get_known_routes(),
         "model": {"available": get_model() is not None, "version": metrics.get("model_version"),
                   "r2": metrics.get("r2_score"), "mae": metrics.get("mae"), "retraining": _WATCHER["retraining"]},
     }
@@ -1041,7 +844,7 @@ def api_prediction_options():
 @login_required
 def prediction_result(prediction_id):
     pred = db.query_one("""
-        SELECT p.*, v.plate_number FROM predictions p
+        SELECT p.*, v.plate_number, v.brand_model FROM predictions p
         LEFT JOIN vehicles v ON p.vehicle_id = v.id
         WHERE p.id = %s
     """, (prediction_id,))
@@ -1098,9 +901,9 @@ def prediction_history_data(args):
     where, params = ["1=1"], []
     if q:
         like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where.append("(v.plate_number LIKE %s OR p.route LIKE %s OR p.vehicle_type LIKE %s OR p.trip_type LIKE %s"
+        where.append("(v.plate_number LIKE %s OR v.brand_model LIKE %s"
                      " OR (p.vehicle_id IS NULL AND 'Manual Entry' LIKE %s))")
-        params += [like] * 5
+        params += [like] * 3
     if fuel_type in FUEL_TYPES:
         where.append("p.fuel_type = %s")
         params.append(fuel_type)
@@ -1135,7 +938,7 @@ def prediction_history_data(args):
     # and each keeps its request number (1 = the first request ever made) even
     # when the list is filtered or paged, so "No." always names the same request.
     rows = db.query_all(f"""
-        SELECT p.*, v.plate_number, u.full_name, r.full_name AS reviewer_name,
+        SELECT p.*, v.plate_number, v.brand_model, u.full_name, r.full_name AS reviewer_name,
                (SELECT COUNT(*) FROM predictions p2
                 WHERE p2.created_at < p.created_at OR (p2.created_at = p.created_at AND p2.id <= p.id)) AS request_no
         FROM predictions p
@@ -1155,9 +958,10 @@ def prediction_history_data(args):
             "id": p["id"], "num": int(p["request_no"]),
             "created_at": p["created_at"].strftime("%b %d, %Y %I:%M %p"),
             "created_at_long": p["created_at"].strftime("%B %d, %Y %I:%M %p"),
-            "vehicle": p["plate_number"] or "Manual Entry", "vehicle_type": p["vehicle_type"],
-            "vehicle_label": f"{p['plate_number'] or 'Manual Entry'} ({p['vehicle_type']})",
-            "route": p["route"], "fuel_type": p["fuel_type"],
+            "vehicle": p["plate_number"] or "Manual Entry", "vehicle_model": p["brand_model"] or "",
+            "vehicle_label": f"{p['plate_number']} ({p['brand_model']})" if p["plate_number"] else "Manual Entry",
+            "fuel_type": p["fuel_type"],
+            "engine_power_kw": f"{float(p['engine_power_kw']):g}" if p.get("engine_power_kw") is not None else "",
             "distance_km": f"{float(p['distance_km']):.2f}",
             "predicted_fuel": f"{predicted:.2f}",
             "actual_fuel": f"{actual:.2f}" if actual is not None else "",
@@ -1275,74 +1079,90 @@ def delete_prediction(prediction_id):
     return back_to_list("prediction_history")
 
 
-VEHICLE_STATUSES = ["Active", "Maintenance", "Inactive"]
-
-
 VEHICLE_EXTRA_COLUMNS = (
-    ("seating_capacity", "INT NULL"),
-    ("station", "VARCHAR(100) NULL"),
-    ("assigned_driver", "VARCHAR(100) NULL"),
-    ("remarks", "VARCHAR(255) NULL"),
+    ("engine_power_kw", "DECIMAL(6,2) NULL"),
 )
+# Columns from the earlier design that the study no longer collects (the
+# vehicle records are plate number, model, fuel type and engine power; the
+# Monthly Report of Official Travel records date, distance and fuel consumed).
+# They stay in the database with their old values but are no longer required.
+OPTIONAL_LEGACY_COLUMNS = {
+    "vehicles": ("vehicle_type", "engine_displacement", "year_model"),
+    "trip_records": ("trip_type", "departure_time", "route", "road_type", "terrain_classification",
+                     "odometer_reading", "duration_minutes", "avg_speed_kmh"),
+    "predictions": ("odometer_reading", "duration_minutes", "avg_speed_kmh", "trip_type", "departure_time",
+                    "route", "road_type", "terrain_classification", "vehicle_type", "engine_displacement",
+                    "year_model"),
+}
+# Engine power (kW) from published manufacturer specifications matched to each
+# fleet vehicle's model and fuel type (Scope and Limitations). Filled in only
+# where a vehicle has none yet; corrected values are edited in Vehicle Management.
+PUBLISHED_ENGINE_POWER_KW = {
+    "SFA 4712": 95, "SFA 4713": 95, "SFA 4714": 95,  # Nissan NV350 Urvan 2.5 diesel, 129 PS
+    "SFA 1172": 130,  # Toyota HiAce GL Grandia 2.8 diesel (1GD-FTV), 174 hp
+    "SFA 1173": 128,  # Toyota Innova 2.8 diesel (1GD-FTV), 174 PS
+    "SEF 535": 51,    # Mitsubishi L300 2.5 diesel (4D56), 70 hp
+    "SJC 955": 62,    # Isuzu Crosswind 2.5 diesel (4JA1-L), 85 PS
+    "SGF 810": 63,    # Toyota Revo diesel (2L-II), 85 PS (to be confirmed)
+    "SFA 1741": 209,  # Hino bus 7.7 L diesel (J08E), 280 hp (to be confirmed)
+}
 _VEHICLE_COLUMNS_READY = {"ok": False}
 
 
 def _ensure_vehicle_columns():
-    """Adds the GSO vehicle-list columns (seating capacity, station, driver,
-    remarks) on first use, so an existing database needs no manual migration."""
+    """One-time schema update on first use, so an existing database needs no
+    manual migration: adds the vehicle columns (incl. engine power), adds engine
+    power to the fuel requests, makes the columns the study no longer collects
+    optional, and fills in the published engine power of the fleet vehicles."""
     if _VEHICLE_COLUMNS_READY["ok"]:
         return
-    have = {r["c"] for r in db.query_all("""
-        SELECT COLUMN_NAME AS c FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vehicles'
-    """)}
+    columns = db.query_all("""
+        SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLUMN_TYPE AS ty, IS_NULLABLE AS n
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('vehicles', 'trip_records', 'predictions')
+    """)
+    have = {(r["t"], r["c"]): r for r in columns}
     for name, ddl in VEHICLE_EXTRA_COLUMNS:
-        if name not in have:
+        if ("vehicles", name) not in have:
             db.execute(f"ALTER TABLE vehicles ADD COLUMN {name} {ddl}")
+    if ("predictions", "engine_power_kw") not in have:
+        db.execute("ALTER TABLE predictions ADD COLUMN engine_power_kw DECIMAL(6,2) NULL")
+    for table, names in OPTIONAL_LEGACY_COLUMNS.items():
+        for name in names:
+            col = have.get((table, name))
+            if col and col["n"] == "NO":
+                db.execute(f"ALTER TABLE {table} MODIFY {name} {col['ty']} NULL")
+    for plate, kw in PUBLISHED_ENGINE_POWER_KW.items():
+        db.execute("UPDATE vehicles SET engine_power_kw = %s WHERE plate_number = %s AND engine_power_kw IS NULL",
+                   (kw, plate))
     _VEHICLE_COLUMNS_READY["ok"] = True
 
 
-def query_vehicles(status=""):
-    """Vehicles with live figures from their records: the latest known
-    odometer (recorded value or end of the latest trip, whichever is higher)
-    and how many trip / fuel records depend on each vehicle."""
+def query_vehicles():
+    """Vehicles with how many trip records depend on each one and its last trip."""
     _ensure_vehicle_columns()
-    where, params = "", ()
-    if status in VEHICLE_STATUSES:
-        where, params = "WHERE v.status = %s", (status,)
-    return db.query_all(f"""
+    return db.query_all("""
         SELECT v.*,
-               GREATEST(COALESCE(v.current_odometer, 0),
-                        COALESCE((SELECT MAX(t.odometer_reading + t.distance_km) FROM trip_records t WHERE t.vehicle_id = v.id), 0)
-               ) AS latest_odometer,
                (SELECT COUNT(*) FROM trip_records t WHERE t.vehicle_id = v.id) AS trip_count,
-               (SELECT COUNT(*) FROM fuel_records f WHERE f.vehicle_id = v.id) AS fuel_count,
                (SELECT MAX(t.trip_date) FROM trip_records t WHERE t.vehicle_id = v.id) AS last_trip_date
-        FROM vehicles v {where}
+        FROM vehicles v
         ORDER BY v.plate_number
-    """, params)
+    """)
 
 
 def vehicle_record(v, num):
     """JSON-safe row used by the table, the shared modals and the live API."""
     return {
-        "id": v["id"], "num": num, "plate_number": v["plate_number"], "vehicle_type": v["vehicle_type"],
-        "brand_model": v["brand_model"], "engine_displacement": str(v["engine_displacement"]),
-        "fuel_type": v["fuel_type"], "year_model": v["year_model"], "status": v["status"],
-        "seating_capacity": v["seating_capacity"] if v["seating_capacity"] is not None else "",
-        "station": v["station"] or "", "assigned_driver": v["assigned_driver"] or "", "remarks": v["remarks"] or "",
-        # The edit form gets the vehicle's own recorded reading; the table shows
-        # the latest known one (recorded value or end of the latest trip).
-        # Feeding the latter into the form made every save copy trip mileage
-        # into the vehicle, so a corrected or deleted trip left it too high.
-        "current_odometer": f"{float(v['current_odometer'] or 0):.2f}",
-        "odometer": f"{float(v['latest_odometer']):.2f}",
-        "trip_count": int(v["trip_count"]), "fuel_count": int(v["fuel_count"]),
+        "id": v["id"], "num": num, "plate_number": v["plate_number"], "brand_model": v["brand_model"],
+        "fuel_type": v["fuel_type"],
+        "engine_power_kw": f"{float(v['engine_power_kw']):g}" if v.get("engine_power_kw") is not None else "",
+        "trip_count": int(v["trip_count"]),
         "last_trip_date": str(v["last_trip_date"]) if v["last_trip_date"] else "",
     }
 
 
 def validate_vehicle_form(f, vehicle_id=None):
+    """Vehicle records: plate number, vehicle model, fuel type and engine power (kW)."""
     errors = []
     plate = (f.get("plate_number") or "").strip().upper()
     if not plate:
@@ -1351,62 +1171,43 @@ def validate_vehicle_form(f, vehicle_id=None):
         errors.append("Plate number may only contain letters, numbers, spaces and dashes (max 20 characters).")
     elif db.query_one("SELECT id FROM vehicles WHERE plate_number = %s AND id <> %s", (plate, vehicle_id or 0)):
         errors.append(f"Plate number {plate} is already registered to another vehicle.")
-    if f.get("vehicle_type") not in VEHICLE_TYPES:
-        errors.append("Please choose a valid vehicle type.")
     model = (f.get("brand_model") or "").strip()
     if not model or len(model) > 100:
-        errors.append("Model is required (max 100 characters).")
+        errors.append("Vehicle model is required (max 100 characters).")
     if f.get("fuel_type") not in FUEL_TYPES:
         errors.append("Please choose a valid fuel type.")
-    if f.get("status") not in VEHICLE_STATUSES:
-        errors.append("Please choose a valid status.")
-    checks = (("engine_displacement", "Engine displacement", 0, 20, False),
-              ("current_odometer", "Current odometer", 0, 2_000_000, True))
-    for field, label, lo, hi, allow_lo in checks:
-        try:
-            value = float(f.get(field) or "")
-            if value > hi or value < lo or (value == lo and not allow_lo):
-                raise ValueError
-        except ValueError:
-            errors.append(f"{label} must be a number {'from' if allow_lo else 'greater than'} {lo:,} {'to' if allow_lo else 'and at most'} {hi:,}.")
     try:
-        year = int(f.get("year_model") or "")
-        if not 1980 <= year <= today_local().year + 1:
+        power = float(f.get("engine_power_kw") or "")
+        # power != power catches "nan", which passes every comparison.
+        if power != power or not 0 < power <= 1000:
             raise ValueError
     except ValueError:
-        errors.append(f"Year model must be a whole number from 1980 to {today_local().year + 1}.")
-    seats = (f.get("seating_capacity") or "").strip()
-    if seats and not (seats.isdigit() and 1 <= int(seats) <= 100):
-        errors.append("Seating capacity must be a whole number from 1 to 100 (or left blank).")
-    for field, label, limit in (("station", "Station", 100), ("assigned_driver", "Driver", 100),
-                                ("remarks", "Remarks", 255)):
-        if len((f.get(field) or "").strip()) > limit:
-            errors.append(f"{label} must be at most {limit} characters.")
+        errors.append("Engine power must be a number greater than 0 and at most 1,000 kW.")
     return errors
 
 
 def _vehicle_values(f):
-    def optional(field):
-        return (f.get(field) or "").strip() or None
-    return (f["plate_number"].strip().upper(), f["vehicle_type"], f["brand_model"].strip(),
-            f["engine_displacement"], f["fuel_type"], f["year_model"], f["current_odometer"], f["status"],
-            optional("seating_capacity"), optional("station"), optional("assigned_driver"), optional("remarks"))
+    return (f["plate_number"].strip().upper(), f["brand_model"].strip(), f["fuel_type"],
+            round(float(f["engine_power_kw"]), 2))
+
+
+def render_vehicles_page(reopen=None):
+    """`reopen` (after a rejected save) opens the same form again with what the
+    user typed, instead of losing it."""
+    rows = [vehicle_record(v, i) for i, v in enumerate(query_vehicles(), 1)]
+    return render_template("vehicles.html", active="vehicles", vehicles=rows, reopen=reopen)
 
 
 @app.route("/vehicles")
 @login_required
 def vehicles():
-    status = request.args.get("status", "")
-    rows = [vehicle_record(v, i) for i, v in enumerate(query_vehicles(status), 1)]
-    return render_template("vehicles.html", active="vehicles", vehicles=rows, vehicle_types=VEHICLE_TYPES,
-                           statuses=VEHICLE_STATUSES, max_year=today_local().year + 1)
+    return render_vehicles_page()
 
 
 @app.route("/api/vehicles")
 @login_required
 def api_vehicles():
-    status = request.args.get("status", "")
-    return {"vehicles": [vehicle_record(v, i) for i, v in enumerate(query_vehicles(status), 1)]}
+    return {"vehicles": [vehicle_record(v, i) for i, v in enumerate(query_vehicles(), 1)]}
 
 
 @app.route("/vehicles/add", methods=["POST"])
@@ -1415,14 +1216,12 @@ def add_vehicle():
     errors = validate_vehicle_form(request.form)
     if errors:
         flash("Could not add vehicle: " + " ".join(errors), "danger")
-        return redirect(url_for("vehicles"))
+        return render_vehicles_page({"modal": "addVehicleModal", "values": request.form.to_dict()})
     try:
         _ensure_vehicle_columns()
         db.execute("""
-            INSERT INTO vehicles (plate_number, vehicle_type, brand_model, engine_displacement,
-                fuel_type, year_model, current_odometer, status,
-                seating_capacity, station, assigned_driver, remarks)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            INSERT INTO vehicles (plate_number, brand_model, fuel_type, engine_power_kw)
+            VALUES (%s,%s,%s,%s)
         """, _vehicle_values(request.form))
         flash("Vehicle added successfully.", "success")
     except Exception:
@@ -1440,13 +1239,12 @@ def edit_vehicle(vehicle_id):
     errors = validate_vehicle_form(request.form, vehicle_id)
     if errors:
         flash("Could not update vehicle: " + " ".join(errors), "danger")
-        return redirect(url_for("vehicles"))
+        return render_vehicles_page({"modal": "editVehicleModal", "vehicle_id": vehicle_id,
+                                     "values": request.form.to_dict()})
     try:
         _ensure_vehicle_columns()
         db.execute("""
-            UPDATE vehicles SET plate_number=%s, vehicle_type=%s, brand_model=%s,
-                engine_displacement=%s, fuel_type=%s, year_model=%s, current_odometer=%s, status=%s,
-                seating_capacity=%s, station=%s, assigned_driver=%s, remarks=%s
+            UPDATE vehicles SET plate_number=%s, brand_model=%s, fuel_type=%s, engine_power_kw=%s
             WHERE id = %s
         """, _vehicle_values(request.form) + (vehicle_id,))
         flash("Vehicle updated successfully.", "success")
@@ -1464,10 +1262,10 @@ def delete_vehicle(vehicle_id):
         flash("That vehicle no longer exists.", "danger")
         return redirect(url_for("vehicles"))
     try:
-        # trip_records / fuel_records cascade in the database schema.
+        # The vehicle's trip records cascade in the database schema.
         db.execute("DELETE FROM vehicles WHERE id = %s", (vehicle_id,))
         compact_ids("vehicles", "trip_records", "fuel_records", "predictions")
-        flash(f"Vehicle {v['plate_number']} and its trip and fuel records were deleted.", "success")
+        flash(f"Vehicle {v['plate_number']} and its trip records were deleted.", "success")
     except Exception:
         app.logger.exception("Deleting vehicle failed")
         flash("Could not delete vehicle due to a database error. Please try again.", "danger")
@@ -1478,75 +1276,44 @@ def delete_vehicle(vehicle_id):
 # TRIP RECORDS
 # ------------------------------------------------------------------
 TRIP_NUMERIC_LIMITS = (
-    # field, label, min, max, min allowed?, required?
-    ("odometer_reading", "Odometer reading", 0, 2_000_000, True, True),
-    ("distance_km", "Distance traveled", 0, 1000, False, True),
-    ("duration_minutes", "Duration", 0, 1440, False, True),
-    ("avg_speed_kmh", "Average speed", 0, 160, False, True),
-    ("passenger_cargo_load_kg", "Passenger / cargo load", 0, 20_000, True, False),
-    ("actual_fuel_consumption", "Gasoline/diesoline consumed", 0, 1000, False, False),
-    ("balance_in_tank", "Balance in the tank", -1000, 1000, True, False),
-    ("fuel_received", "Fuel received", 0, 1000, False, False),
+    # field, label, min, max -- both are required (Monthly Report of Official Travel)
+    ("distance_km", "Distance traveled", 0, 1000),
+    ("actual_fuel_consumption", "Fuel consumed", 0, 1000),
 )
-
-# Columns of the GSO "Monthly Report of Official Travel" kept with each trip
-# (added on first use, so an existing database needs no migration).
-_TRIP_SHEET_READY = {"ok": False}
-
-
-def _ensure_trip_sheet_columns():
-    if _TRIP_SHEET_READY["ok"]:
-        return
-    have = {r["c"] for r in db.query_all("""
-        SELECT COLUMN_NAME AS c FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trip_records'""")}
-    for column, ddl in (("balance_in_tank", "DECIMAL(9,3) NULL COMMENT 'liters, as on the monthly report'"),
-                        ("fuel_received", "DECIMAL(9,3) NULL COMMENT 'liters'"),
-                        ("or_invoice_no", "VARCHAR(60) NULL")):
-        if column not in have:
-            db.execute(f"ALTER TABLE trip_records ADD COLUMN {column} {ddl}")
-    _TRIP_SHEET_READY["ok"] = True
-
-
-def _fmt_liters(value):
-    return f"{float(value):.3f}" if value is not None else ""
+# A trip using less or more than this many liters per 100 km is saved, but the
+# user is asked to double-check it (likely an encoding error on the report).
+TRIP_EFFICIENCY_WARN = (3, 60)
 
 
 def trip_record(t, num):
     """JSON-safe trip row used by the table, the shared modals and the live API."""
-    dep = format_time(t["departure_time"])
     return {
         "id": t["id"], "num": num, "vehicle_id": t["vehicle_id"],
-        "trip_date": str(t["trip_date"]), "departure_time": dep, "trip_type": t["trip_type"],
-        "route": t["route"], "road_type": t["road_type"], "terrain_classification": t["terrain_classification"],
-        "odometer_reading": str(t["odometer_reading"]), "distance_km": str(t["distance_km"]),
-        "duration_minutes": str(t["duration_minutes"]), "avg_speed_kmh": str(t["avg_speed_kmh"]),
-        "passenger_cargo_load_kg": str(t["passenger_cargo_load_kg"]),
+        "trip_date": str(t["trip_date"]), "plate_number": t["plate_number"], "brand_model": t["brand_model"],
+        "distance_km": str(t["distance_km"]),
         "actual_fuel_consumption": str(t["actual_fuel_consumption"]) if t["actual_fuel_consumption"] is not None else "",
-        "remarks": t["remarks"] or "", "plate_number": t["plate_number"],
-        "balance_in_tank": _fmt_liters(t.get("balance_in_tank")), "fuel_received": _fmt_liters(t.get("fuel_received")),
-        "or_invoice_no": t.get("or_invoice_no") or "",
-        "destination": t["route"] + (f" — {t['remarks']}" if t["remarks"] else ""),
-        "date_time": f"{t['trip_date']} {dep}", "road_terrain": f"{t['road_type']} / {t['terrain_classification']}",
+        "remarks": t["remarks"] or "",
     }
 
 
 def query_trips():
-    _ensure_trip_sheet_columns()
+    _ensure_vehicle_columns()
     rows = db.query_all("""
-        SELECT t.*, v.plate_number
+        SELECT t.id, t.vehicle_id, t.trip_date, t.distance_km, t.actual_fuel_consumption, t.remarks,
+               v.plate_number, v.brand_model
         FROM trip_records t
         JOIN vehicles v ON t.vehicle_id = v.id
-        ORDER BY t.trip_date, t.departure_time, t.id
+        ORDER BY t.trip_date, t.id
     """)
-    # Oldest first (January to December, like the GSO monthly travel reports);
-    # a newly added or edited trip lands in its date's place automatically.
+    # Oldest first (January to December, like the Monthly Report of Official
+    # Travel); a newly added or edited trip lands in its date's place automatically.
     return [trip_record(r, i) for i, r in enumerate(rows, 1)]
 
 
 def validate_trip_form(f, trip_id=None):
-    """Returns (errors, warnings). Errors block saving; warnings are shown
-    but the trip is still saved. `trip_id` is the trip being edited, if any."""
+    """Monthly Report of Official Travel: date of travel, vehicle, distance
+    traveled (km) and fuel consumed (L). Returns (errors, warnings). Errors
+    block saving; warnings are shown but the trip is still saved."""
     errors, warnings = [], []
     vid = (f.get("vehicle_id") or "").strip()
     if not (vid.isdigit() and db.query_one("SELECT id FROM vehicles WHERE id = %s", (vid,))):
@@ -1554,63 +1321,29 @@ def validate_trip_form(f, trip_id=None):
     try:
         trip_date = date.fromisoformat((f.get("trip_date") or "").strip())
         if not date(2000, 1, 1) <= trip_date <= today_local():
-            errors.append(f"Trip date must be between 2000-01-01 and today ({today_local().isoformat()}).")
+            errors.append(f"Date of travel must be between 2000-01-01 and today ({today_local().isoformat()}).")
     except ValueError:
-        errors.append("Trip date must be a valid date.")
-    if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?", (f.get("departure_time") or "").strip()):
-        errors.append("Departure time must be a valid 24-hour time, e.g. 08:30.")
-    for field, options, label in (("trip_type", TRIP_TYPES, "trip type"), ("road_type", ROAD_TYPES, "road type"),
-                                  ("terrain_classification", TERRAINS, "terrain")):
-        if f.get(field) not in options:
-            errors.append(f"Please choose a valid {label}.")
-    route = (f.get("route") or "").strip()
-    if not route or len(route) > 150:
-        errors.append("Route is required (max 150 characters).")
+        errors.append("Date of travel must be a valid date.")
     if len((f.get("remarks") or "").strip()) > 255:
         errors.append("Remarks must be at most 255 characters.")
-    if len((f.get("or_invoice_no") or "").strip()) > 60:
-        errors.append("OR / Invoice no. must be at most 60 characters.")
     values = {}
-    for field, label, lo, hi, allow_lo, required in TRIP_NUMERIC_LIMITS:
-        raw = (f.get(field) or "").strip()
-        if raw == "" and not required:
-            continue
+    for field, label, lo, hi in TRIP_NUMERIC_LIMITS:
+        raw = (f.get(field) or "").strip().replace(",", "")
         try:
             value = float(raw)
-            if value != value or value > hi or value < lo or (value == lo and not allow_lo):
+            # value != value catches "nan", which passes every comparison.
+            if value != value or not lo < value <= hi:
                 raise ValueError
             values[field] = value
         except ValueError:
-            errors.append(f"{label} must be a number {'from' if allow_lo else 'greater than'} {lo:,} "
-                          f"{'to' if allow_lo else 'and at most'} {hi:,}.")
-    if not errors and {"distance_km", "duration_minutes", "avg_speed_kmh"} <= values.keys():
-        implied = values["distance_km"] / (values["duration_minutes"] / 60)
-        if abs(implied - values["avg_speed_kmh"]) / values["avg_speed_kmh"] > 0.5:
-            warnings.append(f"Distance and duration imply about {implied:.0f} km/h, but the average speed entered is "
-                            f"{values['avg_speed_kmh']:g} km/h. Please double-check this trip.")
-    if not errors and {"odometer_reading", "distance_km"} <= values.keys():
-        warnings.extend(_odometer_warnings(vid, trip_date, values["odometer_reading"], values["distance_km"], trip_id))
+            errors.append(f"{label} must be a number greater than {lo:,} and at most {hi:,}.")
+    if not errors:
+        per_100 = values["actual_fuel_consumption"] / values["distance_km"] * 100
+        lo, hi = TRIP_EFFICIENCY_WARN
+        if not lo <= per_100 <= hi:
+            warnings.append(f"This trip used {per_100:.1f} L per 100 km, which is unusual. Please double-check the "
+                            "distance and the fuel consumed.")
     return errors, warnings
-
-
-def _odometer_warnings(vehicle_id, trip_date, odometer, distance, trip_id=None):
-    """The odometer (reading at the start of the trip) must not go backwards:
-    not below where the vehicle's previous trip ended, and this trip must end
-    before the next trip starts."""
-    warnings = []
-    prev = db.query_one("""SELECT MAX(odometer_reading + distance_km) AS km FROM trip_records
-                           WHERE vehicle_id = %s AND trip_date < %s AND id <> %s""",
-                        (vehicle_id, trip_date, trip_id or 0))["km"]
-    if prev is not None and odometer < float(prev) - 0.5:
-        warnings.append(f"The odometer ({odometer:,.0f} km) is lower than where this vehicle's previous trip ended "
-                        f"({float(prev):,.0f} km). Please double-check it.")
-    nxt = db.query_one("""SELECT MIN(odometer_reading) AS km FROM trip_records
-                          WHERE vehicle_id = %s AND trip_date > %s AND id <> %s""",
-                       (vehicle_id, trip_date, trip_id or 0))["km"]
-    if nxt is not None and odometer + distance > float(nxt) + 0.5:
-        warnings.append(f"This trip ends at {odometer + distance:,.0f} km, past the odometer of this vehicle's next trip "
-                        f"({float(nxt):,.0f} km). Please double-check the odometer and distance.")
-    return warnings
 
 
 _PREDICTION_LINK_READY = {"ok": False}
@@ -1693,47 +1426,19 @@ def _link_actuals_quietly():
         app.logger.exception("Automatic actual-fuel matching failed")
 
 
-def _sync_trip_fuel_records(trip_id=None):
-    """Keep Fuel Records in step with Trip Records: a trip with actual fuel
-    consumption has a linked fuel record (created as "Auto-logged from trip"),
-    and editing the trip updates the date, vehicle, liters and odometer
-    (end of trip) of its linked record. With no trip_id, every trip with
-    actual fuel but no fuel record gets one (used after a CSV import)."""
-    if trip_id is not None:
-        db.execute("""
-            UPDATE fuel_records f JOIN trip_records t ON f.trip_record_id = t.id JOIN vehicles v ON t.vehicle_id = v.id
-            SET f.vehicle_id = t.vehicle_id, f.fuel_date = t.trip_date, f.fuel_type = v.fuel_type,
-                f.liters_consumed = t.actual_fuel_consumption, f.odometer_reading = t.odometer_reading + t.distance_km
-            WHERE t.id = %s AND t.actual_fuel_consumption IS NOT NULL
-        """, (trip_id,))
-    db.execute(f"""
-        INSERT INTO fuel_records (vehicle_id, trip_record_id, fuel_date, fuel_type, liters_consumed, odometer_reading, remarks)
-        SELECT t.vehicle_id, t.id, t.trip_date, v.fuel_type, t.actual_fuel_consumption,
-               t.odometer_reading + t.distance_km, 'Auto-logged from trip'
-        FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
-        WHERE t.actual_fuel_consumption IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM fuel_records f WHERE f.trip_record_id = t.id)
-          {"AND t.id = %s" if trip_id is not None else ""}
-    """, (trip_id,) if trip_id is not None else ())
-
-
 def _trip_payload(f):
     return (
-        f["vehicle_id"], f["trip_date"].strip(), f["trip_type"],
-        f["departure_time"].strip(), f["route"].strip(), f["road_type"], f["terrain_classification"],
-        f["odometer_reading"], f["distance_km"], f["duration_minutes"], f["avg_speed_kmh"],
-        (f.get("passenger_cargo_load_kg") or "").strip() or 0,
-        (f.get("actual_fuel_consumption") or "").strip() or None, (f.get("remarks") or "").strip() or None,
-        (f.get("balance_in_tank") or "").strip() or None, (f.get("fuel_received") or "").strip() or None,
-        (f.get("or_invoice_no") or "").strip() or None,
+        f["vehicle_id"], f["trip_date"].strip(),
+        round(float(f["distance_km"].strip().replace(",", "")), 2),
+        round(float(f["actual_fuel_consumption"].strip().replace(",", "")), 2),
+        (f.get("remarks") or "").strip() or None,
     )
 
 
 def render_trips_page(reopen=None, status=200):
-    vehicles_list = db.query_all("SELECT * FROM vehicles ORDER BY plate_number")
+    vehicles_list = db.query_all("SELECT id, plate_number, brand_model FROM vehicles ORDER BY plate_number")
     return render_template(
         "trips.html", active="trips", trips=query_trips(), vehicles=vehicles_list,
-        trip_types=TRIP_TYPES, road_types=ROAD_TYPES, terrains=TERRAINS,
         today=today_local().isoformat(), reopen=reopen,
     ), status
 
@@ -1753,20 +1458,16 @@ def api_trips():
 @app.route("/trips/add", methods=["POST"])
 @login_required
 def add_trip():
-    _ensure_trip_sheet_columns()
+    _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form)
     if errors:
         flash("Could not add trip record: " + " ".join(errors), "danger")
         return render_trips_page({"modal": "addTripModal", "values": request.form.to_dict()})
     try:
-        trip_id = db.execute("""
-            INSERT INTO trip_records (vehicle_id, trip_date, trip_type, departure_time,
-                route, road_type, terrain_classification, odometer_reading, distance_km,
-                duration_minutes, avg_speed_kmh, passenger_cargo_load_kg, actual_fuel_consumption, remarks,
-                balance_in_tank, fuel_received, or_invoice_no)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        db.execute("""
+            INSERT INTO trip_records (vehicle_id, trip_date, distance_km, actual_fuel_consumption, remarks)
+            VALUES (%s,%s,%s,%s,%s)
         """, _trip_payload(request.form))
-        _sync_trip_fuel_records(trip_id)
         flash("Trip record added successfully.", "success")
         for w in warnings:
             flash(w, "warning")
@@ -1783,7 +1484,7 @@ def edit_trip(trip_id):
     if not db.query_one("SELECT id FROM trip_records WHERE id = %s", (trip_id,)):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
-    _ensure_trip_sheet_columns()
+    _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form, trip_id)
     if errors:
         flash("Could not update trip record: " + " ".join(errors), "danger")
@@ -1791,14 +1492,9 @@ def edit_trip(trip_id):
                                   "values": request.form.to_dict()})
     try:
         db.execute("""
-            UPDATE trip_records SET vehicle_id=%s, trip_date=%s, trip_type=%s,
-                departure_time=%s, route=%s, road_type=%s, terrain_classification=%s,
-                odometer_reading=%s, distance_km=%s, duration_minutes=%s, avg_speed_kmh=%s,
-                passenger_cargo_load_kg=%s, actual_fuel_consumption=%s, remarks=%s,
-                balance_in_tank=%s, fuel_received=%s, or_invoice_no=%s
+            UPDATE trip_records SET vehicle_id=%s, trip_date=%s, distance_km=%s, actual_fuel_consumption=%s, remarks=%s
             WHERE id=%s
         """, _trip_payload(request.form) + (trip_id,))
-        _sync_trip_fuel_records(trip_id)
         flash("Trip record updated successfully.", "success")
         for w in warnings:
             flash(w, "warning")
@@ -1809,31 +1505,21 @@ def edit_trip(trip_id):
     return redirect(url_for("trips"))
 
 
-IMPORT_COLUMNS = ["plate_number", "trip_date", "departure_time", "trip_type", "route", "road_type",
-                  "terrain_classification", "odometer_reading", "distance_km", "duration_minutes",
-                  "avg_speed_kmh", "passenger_cargo_load_kg", "actual_fuel_consumption", "remarks",
-                  "balance_in_tank", "fuel_received", "or_invoice_no"]
-IMPORT_OPTIONAL = {"passenger_cargo_load_kg", "actual_fuel_consumption", "remarks",
-                   "balance_in_tank", "fuel_received", "or_invoice_no"}
+# CSV import of the Monthly Report of Official Travel (one row per trip).
+IMPORT_COLUMNS = ["plate_number", "trip_date", "distance_km", "actual_fuel_consumption", "remarks"]
+IMPORT_OPTIONAL = {"remarks"}
 IMPORT_MAX_ROWS = 5000
 IMPORT_EXAMPLE_REMARK = "example row - delete before importing"
-IMPORT_NUMERIC = {"odometer_reading", "distance_km", "duration_minutes", "avg_speed_kmh",
-                  "passenger_cargo_load_kg", "actual_fuel_consumption", "balance_in_tank", "fuel_received"}
+IMPORT_NUMERIC = {"distance_km", "actual_fuel_consumption"}
 # Other header spellings people type in Excel, after _header_key() normalisation.
 IMPORT_HEADER_ALIASES = {
     "plate": "plate_number", "plate_no": "plate_number", "vehicle": "plate_number", "vehicle_plate": "plate_number",
-    "date": "trip_date", "time": "departure_time", "departure": "departure_time",
-    "terrain": "terrain_classification", "odometer": "odometer_reading",
-    "distance": "distance_km", "duration": "duration_minutes", "duration_min": "duration_minutes",
-    "avg_speed": "avg_speed_kmh", "average_speed": "avg_speed_kmh", "speed": "avg_speed_kmh",
-    "load": "passenger_cargo_load_kg", "passenger_cargo_load": "passenger_cargo_load_kg", "load_kg": "passenger_cargo_load_kg",
-    "actual_fuel": "actual_fuel_consumption", "fuel": "actual_fuel_consumption",
-    "fuel_consumption": "actual_fuel_consumption", "liters": "actual_fuel_consumption", "remark": "remarks",
+    "date": "trip_date", "date_of_travel": "trip_date", "travel_date": "trip_date",
+    "distance": "distance_km", "distance_traveled": "distance_km", "distance_travelled": "distance_km",
+    "actual_fuel": "actual_fuel_consumption", "fuel": "actual_fuel_consumption", "fuel_consumed": "actual_fuel_consumption",
+    "fuel_consumption": "actual_fuel_consumption", "liters": "actual_fuel_consumption",
     "gasoline_diesoline_consumed": "actual_fuel_consumption", "consumed": "actual_fuel_consumption",
-    "balance": "balance_in_tank", "balance_in_the_tank": "balance_in_tank",
-    "fuel_received_in_liters": "fuel_received", "received": "fuel_received",
-    "or_no": "or_invoice_no", "or_no_invoce_no": "or_invoice_no", "or_no_invoice_no": "or_invoice_no",
-    "invoice_no": "or_invoice_no", "destination": "route", "destinations": "route",
+    "remark": "remarks",
 }
 IMPORT_DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d", "%m-%d-%Y", "%d-%b-%Y", "%d-%b-%y",
                        "%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y")
@@ -1846,14 +1532,9 @@ def _header_key(header):
     return key if key in IMPORT_COLUMNS else IMPORT_HEADER_ALIASES.get(key, key)
 
 
-def _canonical_choice(value, options):
-    """'errand' -> 'Errand' (Excel users often change letter case)."""
-    return next((o for o in options if o.lower() == value.strip().lower()), value.strip())
-
-
 def _normalize_import_row(row):
-    """Accept common spreadsheet formats: many date styles, 12- or 24-hour
-    times, numbers with thousands separators and any letter case."""
+    """Accept common spreadsheet formats: many date styles and numbers with
+    thousands separators."""
     out = {k: (row.get(k) or "").strip() for k in IMPORT_COLUMNS}
     d = out["trip_date"].split(" ")[0] if re.match(r"\d{4}-\d{2}-\d{2} ", out["trip_date"]) else out["trip_date"]
     for fmt in IMPORT_DATE_FORMATS:
@@ -1862,17 +1543,8 @@ def _normalize_import_row(row):
             break
         except ValueError:
             continue
-    m = re.fullmatch(r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp]\.?[Mm]\.?)?", out["departure_time"])
-    if m:
-        hour, ampm = int(m.group(1)), (m.group(3) or "").lower().replace(".", "")
-        if ampm and 1 <= hour <= 12:
-            hour = hour % 12 + (12 if ampm == "pm" else 0)
-        out["departure_time"] = f"{hour:02d}:{m.group(2)}" if hour <= 23 else out["departure_time"]
     for field in IMPORT_NUMERIC:
         out[field] = out[field].replace(",", "").replace(" ", "")
-    out["trip_type"] = _canonical_choice(out["trip_type"], TRIP_TYPES)
-    out["road_type"] = _canonical_choice(out["road_type"], ROAD_TYPES)
-    out["terrain_classification"] = _canonical_choice(out["terrain_classification"], TERRAINS)
     return out
 
 
@@ -1885,20 +1557,19 @@ def _decode_csv(raw):
         return raw.decode("cp1252", errors="replace")
 
 
-def _trip_key(vehicle_id, trip_date, departure_time, odometer, distance):
-    """Identity of a trip ticket, used to skip rows that were already imported."""
-    return (int(vehicle_id), str(trip_date), str(departure_time)[:5], round(float(odometer), 2), round(float(distance), 2))
+def _trip_key(vehicle_id, trip_date, distance, fuel):
+    """Identity of a trip on the report, used to skip rows that were already imported."""
+    return (int(vehicle_id), str(trip_date), round(float(distance), 2), round(float(fuel), 2))
 
 
 @app.route("/trips/import-template.csv")
 @admin_required
 def trip_import_template():
     output = io.StringIO()
-    output.write("\ufeff")
+    output.write("﻿")
     writer = csv.writer(output)
     writer.writerow(IMPORT_COLUMNS)
-    writer.writerow(["SFA 4714", "2026-07-01", "08:00", "Official Business", "RASUC/RCAF", "Paved", "Flat",
-                     "16368", "120", "180", "40", "0", "12.0", IMPORT_EXAMPLE_REMARK, "23.000", "35.000", "008500"])
+    writer.writerow(["SFA 4714", "2026-07-01", "120", "12.0", IMPORT_EXAMPLE_REMARK])
     return Response(output.getvalue(), mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": "attachment; filename=trip_records_template.csv"})
 
@@ -1906,9 +1577,10 @@ def trip_import_template():
 @app.route("/trips/import", methods=["POST"])
 @admin_required
 def import_trips():
-    """Bulk-import trip tickets from a CSV (e.g. saved from Excel). All rows
-    are validated first; nothing is saved unless every row is valid."""
-    _ensure_trip_sheet_columns()
+    """Bulk-import the Monthly Report of Official Travel from a CSV (e.g. saved
+    from Excel). All rows are validated first; nothing is saved unless every
+    row is valid."""
+    _ensure_vehicle_columns()
     file = request.files.get("file")
     if not file or not file.filename.lower().endswith(".csv"):
         flash("Please choose a .csv file (in Excel: File > Save As > CSV UTF-8).", "danger")
@@ -1925,9 +1597,9 @@ def import_trips():
         return redirect(url_for("trips"))
 
     vehicles_by_plate = {v["plate_number"].upper(): v["id"] for v in db.query_all("SELECT id, plate_number FROM vehicles")}
-    existing = {_trip_key(t["vehicle_id"], t["trip_date"], format_time(t["departure_time"]), t["odometer_reading"],
-                          t["distance_km"])
-                for t in db.query_all("SELECT vehicle_id, trip_date, departure_time, odometer_reading, distance_km FROM trip_records")}
+    existing = {_trip_key(t["vehicle_id"], t["trip_date"], t["distance_km"], t["actual_fuel_consumption"])
+                for t in db.query_all("""SELECT vehicle_id, trip_date, distance_km, actual_fuel_consumption
+                                         FROM trip_records WHERE actual_fuel_consumption IS NOT NULL""")}
     payloads, errors, warnings_count, duplicates, examples = [], [], 0, 0, 0
     rows = list(reader)
     if len(rows) > IMPORT_MAX_ROWS:
@@ -1949,7 +1621,7 @@ def import_trips():
         errors.extend(f"Row {line_no}: {e}" for e in row_errors)
         if row_errors:
             continue
-        key = _trip_key(vid, row["trip_date"], row["departure_time"], row["odometer_reading"], row["distance_km"])
+        key = _trip_key(vid, row["trip_date"], row["distance_km"], row["actual_fuel_consumption"])
         if key in existing:
             duplicates += 1  # already in the system (e.g. the same file imported twice)
             continue
@@ -1976,11 +1648,8 @@ def import_trips():
         conn.begin()
         with conn.cursor() as cur:
             cur.executemany("""
-                INSERT INTO trip_records (vehicle_id, trip_date, trip_type, departure_time,
-                    route, road_type, terrain_classification, odometer_reading, distance_km,
-                    duration_minutes, avg_speed_kmh, passenger_cargo_load_kg, actual_fuel_consumption, remarks,
-                    balance_in_tank, fuel_received, or_invoice_no)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                INSERT INTO trip_records (vehicle_id, trip_date, distance_km, actual_fuel_consumption, remarks)
+                VALUES (%s,%s,%s,%s,%s)
             """, payloads)
         conn.commit()
     except Exception:
@@ -1988,15 +1657,11 @@ def import_trips():
         app.logger.exception("Trip import failed")
         flash("Nothing was imported because of a database error. Please try again.", "danger")
         return redirect(url_for("trips"))
-    try:
-        _sync_trip_fuel_records()  # fuel records for the imported trips with actual fuel
-    except Exception:
-        app.logger.exception("Auto-logging fuel records after import failed")
     msg = f"Imported {len(payloads)} trip record(s). The model retrains automatically."
     if skipped:
         msg += " " + "; ".join(skipped).capitalize() + "."
     if warnings_count:
-        msg += f" {warnings_count} row(s) have a distance/duration/speed mismatch; please review them."
+        msg += f" {warnings_count} row(s) have an unusual fuel use per 100 km; please review them."
     flash(msg, "success")
     _link_actuals_quietly()
     return redirect(url_for("trips"))
@@ -2009,10 +1674,13 @@ def delete_trip(trip_id):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
     try:
-        # Its fuel record describes this trip, so it goes too (otherwise it is
-        # left behind unlinked and Fuel Records no longer matches Trip Records).
-        removed_fuel = db.query_one("SELECT COUNT(*) AS c FROM fuel_records WHERE trip_record_id = %s", (trip_id,))["c"]
-        db.execute("DELETE FROM fuel_records WHERE trip_record_id = %s", (trip_id,))
+        # The old auto-logged fuel record of this trip (from the earlier design)
+        # describes the same trip, so it goes too. A database created from the
+        # current schema has no fuel_records table.
+        try:
+            db.execute("DELETE FROM fuel_records WHERE trip_record_id = %s", (trip_id,))
+        except Exception:
+            pass
         # A fuel request whose actual fuel came from this trip loses it (and may
         # be matched again to another trip below); manual entries are kept.
         _ensure_prediction_link_columns()
@@ -2021,199 +1689,12 @@ def delete_trip(trip_id):
         db.execute("UPDATE predictions SET trip_record_id = NULL WHERE trip_record_id = %s", (trip_id,))
         db.execute("DELETE FROM trip_records WHERE id = %s", (trip_id,))
         compact_ids("trip_records", "fuel_records")
-        flash("Trip record deleted successfully." + (f" Its fuel record was deleted too." if removed_fuel else ""), "success")
+        flash("Trip record deleted successfully.", "success")
         _link_actuals_quietly()
     except Exception:
         app.logger.exception("Deleting trip failed")
         flash("Could not delete trip record due to a database error. Please try again.", "danger")
     return redirect(url_for("trips"))
-
-
-# ------------------------------------------------------------------
-# FUEL RECORDS
-# ------------------------------------------------------------------
-def fuel_record(f, num):
-    """JSON-safe fuel row used by the table, the shared modal and the live API."""
-    return {
-        "id": f["id"], "num": num, "vehicle_id": f["vehicle_id"], "trip_record_id": f["trip_record_id"] or "",
-        "fuel_date": str(f["fuel_date"]), "fuel_type": f["fuel_type"],
-        "liters_consumed": str(f["liters_consumed"]), "odometer_reading": str(f["odometer_reading"]),
-        "fuel_cost": str(f["fuel_cost"]) if f["fuel_cost"] is not None else "",
-        "remarks": f["remarks"] or "", "plate_number": f["plate_number"],
-    }
-
-
-def fuel_records_data():
-    rows = db.query_all("""
-        SELECT f.*, v.plate_number FROM fuel_records f
-        JOIN vehicles v ON f.vehicle_id = v.id
-        ORDER BY f.fuel_date, f.id
-    """)  # oldest first (January to December), like Trip Records
-    summary_row = db.query_one("""
-        SELECT COALESCE(SUM(liters_consumed),0) AS total_liters,
-               COALESCE(AVG(liters_consumed),0) AS avg_liters,
-               SUM(trip_record_id IS NOT NULL) AS linked_count,
-               COUNT(*) AS record_count
-        FROM fuel_records
-    """)
-    summary = {
-        "total_liters": f"{float(summary_row['total_liters']):,.2f}",
-        "avg_liters": f"{float(summary_row['avg_liters']):,.2f}",
-        "linked_count": int(summary_row["linked_count"] or 0),
-        "record_count": summary_row["record_count"],
-    }
-    return [fuel_record(r, i) for i, r in enumerate(rows, 1)], summary
-
-
-def validate_fuel_form(f):
-    """Returns (errors, warnings). Errors block saving; warnings are shown
-    but the record is still saved."""
-    errors, warnings = [], []
-    vid = (f.get("vehicle_id") or "").strip()
-    vehicle = db.query_one("SELECT id, plate_number, fuel_type FROM vehicles WHERE id = %s", (vid,)) if vid.isdigit() else None
-    if not vehicle:
-        errors.append("Please choose a valid vehicle.")
-    tid = (f.get("trip_record_id") or "").strip()
-    if tid:
-        trip = db.query_one("SELECT id, vehicle_id FROM trip_records WHERE id = %s", (tid,)) if tid.isdigit() else None
-        if not trip:
-            errors.append("The selected trip record does not exist.")
-        elif vehicle and trip["vehicle_id"] != vehicle["id"]:
-            errors.append(f"The selected trip belongs to a different vehicle, not {vehicle['plate_number']}.")
-    try:
-        fuel_date = date.fromisoformat((f.get("fuel_date") or "").strip())
-        if not date(2000, 1, 1) <= fuel_date <= today_local():
-            errors.append(f"Date must be between 2000-01-01 and today ({today_local().isoformat()}).")
-    except ValueError:
-        errors.append("Date must be a valid date.")
-    if f.get("fuel_type") not in FUEL_TYPES:
-        errors.append("Please choose a valid fuel type.")
-    elif vehicle and f["fuel_type"] != vehicle["fuel_type"]:
-        warnings.append(f"{vehicle['plate_number']} is registered as a {vehicle['fuel_type']} vehicle, "
-                        f"but this record says {f['fuel_type']}. Please double-check.")
-    for field, label, lo, hi, allow_lo, required in (
-        ("liters_consumed", "Liters consumed", 0, 1000, False, True),
-        ("odometer_reading", "Odometer reading", 0, 2_000_000, True, True),
-        ("fuel_cost", "Fuel cost", 0, 1_000_000, True, False),
-    ):
-        raw = (f.get(field) or "").strip()
-        if raw == "" and not required:
-            continue
-        try:
-            value = float(raw)
-            if value != value or value > hi or value < lo or (value == lo and not allow_lo):
-                raise ValueError
-        except ValueError:
-            errors.append(f"{label} must be a number {'from' if allow_lo else 'greater than'} {lo:,} "
-                          f"{'to' if allow_lo else 'and at most'} {hi:,}.")
-    if len((f.get("remarks") or "").strip()) > 255:
-        errors.append("Remarks must be at most 255 characters.")
-    return errors, warnings
-
-
-def _fuel_payload(f):
-    # Fuel cost is not collected (financial reporting is outside the study's scope).
-    return (
-        f["vehicle_id"], (f.get("trip_record_id") or "").strip() or None, f["fuel_date"].strip(), f["fuel_type"],
-        f["liters_consumed"], f["odometer_reading"], None, (f.get("remarks") or "").strip() or None,
-    )
-
-
-def fuel_trip_options():
-    # Every trip (not just the latest 200), so editing an older record keeps its link.
-    return db.query_all("""
-        SELECT t.id, t.trip_date, t.vehicle_id, v.plate_number FROM trip_records t
-        JOIN vehicles v ON t.vehicle_id = v.id ORDER BY t.trip_date DESC, t.id DESC
-    """)
-
-
-def render_fuel_page(reopen=None, status=200):
-    rows, summary = fuel_records_data()
-    vehicles_list = db.query_all("SELECT * FROM vehicles ORDER BY plate_number")
-    trips_list = fuel_trip_options()
-    return render_template(
-        "fuel_records.html", active="fuel_records", fuel_records=rows, summary=summary,
-        vehicles=vehicles_list, trips=trips_list, today=today_local().isoformat(), reopen=reopen,
-    ), status
-
-
-@app.route("/fuel-records")
-@login_required
-def fuel_records():
-    return render_fuel_page()
-
-
-@app.route("/api/fuel-records")
-@login_required
-def api_fuel_records():
-    rows, summary = fuel_records_data()
-    trips = [{"id": t["id"], "vehicle_id": t["vehicle_id"],
-              "label": f"#{t['id']} - {t['plate_number']} ({t['trip_date']})"} for t in fuel_trip_options()]
-    return {"fuel_records": rows, "summary": summary, "trips": trips}
-
-
-@app.route("/fuel-records/add", methods=["POST"])
-@login_required
-def add_fuel_record():
-    errors, warnings = validate_fuel_form(request.form)
-    if errors:
-        flash("Could not add fuel record: " + " ".join(errors), "danger")
-        return render_fuel_page({"modal": "addFuelModal", "values": request.form.to_dict()})
-    try:
-        db.execute("""
-            INSERT INTO fuel_records (vehicle_id, trip_record_id, fuel_date, fuel_type,
-                liters_consumed, odometer_reading, fuel_cost, remarks)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        """, _fuel_payload(request.form))
-        flash("Fuel record added successfully.", "success")
-        for w in warnings:
-            flash(w, "warning")
-    except Exception:
-        app.logger.exception("Adding fuel record failed")
-        flash("Could not add fuel record due to a database error. Please try again.", "danger")
-    return redirect(url_for("fuel_records"))
-
-
-@app.route("/fuel-records/<int:record_id>/edit", methods=["POST"])
-@login_required
-def edit_fuel_record(record_id):
-    if not db.query_one("SELECT id FROM fuel_records WHERE id = %s", (record_id,)):
-        flash("That fuel record no longer exists.", "danger")
-        return redirect(url_for("fuel_records"))
-    errors, warnings = validate_fuel_form(request.form)
-    if errors:
-        flash("Could not update fuel record: " + " ".join(errors), "danger")
-        return render_fuel_page({"modal": "editFuelModal", "record_id": record_id,
-                                 "values": request.form.to_dict()})
-    try:
-        db.execute("""
-            UPDATE fuel_records SET vehicle_id=%s, trip_record_id=%s, fuel_date=%s, fuel_type=%s,
-                liters_consumed=%s, odometer_reading=%s, fuel_cost=%s, remarks=%s
-            WHERE id=%s
-        """, _fuel_payload(request.form) + (record_id,))
-        flash("Fuel record updated successfully.", "success")
-        for w in warnings:
-            flash(w, "warning")
-    except Exception:
-        app.logger.exception("Updating fuel record failed")
-        flash("Could not update fuel record due to a database error. Please try again.", "danger")
-    return redirect(url_for("fuel_records"))
-
-
-@app.route("/fuel-records/<int:record_id>/delete", methods=["POST"])
-@admin_required
-def delete_fuel_record(record_id):
-    if not db.query_one("SELECT id FROM fuel_records WHERE id = %s", (record_id,)):
-        flash("That fuel record no longer exists.", "danger")
-        return redirect(url_for("fuel_records"))
-    try:
-        db.execute("DELETE FROM fuel_records WHERE id = %s", (record_id,))
-        compact_ids("fuel_records")
-        flash("Fuel record deleted successfully.", "success")
-    except Exception:
-        app.logger.exception("Deleting fuel record failed")
-        flash("Could not delete fuel record due to a database error. Please try again.", "danger")
-    return redirect(url_for("fuel_records"))
 
 
 # ------------------------------------------------------------------
@@ -2223,44 +1704,42 @@ _MODEL_CHARTS_CACHE = {"key": None, "data": None}
 _RETRAIN_LOCK = threading.Lock()
 _LAST_DATA_CHECK = {"at": 0.0}
 
-# Every model feature column of a trip + its vehicle, so adding, editing or
-# deleting any trip record (or editing a vehicle) changes the fingerprint.
+# Every value the model trains on from a trip and its vehicle, so adding,
+# editing or deleting a trip record (or editing a vehicle) changes the fingerprint.
 _SYSTEM_DATA_FINGERPRINT_SQL = """
     SELECT COUNT(*) AS n,
-           COALESCE(SUM(CRC32(CONCAT_WS('|', t.id, t.trip_type, t.departure_time, t.route, t.road_type,
-               t.terrain_classification, t.odometer_reading, t.distance_km, t.duration_minutes,
-               t.avg_speed_kmh, t.passenger_cargo_load_kg, t.actual_fuel_consumption,
-               v.vehicle_type, v.engine_displacement, v.fuel_type, v.year_model))), 0) AS crc
+           COALESCE(SUM(CRC32(CONCAT_WS('|', t.id, t.trip_date, t.distance_km, t.actual_fuel_consumption,
+               v.plate_number, v.fuel_type, v.engine_power_kw))), 0) AS crc
     FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
     WHERE t.actual_fuel_consumption IS NOT NULL
 """
 
 
 def load_system_trip_records():
-    """Trip records entered in the system that have a measured fuel value,
-    shaped like the historical CSV so they can be trained on together."""
-    from model.preprocess import departure_period_from_time
-    rows = db.query_all("""
-        SELECT v.vehicle_type, v.brand_model, v.engine_displacement, v.fuel_type, v.year_model,
-               t.odometer_reading, t.distance_km, t.duration_minutes, t.avg_speed_kmh, t.trip_type,
-               t.departure_time, t.passenger_cargo_load_kg, t.route, t.road_type,
-               t.terrain_classification, t.actual_fuel_consumption
+    """The trips in the system (Monthly Report of Official Travel: date,
+    plate number, distance, fuel consumed) merged with the vehicle records
+    (engine power and fuel type) using the plate number."""
+    from model.preprocess import merge_trips_and_vehicles
+    _ensure_vehicle_columns()
+    trips = pd.DataFrame(db.query_all("""
+        SELECT t.trip_date, v.plate_number, t.distance_km, t.actual_fuel_consumption
         FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
         WHERE t.actual_fuel_consumption IS NOT NULL
-    """)
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    df["departure_time"] = df["departure_time"].map(lambda t: format_time(t) if isinstance(t, timedelta) else str(t))
-    df["departure_period"] = df["departure_time"].map(departure_period_from_time)
-    numeric = ["engine_displacement", "year_model", "odometer_reading", "distance_km", "duration_minutes",
-               "avg_speed_kmh", "passenger_cargo_load_kg", "actual_fuel_consumption"]
-    df[numeric] = df[numeric].astype(float)
+        ORDER BY t.trip_date, t.id
+    """))
+    if trips.empty:
+        return trips
+    vehicles = pd.DataFrame(db.query_all("SELECT plate_number, brand_model, fuel_type, engine_power_kw FROM vehicles"))
+    df = merge_trips_and_vehicles(trips, vehicles)
+    df["trip_date"] = df["trip_date"].astype(str)
+    for col in ("distance_km", "actual_fuel_consumption", "engine_power_kw"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
 def load_training_frame():
-    """Historical CSV + system trip records, merged with rated efficiency."""
+    """Local trips (historical CSV + the trips in the system) merged with the
+    supplementary dataset."""
     from model.preprocess import load_and_merge_datasets
     return load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
                                    app.config["SUPPLEMENTARY_DATA_PATH"],
@@ -2270,29 +1749,30 @@ def load_training_frame():
 def current_data_fingerprint():
     """Changes whenever the CSV datasets or any trip/vehicle data the model
     trains on changes."""
+    _ensure_vehicle_columns()
     fp = db.query_one(_SYSTEM_DATA_FINGERPRINT_SQL)
     mtimes = [os.path.getmtime(app.config[k]) for k in ("HISTORICAL_DATA_PATH", "SUPPLEMENTARY_DATA_PATH")]
     return f"{mtimes[0]:.0f}-{mtimes[1]:.0f}-{int(fp['n'])}-{int(fp['crc'])}"
 
 
 def retrain_model(log=None):
-    """Retrain on CSV + system trip records and save model + metrics."""
+    """Retrain on the local trips + supplementary dataset and save model + metrics."""
     from model.train_model import train_and_save
+    from model.preprocess import load_and_merge_datasets, supplementary_info
     fingerprint = current_data_fingerprint()
     system_records = load_system_trip_records()
-    from model.preprocess import load_and_merge_datasets, supplementary_info
     info = supplementary_info(app.config["SUPPLEMENTARY_DATA_PATH"])
     extra = {"data_fingerprint": fingerprint, "system_records": int(len(system_records)),
              "supplementary_kind": info["kind"]}
     df = load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
                                  app.config["SUPPLEMENTARY_DATA_PATH"], extra_df=system_records)
-    return train_and_save(df, extra_metrics=extra, log=log or (lambda *a, **k: None),
-                          excluded_features=info["dropped_features"])
+    return train_and_save(df, extra_metrics=extra, log=log or (lambda *a, **k: None))
 
 
 _WATCHER = {"running": False, "retraining": False, "last_check": None}
 _WATCHER_WAKE = threading.Event()
 WATCHER_INTERVAL_SECONDS = 3
+RETRAIN_RETRY_SECONDS = 60  # wait this long before retrying a retrain that failed
 
 # Form submissions that change the model's training data; after any of these
 # the watcher is woken immediately instead of waiting for its next tick.
@@ -2309,16 +1789,29 @@ def _check_and_retrain():
         return
     with _RETRAIN_LOCK:
         fingerprint = current_data_fingerprint()
-        saved = None
+        saved, outdated = None, False
         if os.path.exists(app.config["METRICS_PATH"]) and os.path.exists(app.config["MODEL_PATH"]):
             with open(app.config["METRICS_PATH"]) as f:
-                saved = json.load(f).get("data_fingerprint")
+                saved_metrics = json.load(f)
+            saved = saved_metrics.get("data_fingerprint")
+            # Trained by an earlier version of the training code (before the
+            # Distance x Engine Power equation and cross-validated MAE/RMSE): train again once.
+            outdated = saved_metrics.get("centering") is None or saved_metrics.get("cv_mean_rmse") is None
         _WATCHER["last_check"] = now_local().isoformat(timespec="seconds")
-        if saved != fingerprint:
+        if saved != fingerprint or outdated:
+            # After a failed retrain, try the same data again only after a pause,
+            # instead of every few seconds (which would keep the server PC busy).
+            failed = _WATCHER.get("failed")
+            if failed and failed["fingerprint"] == fingerprint and time.time() - failed["at"] < RETRAIN_RETRY_SECONDS:
+                return
             app.logger.info("Training data changed; retraining model automatically...")
             _WATCHER["retraining"] = True
             try:
                 retrain_model()
+                _WATCHER["failed"] = None
+            except Exception:
+                _WATCHER["failed"] = {"fingerprint": fingerprint, "at": time.time()}
+                raise
             finally:
                 _WATCHER["retraining"] = False
 
@@ -2406,61 +1899,54 @@ def build_model_charts():
     data and 80/20 split (random_state=42) the current model was trained
     on. Cached per model version, so it refreshes after every retrain."""
     from sklearn.model_selection import train_test_split
-    from model.preprocess import FEATURE_COLUMNS, NUMERIC_FEATURES, TARGET_COLUMN, clean_data
+    from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, clean_data
 
     pipeline = get_model()
     metrics = get_metrics()
-    if pipeline is None or metrics is None:
+    if pipeline is None or metrics is None or metrics.get("equation_terms") is None:
         return None
     key = metrics.get("model_version")
     if _MODEL_CHARTS_CACHE["key"] == key:
         return _MODEL_CHARTS_CACHE["data"]
 
-    # Rebuild exactly the frame this model version was trained on: a model
-    # trained before system records were included is charted on the CSV only.
-    if metrics.get("system_records") is None:
-        from model.preprocess import load_and_merge_datasets
-        frame = load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"], app.config["SUPPLEMENTARY_DATA_PATH"])
-    else:
-        frame = load_training_frame()
-    df = clean_data(frame)
+    df = clean_data(load_training_frame())
     X_train, X_test, y_train, y_test = train_test_split(
         df[FEATURE_COLUMNS], df[TARGET_COLUMN], test_size=0.2, random_state=42)
     y_pred = pipeline.predict(X_test)
     actual = [round(float(v), 2) for v in y_test.values]
     predicted = [round(float(v), 2) for v in y_pred]
+    residuals = np.asarray(actual) - np.asarray(predicted)
     lo, hi = min(actual + predicted), max(actual + predicted)
 
-    # Histogram on "nice" fixed-width bins (1, 2, 2.5, 5 or 10 L) so every bar
-    # covers the same, readable range, e.g. 0–2.5 L, 2.5–5 L, ...
-    fuel = df[TARGET_COLUMN]
-    fuel_max = float(fuel.max())
-    width = next(w for w in (1, 2, 2.5, 5, 10, 25, 50) if fuel_max / w <= 20)
-    edges = np.arange(0, np.floor(fuel_max / width) * width + width * 1.001, width)
-    counts, edges = np.histogram(fuel, bins=edges)
+    # Residual histogram (normality check) on "nice" fixed-width bins centred on 0.
+    spread = float(np.abs(residuals).max()) or 1.0
+    width = next(w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * spread / w <= 24)
+    half = np.ceil(spread / width) * width
+    edges = np.arange(-half, half + width * 1.001, width)
+    counts, edges = np.histogram(residuals, bins=edges)
     fmt = (lambda v: f"{v:g}")
-    mode_i = int(np.argmax(counts))
-    # A variable with the same value in every record has no defined
-    # correlation; leave it out instead of showing a misleading 0.00.
-    corr_cols = [c for c in NUMERIC_FEATURES if df[c].astype(float).nunique() > 1] + [TARGET_COLUMN]
-    corr = df[corr_cols].corr().round(2).fillna(0)
+
+    # Correlation heatmap of the equation's terms and the fuel consumed. A term
+    # with the same value in every record has no defined correlation; it is
+    # left out instead of showing a misleading 0.00.
+    terms = pipeline.named_steps["encoder"].transform(df[FEATURE_COLUMNS]).assign(**{TARGET_COLUMN: df[TARGET_COLUMN].astype(float)})
+    corr_cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
+    corr = terms[corr_cols].corr().round(2).fillna(0)
 
     data = {
         "avp_points": [{"x": a, "y": p} for a, p in zip(actual, predicted)],
         "avp_line": [{"x": round(lo, 2), "y": round(lo, 2)}, {"x": round(hi, 2), "y": round(hi, 2)}],
         "residual_points": [{"x": p, "y": round(a - p, 2)} for a, p in zip(actual, predicted)],
         "residual_range": [round(min(predicted), 2), round(max(predicted), 2)],
-        "dist_labels": [f"{fmt(edges[i])}–{fmt(edges[i + 1])}" for i in range(len(counts))],
-        "dist_counts": [int(c) for c in counts],
-        "dist_stats": {
-            "records": int(len(fuel)),
-            "mean": round(float(fuel.mean()), 2),
-            "median": round(float(fuel.median()), 2),
-            "min": round(float(fuel.min()), 2),
-            "max": round(fuel_max, 2),
-            "std": round(float(fuel.std()), 2),
-            "mode_range": f"{fmt(edges[mode_i])}–{fmt(edges[mode_i + 1])}",
-            "mode_count": int(counts[mode_i]),
+        "resid_labels": [f"{fmt(round(edges[i], 2))} to {fmt(round(edges[i + 1], 2))}" for i in range(len(counts))],
+        "resid_counts": [int(c) for c in counts],
+        "resid_stats": {
+            "records": int(len(residuals)),
+            "mean": round(float(residuals.mean()), 3),
+            "std": round(float(residuals.std()), 3),
+            "min": round(float(residuals.min()), 2),
+            "max": round(float(residuals.max()), 2),
+            "within_1": round(float((np.abs(residuals) <= 1).mean() * 100), 1),
             "bin_width": width,
         },
         "corr_labels": corr_cols,
@@ -2482,24 +1968,29 @@ def model_performance():
 @admin_required
 def export_training_dataset(name):
     """The model's training data for the Google Colab notebook
-    (notebooks/fuel_consumption_linear_regression.ipynb), which reads
-    historical_fleet_data.csv and supplementary_data.csv:
+    (notebooks/fuel_consumption_linear_regression.ipynb), as the three CSV files
+    of Chapter III (How the Project Will Work):
 
-    * historical_fleet_data - the rows of the historical CSV plus every trip
-      record in the system with actual fuel, in the same columns and order the
-      web application trains on, so the notebook reproduces its results;
+    * trip_records - the Monthly Report of Official Travel: date of travel,
+      plate number, distance traveled and fuel consumed of every local trip
+      (historical CSV + the trips in the system);
+    * vehicle_records - plate number, vehicle model, fuel type and engine power;
     * supplementary_data - the supplementary dataset, unchanged."""
+    from model.preprocess import TRIP_COLUMNS, VEHICLE_COLUMNS
     if name == "supplementary_data":
         with open(app.config["SUPPLEMENTARY_DATA_PATH"], "rb") as f:
             body = f.read()
-    elif name == "historical_fleet_data":
-        columns = list(pd.read_csv(app.config["HISTORICAL_DATA_PATH"], nrows=0).columns)
+    elif name == "trip_records":
         historical = pd.read_csv(app.config["HISTORICAL_DATA_PATH"])
         system = load_system_trip_records()
-        frames = [f for f in (historical, system.reindex(columns=columns) if not system.empty else None)
-                  if f is not None and not f.empty]
-        data = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=columns)
-        body = data[columns].to_csv(index=False).encode("utf-8")
+        frames = [f.reindex(columns=TRIP_COLUMNS) for f in (historical, system) if f is not None and not f.empty]
+        data = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=TRIP_COLUMNS)
+        body = data.to_csv(index=False).encode("utf-8")
+    elif name == "vehicle_records":
+        _ensure_vehicle_columns()
+        data = pd.DataFrame(db.query_all("SELECT plate_number, brand_model, fuel_type, engine_power_kw FROM vehicles "
+                                         "ORDER BY plate_number"), columns=VEHICLE_COLUMNS)
+        body = data.to_csv(index=False).encode("utf-8")
     else:
         flash("Unknown dataset.", "danger")
         return redirect(url_for("model_performance"))
@@ -2533,9 +2024,8 @@ def api_model_performance_data():
 # Which filters each report actually uses (the page disables the others).
 REPORT_FILTERS = {
     "vehicle": ["vehicle_id", "fuel_type"],
-    "trip": ["date_from", "date_to", "vehicle_id", "trip_type"],
-    "fuel": ["date_from", "date_to", "vehicle_id", "fuel_type"],
-    "prediction": ["date_from", "date_to", "vehicle_id", "fuel_type", "trip_type"],
+    "trip": ["date_from", "date_to", "vehicle_id"],
+    "prediction": ["date_from", "date_to", "vehicle_id", "fuel_type"],
     "model": [],
 }
 
@@ -2571,12 +2061,6 @@ def parse_report_args(args):
             f["fuel_type"] = ft
         else:
             errors.append("Please choose a valid fuel type.")
-    tt = args.get("trip_type") or ""
-    if "trip_type" in allowed and tt:
-        if tt in TRIP_TYPES:
-            f["trip_type"] = tt
-        else:
-            errors.append("Please choose a valid trip type.")
     return f, errors
 
 
@@ -2587,81 +2071,64 @@ def _num(v, places=2):
 def build_report(f):
     """Returns (columns, rows, totals) for validated filters `f`. All cell
     values are strings so the same data serves HTML, JSON and CSV."""
+    from model.preprocess import TERM_LABELS
     report_type = f["type"]
     date_from, date_to = f.get("date_from"), f.get("date_to")
-    vehicle_id, fuel_type, trip_type = f.get("vehicle_id"), f.get("fuel_type"), f.get("trip_type")
+    vehicle_id, fuel_type = f.get("vehicle_id"), f.get("fuel_type")
     dash = "—"
 
     if report_type == "vehicle":
-        # Same columns as the GSO vehicle list, plus the specs the model uses.
-        columns = ["No.", "Vehicle Model", "Plate Number", "Seating Capacity", "Station", "Driver", "Remarks",
-                   "Vehicle Type", "Engine (L)", "Fuel Type", "Year Model", "Status"]
+        # The vehicle records: plate number, vehicle model, fuel type and engine power.
+        columns = ["No.", "Plate Number", "Vehicle Model", "Fuel Type", "Engine Power (kW)", "Trips"]
         where, params = ["1=1"], []
         if vehicle_id:
-            where.append("id = %s"); params.append(vehicle_id)
+            where.append("v.id = %s"); params.append(vehicle_id)
         if fuel_type:
-            where.append("fuel_type = %s"); params.append(fuel_type)
+            where.append("v.fuel_type = %s"); params.append(fuel_type)
         _ensure_vehicle_columns()
-        rows_db = db.query_all(f"SELECT * FROM vehicles WHERE {' AND '.join(where)} ORDER BY plate_number", params)
-        rows = [{"No.": str(i), "Vehicle Model": r["brand_model"], "Plate Number": r["plate_number"],
-                 "Seating Capacity": str(r["seating_capacity"]) if r["seating_capacity"] is not None else dash,
-                 "Station": r["station"] or dash, "Driver": r["assigned_driver"] or dash, "Remarks": r["remarks"] or dash,
-                 "Vehicle Type": r["vehicle_type"], "Engine (L)": str(r["engine_displacement"]),
-                 "Fuel Type": r["fuel_type"], "Year Model": str(r["year_model"]), "Status": r["status"]} for i, r in enumerate(rows_db, 1)]
+        rows_db = db.query_all(f"""
+            SELECT v.*, (SELECT COUNT(*) FROM trip_records t WHERE t.vehicle_id = v.id) AS trip_count
+            FROM vehicles v WHERE {' AND '.join(where)} ORDER BY v.plate_number""", params)
+        rows = [{"No.": str(i), "Plate Number": r["plate_number"], "Vehicle Model": r["brand_model"],
+                 "Fuel Type": r["fuel_type"],
+                 "Engine Power (kW)": f"{float(r['engine_power_kw']):g}" if r["engine_power_kw"] is not None else dash,
+                 "Trips": str(r["trip_count"])} for i, r in enumerate(rows_db, 1)]
         totals = {"Vehicles": str(len(rows))}
-        for st in VEHICLE_STATUSES:
-            totals[st] = str(sum(1 for r in rows_db if r["status"] == st))
 
     elif report_type == "trip":
-        columns = ["No.", "Date", "Vehicle", "Trip Type", "Route", "Distance (km)", "Duration (min)", "Avg Speed (km/h)", "Actual Fuel (L)"]
+        # The Monthly Report of Official Travel: date, vehicle, distance and fuel consumed.
+        columns = ["No.", "Date of Travel", "Vehicle", "Distance (km)", "Fuel Consumed (L)", "L/100 km"]
         where, params = ["1=1"], []
         if date_from: where.append("t.trip_date >= %s"); params.append(date_from)
         if date_to: where.append("t.trip_date <= %s"); params.append(date_to)
         if vehicle_id: where.append("t.vehicle_id = %s"); params.append(vehicle_id)
-        if trip_type: where.append("t.trip_type = %s"); params.append(trip_type)
         rows_db = db.query_all(f"""
             SELECT t.*, v.plate_number FROM trip_records t JOIN vehicles v ON t.vehicle_id=v.id
-            WHERE {' AND '.join(where)} ORDER BY t.trip_date, t.departure_time, t.id
+            WHERE {' AND '.join(where)} ORDER BY t.trip_date, t.id
         """, params)
-        rows = [{"No.": str(i), "Date": str(r["trip_date"]), "Vehicle": r["plate_number"], "Trip Type": r["trip_type"],
-                 "Route": r["route"], "Distance (km)": str(r["distance_km"]), "Duration (min)": str(r["duration_minutes"]),
-                 "Avg Speed (km/h)": str(r["avg_speed_kmh"]),
-                 "Actual Fuel (L)": str(r["actual_fuel_consumption"]) if r["actual_fuel_consumption"] is not None else dash}
-                for i, r in enumerate(rows_db, 1)]
+        rows = []
+        for i, r in enumerate(rows_db, 1):
+            fuel = r["actual_fuel_consumption"]
+            per_100 = float(fuel) / float(r["distance_km"]) * 100 if fuel is not None and float(r["distance_km"]) else None
+            rows.append({"No.": str(i), "Date of Travel": str(r["trip_date"]), "Vehicle": r["plate_number"],
+                         "Distance (km)": str(r["distance_km"]),
+                         "Fuel Consumed (L)": str(fuel) if fuel is not None else dash,
+                         "L/100 km": f"{per_100:.2f}" if per_100 is not None else dash})
         fuel_vals = [float(r["actual_fuel_consumption"]) for r in rows_db if r["actual_fuel_consumption"] is not None]
         totals = {"Trips": str(len(rows)),
                   "Total Distance": _num(sum(float(r["distance_km"]) for r in rows_db)) + " km",
-                  "Total Actual Fuel": _num(sum(fuel_vals)) + " L",
+                  "Total Fuel Consumed": _num(sum(fuel_vals)) + " L",
                   "Avg Fuel / Trip": (_num(sum(fuel_vals) / len(fuel_vals)) + " L") if fuel_vals else dash}
 
-    elif report_type == "fuel":
-        # No cost column: fuel budget monitoring / financial reporting is outside the study's scope.
-        columns = ["No.", "Date", "Vehicle", "Fuel Type", "Liters", "Odometer (km)", "Remarks"]
-        where, params = ["1=1"], []
-        if date_from: where.append("f.fuel_date >= %s"); params.append(date_from)
-        if date_to: where.append("f.fuel_date <= %s"); params.append(date_to)
-        if vehicle_id: where.append("f.vehicle_id = %s"); params.append(vehicle_id)
-        if fuel_type: where.append("f.fuel_type = %s"); params.append(fuel_type)
-        rows_db = db.query_all(f"""
-            SELECT f.*, v.plate_number FROM fuel_records f JOIN vehicles v ON f.vehicle_id=v.id
-            WHERE {' AND '.join(where)} ORDER BY f.fuel_date, f.id
-        """, params)
-        rows = [{"No.": str(i), "Date": str(r["fuel_date"]), "Vehicle": r["plate_number"], "Fuel Type": r["fuel_type"],
-                 "Liters": str(r["liters_consumed"]), "Odometer (km)": str(r["odometer_reading"]),
-                 "Remarks": r["remarks"] or dash} for i, r in enumerate(rows_db, 1)]
-        totals = {"Records": str(len(rows)),
-                  "Total Liters": _num(sum(float(r["liters_consumed"]) for r in rows_db)) + " L",
-                  "Avg Liters / Record": (_num(sum(float(r["liters_consumed"]) for r in rows_db) / len(rows_db)) + " L")
-                  if rows_db else "—"}
-
     elif report_type == "prediction":
-        columns = ["No.", "Date", "Vehicle", "Distance (km)", "Fuel Type", "Predicted Fuel (L)", "Actual Fuel (L)", "Difference (L)"]
+        columns = ["No.", "Date", "Vehicle", "Distance (km)", "Engine Power (kW)", "Fuel Type", "Predicted Fuel (L)",
+                   "Actual Fuel (L)", "Difference (L)"]
         where, params = ["1=1"], []
         if date_from: where.append("DATE(p.created_at) >= %s"); params.append(date_from)
         if date_to: where.append("DATE(p.created_at) <= %s"); params.append(date_to)
         if vehicle_id: where.append("p.vehicle_id = %s"); params.append(vehicle_id)
         if fuel_type: where.append("p.fuel_type = %s"); params.append(fuel_type)
-        if trip_type: where.append("p.trip_type = %s"); params.append(trip_type)
+        _ensure_vehicle_columns()
         rows_db = db.query_all(f"""
             SELECT p.*, v.plate_number FROM predictions p LEFT JOIN vehicles v ON p.vehicle_id=v.id
             WHERE {' AND '.join(where)} ORDER BY p.created_at, p.id
@@ -2674,7 +2141,9 @@ def build_report(f):
                 errs.append(abs(diff))
             rows.append({"No.": str(i), "Date": r["created_at"].strftime("%Y-%m-%d"),
                          "Vehicle": r["plate_number"] or "Manual Entry",
-                         "Distance (km)": str(r["distance_km"]), "Fuel Type": r["fuel_type"],
+                         "Distance (km)": str(r["distance_km"]),
+                         "Engine Power (kW)": f"{float(r['engine_power_kw']):g}" if r.get("engine_power_kw") is not None else dash,
+                         "Fuel Type": r["fuel_type"],
                          "Predicted Fuel (L)": str(r["predicted_fuel"]),
                          "Actual Fuel (L)": str(r["actual_fuel"]) if r["actual_fuel"] is not None else dash,
                          "Difference (L)": f"{diff:.2f}" if diff is not None else dash})
@@ -2689,22 +2158,35 @@ def build_report(f):
         rows = []
         if m:
             for label, value in (
-                ("Model Version", m.get("model_version")), ("R² Score", m.get("r2_score")),
-                ("MAE (L)", m.get("mae")), ("RMSE (L)", m.get("rmse")),
+                ("Model Version", m.get("model_version")),
+                ("Train-Test Split", "80% training / 20% testing"),
+                ("R² Score", m.get("r2_score")), ("MAE (L)", m.get("mae")), ("RMSE (L)", m.get("rmse")),
                 ("Cross-Validation Folds", m.get("cv_folds")), ("CV Mean R²", m.get("cv_mean_r2")),
-                ("CV Std. Deviation", m.get("cv_std_r2")), ("Training Set Size", m.get("train_size")),
+                ("CV Std. Deviation", m.get("cv_std_r2")),
+                ("CV Mean MAE (L)", m.get("cv_mean_mae")), ("CV Mean RMSE (L)", m.get("cv_mean_rmse")),
+                ("Training Set Size", m.get("train_size")),
                 ("Testing Set Size", m.get("test_size")), ("Total Dataset Records", m.get("total_records")),
-                ("System Trip Records Used", m.get("system_records")),
+                ("Local Trip Records Used", (m.get("data_sources") or {}).get("system")),
+                ("Supplementary Records Used", (m.get("data_sources") or {}).get("supplementary")),
                 ("Trained At", m.get("trained_at_display")), ("Model Status", (m.get("status") or "").capitalize()),
             ):
                 if value is not None:
                     rows.append({"Metric": label, "Value": str(value)})
-            removed = m.get("removed_features") or []
-            if m.get("vif_initial") is not None:
-                rows.append({"Metric": f"Predictors removed (VIF > {m.get('vif_threshold', 5):g})",
-                             "Value": ", ".join(f"{r['feature']} ({r['vif']})" for r in removed) or "None"})
-                rows.append({"Metric": "Numeric predictors used",
-                             "Value": ", ".join(m.get("selected_numeric_features") or [])})
+            if m.get("coefficients"):
+                centering = m.get("centering") or {}
+                for name, value in (("mean distance", centering.get("distance_km")), ("mean engine power", centering.get("engine_power_kw"))):
+                    if value is not None:
+                        rows.append({"Metric": f"Centering: {name}", "Value": str(value)})
+                rows.append({"Metric": "Intercept (β₀), centered", "Value": str(m.get("intercept"))})
+                for i, term in enumerate(m.get("equation_terms") or [], 1):
+                    rows.append({"Metric": f"β{i} {TERM_LABELS.get(term, term)}, centered", "Value": str(m["coefficients"].get(term))})
+                if m.get("raw_coefficients"):
+                    rows.append({"Metric": "Intercept (β₀), original units", "Value": str(m.get("raw_intercept"))})
+                    for i, term in enumerate(m.get("equation_terms") or [], 1):
+                        rows.append({"Metric": f"β{i} {TERM_LABELS.get(term, term)}, original units",
+                                     "Value": str(m["raw_coefficients"].get(term))})
+            for term, value in (m.get("vif") or {}).items():
+                rows.append({"Metric": f"VIF {TERM_LABELS.get(term, term)}", "Value": "—" if value is None else str(value)})
             for t in (m.get("diagnostics") or {}).get("tests", []):
                 p = "" if t["p_value"] is None else f", p = {t['p_value']}"
                 rows.append({"Metric": f"{t['assumption']} ({t['test']})",
@@ -2726,8 +2208,6 @@ def report_payload(args):
         applied.append(f"Vehicle: {f['vehicle_label']}")
     if f.get("fuel_type"):
         applied.append(f"Fuel: {f['fuel_type']}")
-    if f.get("trip_type"):
-        applied.append(f"Trip type: {f['trip_type']}")
     return {"errors": [], "type": f["type"], "title": REPORT_TYPES[f["type"]], "columns": columns, "rows": rows,
             # A list keeps the display order (JSON objects get their keys sorted).
             "totals": list(totals.items()), "applied": applied or ["All records"],
@@ -2742,7 +2222,7 @@ def reports():
     report = report_payload(request.args) if generated else None
     return render_template(
         "reports.html", active="reports", report_types=REPORT_TYPES, report_filters=REPORT_FILTERS,
-        vehicles=vehicles_list, trip_types=TRIP_TYPES, generated=generated, report=report,
+        vehicles=vehicles_list, generated=generated, report=report,
     )
 
 
@@ -2813,33 +2293,6 @@ def render_settings(form=None, status=200):
 @login_required
 def settings():
     return render_settings()
-
-
-@app.route("/settings/organization", methods=["POST"])
-@admin_required
-def update_organization():
-    values, errors = {}, []
-    labels = {"org_name": "Agency / organization name", "org_short": "Short name",
-              "office_name": "Office name", "office_short": "Office short name"}
-    for key, limit in ORG_LIMITS.items():
-        value = re.sub(r"\s+", " ", request.form.get(key, "")).strip()
-        if not value:
-            errors.append(f"{labels[key]} is required.")
-        elif len(value) > limit:
-            errors.append(f"{labels[key]} must be at most {limit} characters.")
-        values[key] = value
-    if errors:
-        for e in errors:
-            flash(e, "danger")
-        return redirect(url_for("settings"))
-    _ensure_org_table()
-    for key, value in values.items():
-        db.execute("""INSERT INTO app_settings (setting_key, setting_value) VALUES (%s, %s)
-                      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)""", (key, value))
-    g.pop("org", None)
-    _ORG_CACHE["value"] = None  # show the new names right away
-    flash("Organization details saved. Every page now shows the new name.", "success")
-    return redirect(url_for("settings"))
 
 
 @app.route("/api/me")

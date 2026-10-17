@@ -108,37 +108,5 @@
     </div>
   </div>
 
-  {% if is_admin %}
-  <div class="col-12">
-    <div class="card-surface">
-      <div class="section-title"><i class="fa-solid fa-building-columns text-primary"></i> Organization</div>
-      <p class="text-muted small">The government agency and office that use this copy of the system. These names appear on
-        the login page, the sidebar, printed reports, and the Terms &amp; Privacy Policy.</p>
-      <form method="POST" action="{{ url_for('update_organization') }}" class="needs-validation" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="row g-3">
-          <div class="col-md-8">
-            <label class="form-label" for="org_name">Agency / organization name</label>
-            <input type="text" class="form-control" id="org_name" name="org_name" value="{{ org.org_name }}" maxlength="120" required>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" for="org_short">Short name</label>
-            <input type="text" class="form-control" id="org_short" name="org_short" value="{{ org.org_short }}" maxlength="15" required>
-            <div class="form-text">Shown as "{{ org.org_short }} FleetFuel".</div>
-          </div>
-          <div class="col-md-8">
-            <label class="form-label" for="office_name">Office name</label>
-            <input type="text" class="form-control" id="office_name" name="office_name" value="{{ org.office_name }}" maxlength="120" required>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" for="office_short">Office short name</label>
-            <input type="text" class="form-control" id="office_short" name="office_short" value="{{ org.office_short }}" maxlength="15" required>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-navy mt-3"><i class="fa-solid fa-floppy-disk me-1"></i> Save Organization</button>
-      </form>
-    </div>
-  </div>
-  {% endif %}
 </div>
 {% endblock %}

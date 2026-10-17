@@ -1,1 +1,1 @@
-vehicle_type,brand_model,engine_displacement,fuel_type,year_model,odometer_reading,distance_km,duration_minutes,avg_speed_kmh,trip_type,departure_time,departure_period,passenger_cargo_load_kg,route,road_type,terrain_classification,actual_fuel_consumption
+trip_date,plate_number,distance_km,actual_fuel_consumption,fuel_type,engine_power_kw

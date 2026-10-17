@@ -2,50 +2,20 @@
 {% block title %}Trip Records{% endblock %}
 {% block page_title %}Trip Records{% endblock %}
 
+{# Monthly Report of Official Travel: date of travel, vehicle, distance traveled and fuel consumed. #}
 {% macro trip_fields() %}
   <div class="row g-2">
     <div class="col-md-6">
       <label class="form-label">Vehicle</label>
       <select class="form-select" name="vehicle_id" required>
         <option value="" selected disabled>Select vehicle</option>
-        {% for v in vehicles %}<option value="{{ v.id }}">{{ v.plate_number }} - {{ v.brand_model }}{{ ' (' ~ v.status ~ ')' if v.status != 'Active' }}</option>{% endfor %}
+        {% for v in vehicles %}<option value="{{ v.id }}">{{ v.plate_number }} - {{ v.brand_model }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-6"><label class="form-label">Trip Date</label><input type="date" class="form-control" name="trip_date" min="2000-01-01" max="{{ today }}" required></div>
-    <div class="col-md-6"><label class="form-label">Departure Time</label>
-      <input type="text" class="form-control" name="departure_time"
-             placeholder="HH:MM (24-hour, e.g. 08:30)" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" required>
-      <div class="invalid-feedback">Enter a valid 24-hour time, e.g. 08:30 or 17:15.</div>
-    </div>
-    <div class="col-md-6"><label class="form-label">Trip Type</label>
-      <select class="form-select" name="trip_type" required>
-        <option value="" selected disabled>Select trip type</option>
-        {% for tt in trip_types %}<option value="{{ tt }}">{{ tt }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="col-md-6"><label class="form-label">Destination / Route</label><input class="form-control" name="route" maxlength="150" required></div>
-    <div class="col-md-6"><label class="form-label">Road Type</label>
-      <select class="form-select" name="road_type" required>
-        <option value="" selected disabled>Select road type</option>
-        {% for rt in road_types %}<option value="{{ rt }}">{{ rt }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="col-md-6"><label class="form-label">Terrain Classification</label>
-      <select class="form-select" name="terrain_classification" required>
-        <option value="" selected disabled>Select terrain</option>
-        {% for tr in terrains %}<option value="{{ tr }}">{{ tr }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="col-md-6"><label class="form-label">Odometer Reading (km)</label><input type="number" step="0.01" min="0" max="2000000" class="form-control" name="odometer_reading" required></div>
+    <div class="col-md-6"><label class="form-label">Date of Travel</label><input type="date" class="form-control" name="trip_date" min="2000-01-01" max="{{ today }}" required></div>
     <div class="col-md-6"><label class="form-label">Distance Traveled (km)</label><input type="number" step="0.01" min="0.01" max="1000" class="form-control" name="distance_km" required></div>
-    <div class="col-md-6"><label class="form-label">Duration (minutes)</label><input type="number" step="0.1" min="0.1" max="1439" class="form-control" name="duration_minutes" required></div>
-    <div class="col-md-6"><label class="form-label">Average Speed (km/h)</label><input type="number" step="0.1" min="0.1" max="160" class="form-control" name="avg_speed_kmh" required></div>
-    <div class="col-md-6"><label class="form-label">Passenger/Cargo Load (kg)</label><input type="number" step="0.1" min="0" max="20000" class="form-control" name="passenger_cargo_load_kg" value="0" required></div>
-    <div class="col-md-6"><label class="form-label">Gasoline/Diesoline Consumed (L)</label><input type="number" step="0.01" min="0.01" max="1000" class="form-control" name="actual_fuel_consumption"></div>
-    <div class="col-md-6"><label class="form-label">Balance in the Tank (L)</label><input type="number" step="0.001" min="-1000" max="1000" class="form-control" name="balance_in_tank"></div>
-    <div class="col-md-6"><label class="form-label">Fuel Received (L)</label><input type="number" step="0.001" min="0.001" max="1000" class="form-control" name="fuel_received"></div>
-    <div class="col-md-6"><label class="form-label">OR No. / Invoice No.</label><input class="form-control" name="or_invoice_no" maxlength="60"></div>
-    <div class="col-12"><label class="form-label">Remarks</label><input class="form-control" name="remarks" maxlength="255"></div>
+    <div class="col-md-6"><label class="form-label">Fuel Consumed (L)</label><input type="number" step="0.01" min="0.01" max="1000" class="form-control" name="actual_fuel_consumption" required></div>
+    <div class="col-12"><label class="form-label">Remarks <span class="text-muted">(optional)</span></label><input class="form-control" name="remarks" maxlength="255"></div>
   </div>
 {% endmacro %}
 
@@ -55,7 +25,8 @@
     <div class="d-flex gap-2 flex-wrap align-items-center">
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" class="form-control" id="tripSearch" data-search-input="tripsTable" placeholder="Search date, vehicle, destination, OR no...">
+        <input type="text" class="form-control" id="tripSearch" data-search-input="tripsTable" placeholder="Search date, vehicle, month (2026-06)..."
+               value="{{ request.args.get('q', '') }}">
       </div>
       <span class="live-badge" id="tripLive"><span class="live-dot"></span><span id="tripLiveText">Live</span></span>
     </div>
@@ -70,14 +41,13 @@
       </button>
     </div>
   </div>
+  <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model.</p>
 
   <div class="table-wrap">
     <table class="table-fleet" id="tripsTable">
       <thead>
         <tr>
-          <th>No.</th><th>Date</th><th>Vehicle</th><th>Distance Travelled (km)</th>
-          <th>Gasoline/Diesoline Consumed (L)</th><th>Balance in the Tank (L)</th><th>Fuel Received (L)</th>
-          <th>OR No. / Invoice No.</th><th>Remarks / Destinations</th><th>Actions</th>
+          <th>No.</th><th>Date of Travel</th><th>Vehicle</th><th>Distance Traveled (km)</th><th>Fuel Consumed (L)</th><th>Remarks</th><th>Actions</th>
         </tr>
       </thead>
       <tbody id="tripsBody">
@@ -88,15 +58,12 @@
           <td>{{ t.plate_number }}</td>
           <td>{{ t.distance_km }}</td>
           <td>{{ t.actual_fuel_consumption or '—' }}</td>
-          <td>{{ t.balance_in_tank or '—' }}</td>
-          <td>{{ t.fuel_received or '—' }}</td>
-          <td>{{ t.or_invoice_no or '—' }}</td>
-          <td>{{ t.destination }}</td>
+          <td>{{ t.remarks or '—' }}</td>
           <td>
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#viewTripModal" title="View"><i class="fa-solid fa-eye"></i></button>
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
             {% if is_admin %}
-            <form method="POST" action="{{ url_for('delete_trip', trip_id=t.id) }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record and its fuel record?')">
+            <form method="POST" action="{{ url_for('delete_trip', trip_id=t.id) }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </form>
@@ -104,7 +71,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="10" class="text-center text-muted py-4">No trip records yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No trip records yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -116,24 +83,14 @@
 <div class="modal fade" id="viewTripModal" tabindex="-1" data-record-modal>
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Trip Record #<span data-field="id"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Trip Record #<span data-field="num"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <div class="row g-2">
-          <div class="col-6"><div class="summary-item"><div class="label">Trip ID</div><div class="value">#<span data-field="id"></span></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Date of Travel</div><div class="value" data-field="trip_date"></div></div></div>
           <div class="col-6"><div class="summary-item"><div class="label">Vehicle</div><div class="value" data-field="plate_number"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Date / Time</div><div class="value" data-field="date_time"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Trip Type</div><div class="value" data-field="trip_type"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Destination / Route</div><div class="value" data-field="route"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Road / Terrain</div><div class="value" data-field="road_terrain"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Distance</div><div class="value" data-field="distance_km" data-suffix=" km"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Duration</div><div class="value" data-field="duration_minutes" data-suffix=" min"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Avg Speed</div><div class="value" data-field="avg_speed_kmh" data-suffix=" km/h"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Load</div><div class="value" data-field="passenger_cargo_load_kg" data-suffix=" kg"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Odometer</div><div class="value" data-field="odometer_reading" data-suffix=" km"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Gasoline/Diesoline Consumed (L)</div><div class="value" data-field="actual_fuel_consumption" data-empty="Not recorded"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Balance in the Tank (L)</div><div class="value" data-field="balance_in_tank" data-empty="—"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Fuel Received (L)</div><div class="value" data-field="fuel_received" data-empty="—"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">OR No. / Invoice No.</div><div class="value" data-field="or_invoice_no" data-empty="—"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Vehicle Model</div><div class="value" data-field="brand_model"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Distance Traveled</div><div class="value" data-field="distance_km" data-suffix=" km"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Fuel Consumed</div><div class="value" data-field="actual_fuel_consumption" data-suffix=" L" data-empty="Not recorded"></div></div></div>
           <div class="col-12"><div class="summary-item"><div class="label">Remarks</div><div class="value" data-field="remarks" data-empty="—"></div></div></div>
         </div>
       </div>
@@ -142,11 +99,11 @@
 </div>
 
 <div class="modal fade" id="editTripModal" tabindex="-1" data-record-modal>
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST" action="" data-action-template="{{ url_for('edit_trip', trip_id=0) }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="modal-header"><h5 class="modal-title">Edit Trip Record #<span data-field="id"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header"><h5 class="modal-title">Edit Trip Record #<span data-field="num"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">{{ trip_fields() }}</div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
@@ -165,14 +122,14 @@
         <div class="modal-header"><h5 class="modal-title">Import Trip Records (CSV)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <ol class="small text-muted ps-3 mb-3">
-            <li>Download the <a href="{{ url_for('static', filename='downloads/FleetFuel-Trip-Ticket-Template.xlsx') }}" download>Excel template</a> (with dropdowns and instructions) or the <a href="{{ url_for('trip_import_template') }}" download>CSV template</a>, and fill one trip ticket per row (keep the header row). Save the Excel file as CSV UTF-8 before importing.</li>
+            <li>Download the <a href="{{ url_for('trip_import_template') }}" download>CSV template</a> and fill one trip of the Monthly Report of Official Travel per row (keep the header row): <code>plate_number</code>, <code>trip_date</code>, <code>distance_km</code>, <code>actual_fuel_consumption</code> (fuel consumed in liters), and optional <code>remarks</code>.</li>
             <li>Use the vehicle's <strong>plate number</strong> exactly as registered in Vehicles.</li>
-            <li>Dates as <code>YYYY-MM-DD</code>, <code>MM/DD/YYYY</code> or <code>01-Sep-2026</code>; times as <code>08:30</code> or <code>8:30 AM</code>.</li>
+            <li>Dates as <code>YYYY-MM-DD</code>, <code>MM/DD/YYYY</code> or <code>01-Sep-2026</code>.</li>
             <li>In Excel save with <strong>File &gt; Save As &gt; CSV UTF-8</strong> (plain <em>CSV (Comma delimited)</em> also works).</li>
           </ol>
           <input type="file" class="form-control" name="file" accept=".csv,text/csv" required>
           <div class="form-text">Every row is checked first; if any row has a problem nothing is imported and the rows to fix are listed.
-            Trips that are already recorded (same vehicle, date, time, odometer and distance) are skipped, so importing the same file twice is safe.</div>
+            Trips that are already recorded (same vehicle, date, distance and fuel consumed) are skipped, so importing the same file twice is safe.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
@@ -184,7 +141,7 @@
 </div>
 
 <div class="modal fade" id="addTripModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST" action="{{ url_for('add_trip') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -215,27 +172,29 @@ if (REOPEN) {
   if (REOPEN.trip_id) {
     form.action = EDIT_TRIP_URL.replace('/0/', '/' + REOPEN.trip_id + '/');
     const row = [...document.querySelectorAll('#tripsBody tr[data-record]')].find(function (tr) { return JSON.parse(tr.dataset.record).id === REOPEN.trip_id; });
-    modalEl.querySelectorAll('[data-field="id"]').forEach(function (el) { el.textContent = row ? JSON.parse(row.dataset.record).id : ''; });
+    modalEl.querySelectorAll('[data-field="num"]').forEach(function (el) { el.textContent = row ? JSON.parse(row.dataset.record).num : ''; });
   }
   Object.keys(REOPEN.values).forEach(function (k) {
     const field = form.elements[k];
     if (field && field.type !== 'hidden') field.value = REOPEN.values[k];
   });
   bootstrap.Modal.getOrCreateInstance(modalEl).show();
+} else if (new URLSearchParams(window.location.search).get('add') === '1') {
+  // Dashboard "Add Trip Record" opens the form straight away.
+  history.replaceState(null, '', window.location.pathname);
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('addTripModal')).show();
 }
 
 // ---- Real-time: refresh the table every 5s (keeps the search term) ----
 function tripRow(t) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(t);
-  const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km,
-    t.actual_fuel_consumption || '—', t.balance_in_tank || '—', t.fuel_received || '—', t.or_invoice_no || '—',
-    t.destination];
+  const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km, t.actual_fuel_consumption || '—', t.remarks || '—'];
   tr.innerHTML = cells.map(function (c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') +
     '<td>' +
       '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#viewTripModal" title="View"><i class="fa-solid fa-eye"></i></button> ' +
       '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
-      (IS_ADMIN ? '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record and its fuel record?\')">' +
+      (IS_ADMIN ? '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
         '<input type="hidden" name="csrf_token" value="' + escapeHtml(TRIP_CSRF) + '">' +
         '<button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>' +
       '</form>' : '') +
@@ -248,6 +207,7 @@ function refreshTrips() {
   fetch('/api/trips')
     .then(function (res) { return res.json(); })
     .then(function (d) {
+      if (!d || !Array.isArray(d.trips)) throw new Error('unexpected answer');  // keep the rows on screen
       document.getElementById('tripLive').className = 'live-badge';
       document.getElementById('tripLiveText').textContent = 'Live';
       const json = JSON.stringify(d.trips);
@@ -256,7 +216,7 @@ function refreshTrips() {
       const body = document.getElementById('tripsBody');
       body.innerHTML = '';
       if (!d.trips.length) {
-        body.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No trip records yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No trip records yet.</td></tr>';
       } else {
         const frag = document.createDocumentFragment();
         d.trips.forEach(function (t) { frag.appendChild(tripRow(t)); });

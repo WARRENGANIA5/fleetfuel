@@ -3,8 +3,8 @@ Generates the evaluation figures for the paper (Chapter IV) with
 Matplotlib/Seaborn, from exactly the data, predictors and 80/20 split the
 current model was trained on:
 
-  actual_vs_predicted.png   residual_plot.png      residual_qq_plot.png
-  fuel_distribution.png     correlation_heatmap.png vif_before_after.png
+  actual_vs_predicted.png   residual_plot.png       residual_histogram.png
+  residual_qq_plot.png      correlation_heatmap.png vif.png
   cv_r2_scores.png
 
 Saved to reports/figures/. The web app draws the same charts live; these
@@ -27,7 +27,7 @@ from sklearn.model_selection import KFold, cross_val_score, train_test_split
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from model.preprocess import (FEATURE_COLUMNS, NUMERIC_FEATURES, TARGET_COLUMN,
+from model.preprocess import (FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, TERM_LABELS,
                               clean_data, load_and_merge_datasets)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,12 +37,7 @@ MODEL_PATH = os.path.join(BASE_DIR, "model", "linear_regression_pipeline.joblib"
 METRICS_PATH = os.path.join(BASE_DIR, "model", "metrics.json")
 FIGURES_DIR = os.path.join(BASE_DIR, "reports", "figures")
 
-LABELS = {
-    "odometer_reading": "Odometer (km)", "distance_km": "Distance (km)", "duration_minutes": "Duration (min)",
-    "avg_speed_kmh": "Avg Speed (km/h)", "passenger_cargo_load_kg": "Load (kg)",
-    "engine_displacement": "Engine Size (L)", "year_model": "Year Model",
-    "rated_efficiency_l_per_100km": "Rated Eff. (L/100km)", "actual_fuel_consumption": "Fuel Used (L)",
-}
+LABELS = TERM_LABELS
 sns.set_theme(style="whitegrid")
 BLUE, NAVY, TEAL = "#1d6fd6", "#0b2545", "#1aa38c"
 
@@ -107,34 +102,37 @@ def main():
     fig.axes[0].set_title("Normal Q-Q Plot of Residuals")
     save(fig, "residual_qq_plot.png")
 
-    # 4. Fuel consumption distribution
+    # 4. Histogram of residuals (normality check)
     fig, ax = plt.subplots(figsize=(6.4, 5.2))
-    sns.histplot(df[TARGET_COLUMN], kde=True, color=BLUE, binwidth=2.5, ax=ax)
-    ax.set(xlabel="Fuel Used per Trip (L)", ylabel="Number of Trips", title="Fuel Consumption Distribution")
-    save(fig, "fuel_distribution.png")
+    sns.histplot(residuals, kde=True, color=BLUE, ax=ax)
+    ax.axvline(0, color=NAVY, linestyle="--", linewidth=1.5)
+    ax.set(xlabel="Residual (Actual − Predicted, L)", ylabel="Number of Test Trips", title="Histogram of Residuals")
+    save(fig, "residual_histogram.png")
 
-    # 5. Correlation heatmap (variable selection)
-    corr = df[NUMERIC_FEATURES + [TARGET_COLUMN]].corr().rename(index=LABELS, columns=LABELS)
+    # 5. Correlation heatmap of the equation's terms and the fuel consumed
+    terms = pipeline.named_steps["encoder"].transform(X).assign(**{TARGET_COLUMN: y.astype(float)})
+    cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
+    corr = terms[cols].corr().rename(index=LABELS, columns=LABELS)
     fig, ax = plt.subplots(figsize=(8.2, 6.8))
     sns.heatmap(corr, annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1, square=True, cbar=True, ax=ax,
                 annot_kws={"size": 8})
     ax.set_title("Feature Correlation Heatmap")
     save(fig, "correlation_heatmap.png")
 
-    # 6. VIF before and after variable selection
-    vif_initial = metrics.get("vif_initial") or {}
-    vif_final = metrics.get("vif_final") or {}
-    if vif_initial:
-        names = list(vif_initial)
-        fig, ax = plt.subplots(figsize=(8.2, 4.8))
+    # 6. Variance Inflation Factor of each term (above 5 = high collinearity)
+    vif = {k: v for k, v in (metrics.get("vif") or {}).items() if v is not None}
+    if vif:
+        names = list(vif)
+        fig, ax = plt.subplots(figsize=(8.2, 4.2))
         pos = np.arange(len(names))
-        ax.barh(pos + 0.2, [min(vif_initial[n], 50) for n in names], height=0.4, color="#c9d6e8", label="Before selection")
-        ax.barh(pos - 0.2, [min(vif_final.get(n, 0), 50) for n in names], height=0.4, color=BLUE, label="After selection")
+        ax.barh(pos, [min(vif[n], 50) for n in names], height=0.5, color=BLUE)
+        for i, n in enumerate(names):
+            ax.text(min(vif[n], 50) + 0.5, i, f"{vif[n]:g}", va="center", fontsize=9)
         ax.axvline(metrics.get("vif_threshold", 5), color="#d9534f", linestyle="--", label="Threshold (VIF = 5)")
         ax.set_yticks(pos, [LABELS.get(n, n) for n in names])
         ax.set(xlabel="Variance Inflation Factor (capped at 50 for display)", title="Multicollinearity Check (VIF)")
         ax.legend(loc="lower right")
-        save(fig, "vif_before_after.png")
+        save(fig, "vif.png")
 
     # 7. k-fold cross-validation scores
     scores = cross_val_score(pipeline, X, y, cv=KFold(n_splits=metrics.get("cv_folds", 5), shuffle=True, random_state=42),

@@ -2,7 +2,7 @@
 
 A thesis/capstone web system for **Guimaras State University's General Services Office (GSO)**,
 predicting government fleet fuel consumption using a **Linear Regression** model trained on
-historical trip and fuel records, served through a Flask + MySQL web application.
+the local trip records (Monthly Report of Official Travel) and a supplementary online dataset, served through a Flask + MySQL web application.
 
 This is an original system adapted from the general fuel-prediction concept (Auto MPG +
 Linear Regression) demonstrated in [Kanchu1147/Fuel_Consumption_Prediction_Of_Vehicles](https://github.com/Kanchu1147/Fuel_Consumption_Prediction_Of_Vehicles),
@@ -30,14 +30,14 @@ gov-fleets/
 ├── model/
 │   ├── preprocess.py           Shared preprocessing (train + predict)
 │   ├── train_model.py          Trains & saves the Linear Regression pipeline
-│   ├── diagnostics.py          VIF variable selection + LINE assumption tests (statsmodels)
+│   ├── diagnostics.py          VIF + LINE assumption tests (statsmodels)
 │   ├── evaluate_model.py       Generates the evaluation figures for the paper (reports/figures/)
 │   ├── linear_regression_pipeline.joblib   (generated)
 │   └── metrics.json            (generated)
 ├── data/
-│   ├── generate_dataset.py     Builds the historical + supplementary datasets
-│   ├── historical_fleet_data.csv     (generated)
-│   ├── supplementary_data.csv        (generated)
+│   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from the online dataset
+│   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
+│   ├── supplementary_data.csv        Online trips: distance, engine power, fuel type, fuel consumed
 │   └── dataset_info.json       Fingerprints of the synthetic files ("Demo data" label)
 ├── database/
 │   └── government_fleet_fuel.sql
@@ -56,17 +56,17 @@ gov-fleets/
 
 ## 3. About the Dataset
 
-Guimaras State University does not yet have a digitized historical trip/fuel logbook, so
-`data/generate_dataset.py` generates a physically-consistent **synthetic historical dataset**
-(1,500 trip/fuel records across 11 representative fleet vehicle types) that stands in for that
-collection. Fuel consumption in this dataset is generated from realistic relationships
-(terrain, road type, load, speed, vehicle age, trip type) plus random noise — it is **training
-data**, not a prediction formula. The Linear Regression model in `model/train_model.py` learns
-its own coefficients from this data via scikit-learn; nothing is hardcoded at prediction time.
+The model predicts the **fuel consumed per trip (L)** from three predictors and one interaction term:
 
-**To use real GSU fleet records instead:** replace `data/historical_fleet_data.csv` with the
-real, digitized trip/fuel export, keeping the same column names, then re-run
-`model/train_model.py`.
+    ŷ = β0 + β1(Distance) + β2(Engine Power) + β3(Fuel Type) + β4(Distance × Engine Power)
+
+with fuel type encoded **1 = Gasoline, 0 = Diesel**.
+
+* **Local data:** the GSO Monthly Report of Official Travel — date of travel, vehicle, distance traveled
+  (km) and fuel consumed (L) — entered in **Trip Records**, merged with the **vehicle records** (plate number,
+  vehicle model, fuel type, engine power in kW) using the plate number.
+* **Supplementary dataset:** `data/supplementary_data.csv`, real-world trips from an open online dataset with
+  the same variables (see `data/SUPPLEMENTARY_DATASET_SOURCE.md`).
 
 ## 4. Setup Instructions (Windows / VS Code)
 
@@ -92,21 +92,20 @@ mysql -u root -p < database/government_fleet_fuel.sql
 Copy `.env.example` to `.env` and adjust if your MySQL credentials differ from the defaults
 (`root` / no password / `localhost:3306`).
 
-### 4.5 Generate the dataset and train the model
+### 4.5 Train the model
 ```bash
-python data/generate_dataset.py
 python model/train_model.py
 python model/evaluate_model.py
 ```
-This creates `model/linear_regression_pipeline.joblib`, `model/metrics.json`, and the 4 charts
-used on the Model Performance page. **Predictions will not work until this step is done** — the
+This creates `model/linear_regression_pipeline.joblib`, `model/metrics.json`, and the figures in
+`reports/figures/`. (The running app also trains the model by itself.) **Predictions will not work until this step is done** — the
 Prediction page will show "Model unavailable" until a trained model file exists.
 
 ### 4.6 Seed the database
 ```bash
 python seed_data.py
 ```
-Creates the administrator account and demo vehicles/drivers/trips/fuel records so the
+Creates the administrator account and demo vehicles and trip records so the
 dashboard and modules are populated on first run.
 
 **Default login:**
@@ -132,12 +131,12 @@ Visit **http://127.0.0.1:5000**.
 Retraining is automatic. While the app runs, a background watcher retrains the Linear Regression
 model within a few seconds whenever the training data changes:
 
-- a trip record with an actual fuel value is added, edited, imported (Trip Records > Import CSV) or deleted;
-- a vehicle's type, engine, fuel type or year model is edited, or a vehicle is deleted;
+- a trip record is added, edited, imported (Trip Records > Import CSV) or deleted;
+- a vehicle's plate number, fuel type or engine power is edited, or a vehicle is deleted;
 - `data/historical_fleet_data.csv` or `data/supplementary_data.csv` is replaced.
 
-The model trains on the CSV dataset **plus** every trip record in the system that has an actual
-fuel value. The Prediction, Dashboard and Model Performance pages switch to the new model by
+The model trains on the supplementary dataset **plus** every trip record in the system (merged with its
+vehicle record). The Prediction, Dashboard and Model Performance pages switch to the new model by
 themselves; no restart is needed. `python model/train_model.py` and `python model/evaluate_model.py`
 still work for training outside the app and for regenerating the figures in `reports/figures/`.
 
@@ -158,18 +157,18 @@ records survive if the computer fails.
 
 ## 6. Machine Learning Pipeline Summary
 
-1. Load historical dataset + merge supplementary vehicle efficiency ratings
-2. Clean missing values, filter invalid ranges, remove target outliers (IQR)
-3. Select predictors: distance, duration, avg. speed, load, engine displacement, year model,
-   odometer, rated efficiency (numeric) + trip type, departure period, route, road type,
-   terrain, vehicle type, fuel type (categorical, one-hot encoded)
-4. 80/20 train/test split
-5. Train Linear Regression inside a scikit-learn `Pipeline` (preprocessing + model bundled)
-6. Evaluate with R², MAE, RMSE on the held-out test set
-7. 5-Fold Cross-Validation on the full dataset
-8. Save the fitted pipeline via Joblib and metrics to `model/metrics.json`
-9. Flask loads the same pipeline to preprocess and predict on live form input — training and
-   prediction always use identical preprocessing because it is the same saved object.
+1. Merge the trip records with the vehicle records by plate number; add the supplementary dataset
+2. Clean: drop records with missing values or zero distance; remove outliers with the IQR rule on
+   fuel used per 100 km, within each engine-power group
+3. Encode fuel type (1 = Gasoline, 0 = Diesel); mean-center distance and engine power and add the interaction term Distance × Engine Power
+4. Check multicollinearity with the Variance Inflation Factor (above 5 = high collinearity)
+5. 80/20 train/test split
+6. Train Linear Regression inside a scikit-learn `Pipeline` (encoding + model bundled)
+7. Evaluate with R², MAE and RMSE on the test set and with 5-fold cross-validation
+8. Residual plot and residual histogram; Durbin-Watson on the local trips arranged by date of travel
+9. Save the fitted pipeline via Joblib and metrics to `model/metrics.json`
+10. Prediction: staff select the vehicle and enter the distance; the system takes the vehicle's engine
+    power and fuel type from its record, predicts the fuel, and stores the prediction in the history.
 
 ## 7. Security Notes
 
@@ -189,20 +188,16 @@ Until the synthetic CSV files in `data/` are replaced, every model page shows a 
 
 * **Trip tickets:** Trip Records → **Import CSV** (download the template there). Every row is validated;
   nothing is imported unless all rows are valid. The model retrains automatically.
-* **Historical dataset:** replace `data/historical_fleet_data.csv` (same column names). The app detects
-  the change and retrains.
-* **Supplementary dataset (open online sources):** put the online trip records in
-  `data/supplementary_data.csv` with the same column names as the historical file (it must include
-  `actual_fuel_consumption`). The rows are merged into the training data and every predictor the online
-  dataset does not have is dropped from the model, as stated in the Scope and Limitations. The merge
-  result (sources and dropped variables) is shown on Model Performance. The current file is a per-vehicle-type
-  rated-efficiency table, which is joined on `vehicle_type` instead.
+* **Supplementary dataset (open online sources):** `data/supplementary_data.csv` with the columns
+  `distance_km, engine_power_kw, fuel_type, actual_fuel_consumption`. The app detects a replaced file and retrains.
 
-## Variable selection and assumption checks
+## Multicollinearity and assumption checks
 
-Training first removes numeric predictors with **no measurable link to fuel use** (|r| < 0.10 with fuel
-consumption), then removes predictors with **VIF > 5** (highest first), then tests the LINE conditions on
-the training residuals: Ramsey RESET (linearity), Durbin-Watson (independence), Jarque-Bera (normality),
+Distance and engine power are **mean-centered** (training-set means) before the interaction term is formed;
+this removes the collinearity between the interaction and its components without changing any prediction, and
+the fitted equation is also shown in the original units. Training reports the **VIF** of every term (above 5 =
+high collinearity), uses **HC3 robust standard errors** for the coefficient p-values, and tests the LINE
+conditions on the residuals: Ramsey RESET (linearity), Durbin-Watson (independence), Jarque-Bera (normality),
 Breusch-Pagan (equal variance) and VIF (multicollinearity). Results appear on **Model Performance**, in the
 **Model Performance Report**, and in the Colab notebook. `python model/evaluate_model.py` saves print-ready
 figures to `reports/figures/`.
@@ -240,22 +235,10 @@ The database must only be reachable by the app on the same PC, never from the ne
 3. In `.env` set `MYSQL_HOST=127.0.0.1`, `MYSQL_USER=fleetfuel` and `MYSQL_PASSWORD=<that password>`.
    Use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and every page waits ~2 s.
 
-## Using the system in another government office
-
-Each office runs its **own copy** on its own server PC, so every agency's data stays separate:
-
-1. Copy the project folder (without `backups/`, `static/images/avatars/` and `.env`) to the new server PC
-   and follow sections 4.1–4.7 and the database security steps above. Create a new random `SECRET_KEY`.
-2. Log in as the administrator, open **Settings → Organization**, and enter the agency name, short name,
-   office name and office short name. The login page, sidebar, page titles, printed reports and the
-   Terms & Privacy Policy change immediately.
-3. Replace the demo vehicles, trips and routes with the office's own records (Trip Records → Import CSV).
-   The model retrains automatically on that office's data.
-
 ## Roles and fuel requests
 
 * **Staff (GSO / motorpool):** predict fuel for a planned trip (each prediction is a *fuel request*), encode
-  trip tickets and fuel logs (add, edit, CSV import), record the actual fuel after the trip, and view the
+  trips from the Monthly Report of Official Travel (add, edit, CSV import), record the actual fuel after the trip, and view the
   dashboard, vehicles, model performance and reports. The bell notifies them in real time when a request is
   approved (with the liters released) or rejected.
 * **Administrators:** everything staff can do, plus approve/reject fuel requests and set the fuel to release

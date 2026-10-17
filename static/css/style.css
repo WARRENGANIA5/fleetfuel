@@ -34,24 +34,10 @@
 
 * { box-sizing: border-box; }
 
-/* ---------------- Smooth page changes ----------------
-   The page's own colour behind everything, so a click never flashes white;
-   browsers that support it cross-fade the content while the sidebar and the
-   top bar stay put. */
+/* ---------------- Page changes ----------------
+   No animation: the next page shows the moment it arrives. The page's own
+   colour sits behind everything, so a click never flashes white. */
 html { background: var(--bg-page); }
-@view-transition { navigation: auto; }
-.sidebar { view-transition-name: sidebar; }
-.topbar { view-transition-name: topbar; }
-::view-transition-group(sidebar), ::view-transition-group(topbar) { animation: none; }
-::view-transition-old(sidebar), ::view-transition-old(topbar) { display: none; }
-::view-transition-new(sidebar), ::view-transition-new(topbar) { animation: none; }
-::view-transition-old(root) { animation: 120ms ease-out both vt-fade-out; }
-::view-transition-new(root) { animation: 180ms ease-out both vt-fade-in; }
-@keyframes vt-fade-out { to { opacity: 0; } }
-@keyframes vt-fade-in { from { opacity: 0; transform: translateY(4px); } }
-@media (prefers-reduced-motion: reduce) {
-  @view-transition { navigation: none; }
-}
 
 /* Thin bar along the top while the next page loads. */
 .page-progress {
@@ -63,6 +49,18 @@ html { background: var(--bg-page); }
   pointer-events: none;
 }
 .page-progress.is-loading { opacity: 1; width: 70%; transition: width 6s cubic-bezier(0.1, 0.6, 0.2, 1), opacity 0.1s; }
+
+/* Pages switch in place (script.js). If the next page is not ready within a
+   moment, the old content is cleared and a small spinner holds its place. */
+.content-area.is-switching { position: relative; min-height: 60vh; }
+.content-area.is-switching > * { visibility: hidden; }
+.content-area.is-switching::after {
+  content: ""; position: absolute; top: 140px; left: 50%;
+  width: 34px; height: 34px; margin-left: -17px;
+  border: 3px solid var(--border-soft); border-top-color: var(--blue-600); border-radius: 50%;
+  animation: page-spin 0.7s linear infinite;
+}
+@keyframes page-spin { to { transform: rotate(360deg); } }
 
 body {
   margin: 0;
@@ -193,30 +191,6 @@ a { text-decoration: none; color: inherit; }
 .topbar-title { flex: 1; min-width: 0; }
 .topbar-title h1 { font-size: 20px; font-weight: 700; margin: 0; color: var(--text-dark); }
 .topbar-date { font-size: 12.5px; color: var(--text-muted); }
-
-.topbar-search {
-  flex: 1;
-  max-width: 360px;
-  position: relative;
-  display: none;
-}
-.topbar-search i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
-.topbar-search input {
-  width: 100%;
-  background: var(--bg-page);
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 9px 14px 9px 34px;
-  font-size: 13.5px;
-  color: var(--text-dark);
-}
-.topbar-search input:focus {
-  outline: none;
-  border-color: var(--blue-600);
-  box-shadow: 0 0 0 3px var(--blue-100);
-}
-.topbar-search input::placeholder { color: var(--text-muted); }
-@media (min-width: 768px) { .topbar-search { display: block; } }
 
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 
@@ -767,6 +741,10 @@ a { text-decoration: none; color: inherit; }
   border-bottom: 1px solid var(--border-soft);
 }
 .legend-row:last-child { border-bottom: none; }
+/* Dashboard Fleet Usage rows open that vehicle's trip records. */
+a.legend-link { text-decoration: none; color: inherit; border-radius: 6px; transition: background 0.15s ease; }
+a.legend-link:hover { background: rgba(255,255,255,0.05); }
+a.legend-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .legend-label { flex: 1; font-size: 13px; color: var(--text-dark); font-weight: 500; }
 .legend-value { font-size: 13px; font-weight: 700; color: var(--text-dark); }
@@ -1057,3 +1035,7 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
 /* Stat cards that open a filtered list (e.g. fuel requests waiting for approval) */
 a.stat-card-link { text-decoration: none; color: inherit; cursor: pointer; }
 a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+/* Dashboard Model Status figures: the whole block opens Model Performance. */
+.model-summary-link { cursor: pointer; border-radius: 8px; margin: -6px; padding: 6px; transition: background 0.15s ease; }
+.model-summary-link:hover { background: rgba(255,255,255,0.05); }
+.model-summary-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }

@@ -1,195 +1,168 @@
 """
-Shared preprocessing definition for the fuel-consumption Linear Regression
-model. This module is imported by BOTH train_model.py and app.py so that
-the exact same feature list, encoding, and scaling are applied whether the
-model is being trained or used to serve a live prediction. This avoids the
-classic train/predict mismatch bug.
+Shared preprocessing for the fuel-consumption Linear Regression model
+(Chapter III, How the Project Will Work). Imported by BOTH train_model.py and
+app.py, so the exact same features and encoding are used when the model is
+trained and when it serves a live prediction.
+
+Predictors (Scope): distance traveled (km), engine power (kW) and fuel type;
+the predicted value is the fuel consumed per trip in liters. The model is
+
+    y^ = b0 + b1(Distance) + b2(Engine Power) + b3(Fuel Type) + b4(Distance x Engine Power)
+
+with fuel type encoded as 1 = Gasoline, 0 = Diesel.
 """
-import os
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.base import BaseEstimator, TransformerMixin
 
-NUMERIC_FEATURES = [
-    "odometer_reading",
-    "distance_km",
-    "duration_minutes",
-    "avg_speed_kmh",
-    "passenger_cargo_load_kg",
-    "engine_displacement",
-    "year_model",
-    "rated_efficiency_l_per_100km",
-]
+FUEL_TYPES = ("Diesel", "Gasoline")
+FUEL_TYPE_CODES = {"Diesel": 0, "Gasoline": 1}  # Encoding: 1 represents gasoline and 0 represents diesel
 
-CATEGORICAL_FEATURES = [
-    "trip_type",
-    "departure_period",
-    "route",
-    "road_type",
-    "terrain_classification",
-    "vehicle_type",
-    "fuel_type",
-]
-
-FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+# The three inputs a prediction needs (from the trip and the selected vehicle's record).
+FEATURE_COLUMNS = ["distance_km", "engine_power_kw", "fuel_type"]
+# The four terms of the regression equation, after encoding and the interaction term.
+MODEL_TERMS = ["distance_km", "engine_power_kw", "fuel_type_code", "distance_x_power"]
+TERM_LABELS = {
+    "distance_km": "Distance (km)",
+    "engine_power_kw": "Engine Power (kW)",
+    "fuel_type_code": "Fuel Type (1 = Gasoline)",
+    "distance_x_power": "Distance × Engine Power",
+    "actual_fuel_consumption": "Fuel Consumed (L)",
+}
 TARGET_COLUMN = "actual_fuel_consumption"
 
+# Kept for code that still asks for them: every model term is numeric now.
+NUMERIC_FEATURES = MODEL_TERMS
+CATEGORICAL_FEATURES = []
 
-def departure_period_from_time(time_str):
-    """Bucket a HH:MM(:SS) string into the same periods used in training."""
-    try:
-        hour = int(str(time_str).split(":")[0])
-    except (ValueError, IndexError):
-        hour = 8
-    if 5 <= hour < 9:
-        return "Early Morning"
-    if 9 <= hour < 12:
-        return "Morning"
-    if 12 <= hour < 17:
-        return "Afternoon"
-    if 17 <= hour < 20:
-        return "Evening"
-    return "Night"
+# The local Monthly Report of Official Travel export (one row per trip) and the
+# vehicle records it is merged with on the plate number.
+TRIP_COLUMNS = ["trip_date", "plate_number", "distance_km", TARGET_COLUMN]
+VEHICLE_COLUMNS = ["plate_number", "brand_model", "fuel_type", "engine_power_kw"]
+
+
+def encode_features(frame, centers=None):
+    """Encoding and interaction term: fuel type as 1 (Gasoline) / 0 (Diesel),
+    plus Distance x Engine Power for the higher fuel use per kilometre of
+    larger engines. Returns the four model terms in a fixed order.
+
+    With `centers` (mean distance, mean engine power of the training set),
+    distance and power are mean-centered before the interaction is formed.
+    Centering removes the collinearity between a predictor and an interaction
+    built from it (high VIF) without changing any prediction."""
+    frame = pd.DataFrame(frame)
+    distance = pd.to_numeric(frame["distance_km"], errors="coerce").astype(float)
+    power = pd.to_numeric(frame["engine_power_kw"], errors="coerce").astype(float)
+    fuel = frame["fuel_type"].map(lambda v: FUEL_TYPE_CODES.get(str(v).strip().title(), float("nan"))).astype(float)
+    if centers is not None:
+        distance, power = distance - centers[0], power - centers[1]
+    return pd.DataFrame({
+        "distance_km": distance,
+        "engine_power_kw": power,
+        "fuel_type_code": fuel,
+        "distance_x_power": distance * power,
+    }, index=frame.index)
+
+
+class TermEncoder(BaseEstimator, TransformerMixin):
+    """Pipeline step: learns the mean distance and mean engine power of the
+    training data (fit) and builds the four centered terms (transform)."""
+
+    def fit(self, X, y=None):
+        X = pd.DataFrame(X)
+        self.distance_mean_ = float(pd.to_numeric(X["distance_km"], errors="coerce").mean())
+        self.power_mean_ = float(pd.to_numeric(X["engine_power_kw"], errors="coerce").mean())
+        return self
+
+    def transform(self, X):
+        return encode_features(X, centers=(self.distance_mean_, self.power_mean_))
+
+
+def build_feature_encoder():
+    """The encoding step bundled into the saved joblib pipeline in front of the
+    regression, so a prediction is always encoded exactly like the training data."""
+    return TermEncoder()
+
+
+def raw_equation(intercept, coefficients, centers):
+    """The fitted centered equation written back in the original units:
+    y = b0 + b1(D - d) + b2(P - p) + b3 F + b4(D - d)(P - p)
+      = [b0 - b1 d - b2 p + b4 d p] + (b1 - b4 p) D + (b2 - b4 d) P + b3 F + b4 D P."""
+    b1, b2, b3, b4 = (coefficients[t] for t in MODEL_TERMS)
+    d, p = centers
+    return (intercept - b1 * d - b2 * p + b4 * d * p,
+            {"distance_km": b1 - b4 * p, "engine_power_kw": b2 - b4 * d, "fuel_type_code": b3, "distance_x_power": b4})
+
+
+def merge_trips_and_vehicles(trips, vehicles):
+    """The trip records and the vehicle records are stored separately, so they are
+    merged using the plate number (each trip gets its vehicle's engine power and
+    fuel type)."""
+    vehicles = vehicles[["plate_number", "fuel_type", "engine_power_kw"]].drop_duplicates("plate_number")
+    trips = trips.drop(columns=[c for c in ("fuel_type", "engine_power_kw") if c in trips.columns])
+    return trips.merge(vehicles, on="plate_number", how="left")
 
 
 def supplementary_info(supplementary_path):
-    """Describe the supplementary dataset.
-
-    * "trips"  - trip-level records from open online sources (has the target
-                 column). They are merged into the training data, and every
-                 predictor the online dataset does not have is dropped from the
-                 model ("variables absent from the online dataset are dropped
-                 during merging" - Scope and Limitations).
-    * "lookup" - a per-vehicle-type table of manufacturer-rated efficiency,
-                 joined on vehicle_type as an extra predictor.
-    """
+    """Describe the supplementary dataset: online trip records with the same
+    variables (distance, engine power, fuel type, fuel consumed)."""
     columns = list(pd.read_csv(supplementary_path, nrows=0).columns)
-    if TARGET_COLUMN in columns:
-        dropped = [c for c in FEATURE_COLUMNS if c not in columns and c != "departure_period"]
-        if "departure_period" not in columns and "departure_time" not in columns:
-            dropped.append("departure_period")
-        return {"kind": "trips", "dropped_features": dropped, "columns": columns}
-    return {"kind": "lookup", "dropped_features": [], "columns": columns}
+    missing = [c for c in FEATURE_COLUMNS + [TARGET_COLUMN] if c not in columns]
+    return {"kind": "trips", "dropped_features": [], "missing_columns": missing, "columns": columns}
 
 
 def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None):
-    """Load the historical trip/fuel dataset (plus any extra records, e.g.
-    trip records entered in the system) and merge the supplementary dataset
-    (trip records appended, or a rated-efficiency lookup joined on vehicle_type).
-    A `data_source` column records where each row came from."""
-    df = pd.read_csv(historical_path)
-    df["data_source"] = "historical"
+    """Combine the local trips (the historical CSV plus the trip records in the
+    system, already merged with their vehicles) and the supplementary dataset on
+    their shared variables. Each record is labeled with its source
+    (`data_source`), so the local trips can be identified after merging."""
+    frames = []
+    historical = pd.read_csv(historical_path)
+    if not historical.empty:
+        frames.append(historical.assign(data_source="historical"))
     if extra_df is not None and not extra_df.empty:
-        df = pd.concat([df, extra_df.assign(data_source="system")], ignore_index=True)
-    supp = pd.read_csv(supplementary_path)
-    if TARGET_COLUMN in supp.columns:
-        supp = supp.copy()
-        if "departure_period" not in supp.columns and "departure_time" in supp.columns:
-            supp["departure_period"] = supp["departure_time"].map(departure_period_from_time)
-        df = pd.concat([df, supp.assign(data_source="supplementary")], ignore_index=True)
-    else:
-        df = df.merge(supp[["vehicle_type", "rated_efficiency_l_per_100km"]], on="vehicle_type", how="left")
-        df["rated_efficiency_l_per_100km"] = df["rated_efficiency_l_per_100km"].fillna(
-            df["rated_efficiency_l_per_100km"].median()
-        )
-    # Every feature column exists (NaN where a source lacks it) so downstream
-    # code can always select FEATURE_COLUMNS; dropped predictors are simply
-    # not used by the model.
-    for col in FEATURE_COLUMNS:
+        frames.append(extra_df.assign(data_source="system"))
+    supplementary = pd.read_csv(supplementary_path)
+    frames.append(supplementary.assign(data_source="supplementary"))
+    df = pd.concat(frames, ignore_index=True)
+    for col in FEATURE_COLUMNS + [TARGET_COLUMN, "trip_date", "plate_number"]:
         if col not in df.columns:
             df[col] = pd.NA
     return df
 
 
 def clean_data(df):
-    """Handle missing values and remove clearly invalid / outlier rows."""
+    """Remove records with missing values or zero distance, then extreme
+    outliers with the IQR rule on the fuel used per 100 km, within each group
+    of vehicles with the same engine power (large vehicles are compared only
+    with vehicles of similar size)."""
     df = df.copy()
-    df = df.dropna(subset=[TARGET_COLUMN])
+    for col in ("distance_km", "engine_power_kw", TARGET_COLUMN):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["fuel_type"] = df["fuel_type"].astype("string").str.strip().str.title()
+    df = df.dropna(subset=["distance_km", "engine_power_kw", "fuel_type", TARGET_COLUMN])
+    df = df[df["fuel_type"].isin(FUEL_TYPES)]
+    df = df[(df["distance_km"] > 0) & (df["engine_power_kw"] > 0) & (df[TARGET_COLUMN] > 0)]
 
-    for col in NUMERIC_FEATURES:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            median = df[col].median() if df[col].notna().any() else 0
-            df[col] = df[col].fillna(median)
+    # IQR = Q3 - Q1; lower bound = Q1 - 1.5(IQR); upper bound = Q3 + 1.5(IQR).
+    # The spread never counts as less than 25% of the group's median: a group
+    # whose records all share one value (e.g. fuel written down as distance / 10)
+    # would otherwise have an IQR of 0 and reject every real trip added later.
+    def within_iqr(per_100km):
+        q1, q3 = per_100km.quantile(0.25), per_100km.quantile(0.75)
+        iqr = max(q3 - q1, 0.25 * per_100km.median())
+        return per_100km.between(q1 - 1.5 * iqr, q3 + 1.5 * iqr)
 
-    for col in CATEGORICAL_FEATURES:
-        if col in df.columns:
-            df[col] = df[col].fillna("Unknown")
-
-    # Basic sanity filters
-    df = df[(df["distance_km"] > 0) & (df["distance_km"] < 1000)]
-    df = df[(df["duration_minutes"] > 0) & (df["duration_minutes"] < 1440)]
-    df = df[(df["avg_speed_kmh"] > 0) & (df["avg_speed_kmh"] < 160)]
-    df = df[df[TARGET_COLUMN] > 0]
-
-    # Outlier removal via IQR on the target variable, within each data source:
-    # the fleet's inter-campus trips and the online dataset's city trips have
-    # very different typical fuel use, so one range for the merged data would
-    # discard a whole source as "outliers" instead of the extreme trips in each.
-    def within_iqr(target):
-        q1, q3 = target.quantile(0.25), target.quantile(0.75)
-        iqr = q3 - q1
-        return target.between(q1 - 1.5 * iqr, q3 + 1.5 * iqr)
-
-    if "data_source" in df.columns:
-        keep = df.groupby("data_source", group_keys=False)[TARGET_COLUMN].apply(within_iqr)
-        df = df[keep.reindex(df.index).fillna(False).astype(bool)]
-    else:
-        df = df[within_iqr(df[TARGET_COLUMN])]
-
+    per_100km = df[TARGET_COLUMN] / df["distance_km"] * 100
+    keep = per_100km.groupby(df["engine_power_kw"], group_keys=False).apply(within_iqr)
+    df = df[keep.reindex(df.index).fillna(False).astype(bool)]
     return df.reset_index(drop=True)
 
 
-def build_preprocessing_pipeline(numeric_features=None, categorical_features=None):
-    """ColumnTransformer: scale numeric features, one-hot encode categoricals.
-    Bundled into the saved joblib pipeline together with the regressor so
-    training-time and prediction-time preprocessing can never drift apart.
-    `numeric_features` is the VIF-selected subset (default: all)."""
-    transformer = ColumnTransformer(
-        transformers=[
-            ("numeric", StandardScaler(), list(numeric_features or NUMERIC_FEATURES)),
-            ("categorical", OneHotEncoder(handle_unknown="ignore"), list(categorical_features or CATEGORICAL_FEATURES)),
-        ]
-    )
-    return transformer
-
-
-def build_prediction_frame(form):
-    """Build a single-row DataFrame from a Flask form / dict of raw user
-    input, in exactly the schema the pipeline expects."""
-    row = {
-        "odometer_reading": float(form["odometer_reading"]),
-        "distance_km": float(form["distance_km"]),
-        "duration_minutes": float(form["duration_minutes"]),
-        "avg_speed_kmh": float(form["avg_speed_kmh"]),
-        "passenger_cargo_load_kg": float(form.get("passenger_cargo_load_kg", 0) or 0),
-        "engine_displacement": float(form["engine_displacement"]),
-        "year_model": int(form["year_model"]),
-        "trip_type": form["trip_type"],
-        "departure_period": departure_period_from_time(form["departure_time"]),
-        "route": form["route"],
-        "road_type": form["road_type"],
-        "terrain_classification": form["terrain_classification"],
-        "vehicle_type": form["vehicle_type"],
-        "fuel_type": form["fuel_type"],
-        "rated_efficiency_l_per_100km": float(form.get("rated_efficiency_l_per_100km", 0) or 0),
-    }
-    return pd.DataFrame([row])
-
-
-def attach_rated_efficiency(df_row, supplementary_path):
-    """Look up the supplementary manufacturer-rated efficiency for a single
-    prediction row based on its vehicle_type."""
-    supp = pd.read_csv(supplementary_path)
-    if "rated_efficiency_l_per_100km" not in supp.columns:
-        # A trip-level supplementary dataset has no rated-efficiency lookup; the
-        # predictor is then dropped during merging, so the model never uses it.
-        df_row.loc[0, "rated_efficiency_l_per_100km"] = float("nan")
-        return df_row
-    match = supp[supp["vehicle_type"] == df_row.loc[0, "vehicle_type"]]
-    if not match.empty:
-        df_row.loc[0, "rated_efficiency_l_per_100km"] = float(match.iloc[0]["rated_efficiency_l_per_100km"])
-    else:
-        df_row.loc[0, "rated_efficiency_l_per_100km"] = float(supp["rated_efficiency_l_per_100km"].median())
-    return df_row
+def build_prediction_frame(values):
+    """A single-row frame from the trip distance and the selected vehicle's
+    engine power and fuel type, in the schema the pipeline expects."""
+    return pd.DataFrame([{
+        "distance_km": float(values["distance_km"]),
+        "engine_power_kw": float(values["engine_power_kw"]),
+        "fuel_type": str(values["fuel_type"]),
+    }])

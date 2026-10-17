@@ -9,26 +9,26 @@ Run:  python model/train_model.py
 import json
 import os
 import sys
-from datetime import datetime
 
 import joblib
 import numpy as np
+import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.pipeline import Pipeline
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from model.diagnostics import CORR_THRESHOLD, VIF_THRESHOLD, regression_diagnostics, select_features
+from model.diagnostics import VIF_THRESHOLD, compute_vif, regression_diagnostics
 from timeutil import now_local
 from model.preprocess import (
-    CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
-    NUMERIC_FEATURES,
+    MODEL_TERMS,
     TARGET_COLUMN,
-    build_preprocessing_pipeline,
+    build_feature_encoder,
     clean_data,
+    raw_equation,
     load_and_merge_datasets,
     supplementary_info,
 )
@@ -60,7 +60,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     """Clean `df`, fit the pipeline, evaluate it, and save both the pipeline
     and metrics.json. Shared by the CLI below and by the web app's automatic
     retraining (app.py), so both always train the exact same way."""
-    log("[2/6] Cleaning data and removing outliers...")
+    log("[2/6] Removing records with missing values or zero distance, and IQR outliers per engine power...")
     df = clean_data(df)
     log(f"      Usable records after cleaning: {len(df)}")
 
@@ -68,25 +68,23 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     y = df[TARGET_COLUMN]
 
     log("[3/6] Splitting train/test sets (80/20)...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_STATE
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
 
-    log(f"      Variable selection: removing predictors with |r| < {CORR_THRESHOLD:g} or VIF > {VIF_THRESHOLD:g}...")
-    excluded = list(excluded_features or [])
-    if excluded:
-        log(f"      Dropped during merging (absent from the supplementary dataset): {', '.join(excluded)}")
-    numeric_candidates = [c for c in NUMERIC_FEATURES if c not in excluded]
-    categorical = [c for c in CATEGORICAL_FEATURES if c not in excluded]
-    selected_numeric, vif_initial, vif_final, removed, correlations = select_features(X_train, y_train, numeric_candidates)
-    for r in removed:
-        log(f"        - removed {r['feature']} ({r['reason']}; r = {r['r']}, VIF = {r['vif']})")
-    log(f"      Kept numeric predictors: {', '.join(selected_numeric)}")
+    # Fuel type 1/0 and Distance x Engine Power, with distance and power
+    # mean-centered on the training set (removes the interaction's collinearity).
+    encoder = build_feature_encoder().fit(X_train)
+    centers = (encoder.distance_mean_, encoder.power_mean_)
+    terms = encoder.transform(X)
+    log(f"      Centering: mean distance {centers[0]:.4f} km, mean engine power {centers[1]:.4f} kW")
+    log(f"      Variance Inflation Factor of each predictor (above {VIF_THRESHOLD:g} = high collinearity):")
+    vif = compute_vif(terms)
+    for term, value in vif.items():
+        log(f"        {term:<18} {value}")
+    correlations = {c: round(float(terms[c].corr(y)), 3) for c in MODEL_TERMS if terms[c].std() > 0}
 
-    log("[4/6] Building pipeline and training Linear Regression model...")
-    preprocessor = build_preprocessing_pipeline(selected_numeric, categorical)
+    log("[4/6] Training Linear Regression: fuel = b0 + b1 Distance + b2 Engine Power + b3 Fuel Type + b4 Distance x Power")
     pipeline = Pipeline(steps=[
-        ("preprocessor", preprocessor),
+        ("encoder", build_feature_encoder()),
         ("regressor", LinearRegression()),
     ])
     pipeline.fit(X_train, y_train)
@@ -103,12 +101,25 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
 
     log(f"[6/6] Running {CV_FOLDS}-Fold Cross-Validation on full dataset...")
     kfold = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-    cv_scores = cross_val_score(pipeline, X, y, cv=kfold, scoring="r2")
+    # R2, MAE and RMSE on every fold (scikit-learn reports the errors as negatives).
+    cv = cross_validate(pipeline, X, y, cv=kfold,
+                        scoring=("r2", "neg_mean_absolute_error", "neg_root_mean_squared_error"))
+    cv_scores = cv["test_r2"]
+    cv_mae = -cv["test_neg_mean_absolute_error"]
+    cv_rmse = -cv["test_neg_root_mean_squared_error"]
     log(f"      CV R2 scores: {np.round(cv_scores, 4)}")
     log(f"      CV mean R2  : {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
+    log(f"      CV mean MAE : {cv_mae.mean():.4f} L (+/- {cv_mae.std():.4f})")
+    log(f"      CV mean RMSE: {cv_rmse.mean():.4f} L (+/- {cv_rmse.std():.4f})")
 
     log("      Checking regression assumptions (statsmodels)...")
-    diagnostics = regression_diagnostics(X_train, y_train, selected_numeric, categorical, vif_final)
+    # Durbin-Watson on the residuals of the local trips arranged by date of travel.
+    local = df[df["data_source"].isin(["historical", "system"])] if "data_source" in df else df.iloc[0:0]
+    local_resid = None
+    if not local.empty:
+        local = local.assign(_date=pd.to_datetime(local["trip_date"], errors="coerce")).sort_values(["_date"], kind="stable")
+        local_resid = (local[TARGET_COLUMN] - pipeline.predict(local[FEATURE_COLUMNS])).to_numpy()
+    diagnostics = regression_diagnostics(encoder.transform(X_train), y_train, vif, local_resid)
     for t in diagnostics["tests"]:
         log(f"        {t['assumption']:<26} {t['test']:<26} {'PASS' if t['passed'] else 'NOT MET'}")
 
@@ -117,8 +128,11 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     # sees a half-written model or metrics file.
     joblib.dump(pipeline, MODEL_PATH + ".tmp")
     _replace_with_retry(MODEL_PATH + ".tmp", MODEL_PATH)
-    log(f"\nModel pipeline saved to {MODEL_PATH}")
+    log(f"Model pipeline saved to {MODEL_PATH}")
 
+    regressor = pipeline.named_steps["regressor"]
+    coefficients = {t: float(c) for t, c in zip(MODEL_TERMS, regressor.coef_)}
+    raw_b0, raw_coef = raw_equation(float(regressor.intercept_), coefficients, centers)
     metrics = {
         "model_version": now_local().strftime("v%Y%m%d%H%M%S"),
         "r2_score": round(float(r2), 4),
@@ -127,33 +141,40 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
         "cv_folds": CV_FOLDS,
         "cv_mean_r2": round(float(cv_scores.mean()), 4),
         "cv_std_r2": round(float(cv_scores.std()), 4),
+        "cv_mean_mae": round(float(cv_mae.mean()), 4),
+        "cv_std_mae": round(float(cv_mae.std()), 4),
+        "cv_mean_rmse": round(float(cv_rmse.mean()), 4),
+        "cv_std_rmse": round(float(cv_rmse.std()), 4),
         "train_size": len(X_train),
         "test_size": len(X_test),
         "total_records": len(df),
         "trained_at": now_local().isoformat(timespec="seconds"),
         "status": "active",
+        "equation_terms": MODEL_TERMS,
+        "intercept": float(f"{float(regressor.intercept_):.6g}"),
+        "coefficients": {t: float(f"{c:.6g}") for t, c in coefficients.items()},
+        # Distance and engine power are centered on these training means.
+        "centering": {"distance_km": round(centers[0], 4), "engine_power_kw": round(centers[1], 4)},
+        # The same fitted equation in the original units (the form of Chapter III).
+        "raw_intercept": float(f"{raw_b0:.6g}"),
+        "raw_coefficients": {t: float(f"{c:.6g}") for t, c in raw_coef.items()},
         "vif_threshold": VIF_THRESHOLD,
-        "corr_threshold": CORR_THRESHOLD,
+        "vif": vif,
         "correlations": correlations,
-        "vif_initial": vif_initial,
-        "vif_final": vif_final,
-        "removed_features": removed,
-        "selected_numeric_features": selected_numeric,
-        "selected_categorical_features": categorical,
-        "dropped_in_merge": excluded,
+        "selected_numeric_features": list(MODEL_TERMS),
+        "selected_categorical_features": [],
         "data_sources": {k: int(v) for k, v in df["data_source"].value_counts().items()} if "data_source" in df else {},
         "diagnostics": diagnostics,
-        # Min/max of every numeric feature the model saw, so the app can warn
-        # when a prediction is asked for outside that range (extrapolation).
-        "feature_ranges": {
-            col: [round(float(X[col].min()), 2), round(float(X[col].max()), 2)]
-            for col in X.columns if col in NUMERIC_FEATURES
-        },
-        # Every category the model saw, so the app can warn when a prediction
-        # is asked for a vehicle type, fuel, road or terrain it has no trips for.
-        "category_values": {
-            col: sorted(X[col].dropna().astype(str).unique().tolist()) for col in categorical
-        },
+        # Range of every input the model saw, so the app can warn when a
+        # prediction is asked for outside it (extrapolation).
+        "feature_ranges": {col: [round(float(X[col].min()), 2), round(float(X[col].max()), 2)]
+                           for col in ("distance_km", "engine_power_kw")},
+        "category_values": {"fuel_type": sorted(X["fuel_type"].astype(str).unique().tolist())},
+        # The same ranges per fuel type: e.g. the diesel trips may come from fewer
+        # vehicles and distances than the gasoline trips.
+        "ranges_by_fuel": {fuel: {col: [round(float(g[col].min()), 2), round(float(g[col].max()), 2)]
+                                  for col in ("distance_km", "engine_power_kw")} | {"records": int(len(g))}
+                           for fuel, g in X.groupby(X["fuel_type"].astype(str))},
     }
     metrics.update(extra_metrics or {})
     with open(METRICS_PATH + ".tmp", "w") as f:
@@ -166,8 +187,8 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
 
 def main():
     if not os.path.exists(HISTORICAL_PATH) or not os.path.exists(SUPPLEMENTARY_PATH):
-        print("Historical/supplementary dataset not found. Run data/generate_dataset.py first "
-              "(or replace it with the real GSU fleet dataset using the same column names).")
+        print("Historical/supplementary dataset not found. Put the supplementary dataset in data/supplementary_data.csv "
+              "(see data/SUPPLEMENTARY_DATASET_SOURCE.md); historical_fleet_data.csv may hold only its header row.")
         sys.exit(1)
 
     # Prefer the web app's loader so the trip records entered in the system
@@ -189,8 +210,7 @@ def main():
         print("Nothing to train on: the historical CSV has no rows and the trip records in the database could "
               "not be loaded. Start MySQL (start_server.bat) and run this again.")
         sys.exit(1)
-    return train_and_save(df, extra_metrics={"supplementary_kind": info["kind"]},
-                          excluded_features=info["dropped_features"])
+    return train_and_save(df, extra_metrics={"supplementary_kind": info["kind"]})
 
 
 if __name__ == "__main__":

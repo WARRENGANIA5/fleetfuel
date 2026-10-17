@@ -2,18 +2,13 @@
 {% block title %}Vehicle Management{% endblock %}
 {% block page_title %}Vehicle Management{% endblock %}
 
+{# Vehicle records: plate number, vehicle model, fuel type and engine power (kW). #}
 {% macro vehicle_fields() %}
   <div class="mb-2"><label class="form-label">Plate Number</label>
     <input class="form-control" name="plate_number" maxlength="20" pattern="[A-Za-z0-9][A-Za-z0-9 \-]*" required>
     <div class="invalid-feedback">Letters, numbers, spaces and dashes only.</div></div>
-  <div class="mb-2"><label class="form-label">Vehicle Type</label>
-    <select class="form-select" name="vehicle_type" required>
-      <option value="" selected disabled>Select type</option>
-      {% for t in vehicle_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="mb-2"><label class="form-label">Model</label><input class="form-control" name="brand_model" maxlength="100" required></div>
-  <div class="mb-2"><label class="form-label">Engine Displacement (L)</label><input type="number" step="0.01" min="0.01" max="20" class="form-control" name="engine_displacement" required></div>
+  <div class="mb-2"><label class="form-label">Vehicle Model</label>
+    <input class="form-control" name="brand_model" maxlength="100" placeholder="e.g. Nissan NV350 Urvan" required></div>
   <div class="mb-2"><label class="form-label">Fuel Type</label>
     <select class="form-select" name="fuel_type" required>
       <option value="" selected disabled>Select fuel type</option>
@@ -21,17 +16,9 @@
       <option value="Gasoline">Gasoline</option>
     </select>
   </div>
-  <div class="mb-2"><label class="form-label">Year Model</label><input type="number" min="1980" max="{{ max_year }}" class="form-control" name="year_model" required></div>
-  <div class="mb-2"><label class="form-label">Recorded Odometer (km) <span class="text-muted">(trips add to this automatically)</span></label><input type="number" step="0.01" min="0" max="2000000" class="form-control" name="current_odometer" value="0" required></div>
-  <div class="mb-2"><label class="form-label">Seating Capacity <span class="text-muted">(optional)</span></label><input type="number" min="1" max="100" step="1" class="form-control" name="seating_capacity"></div>
-  <div class="mb-2"><label class="form-label">Station <span class="text-muted">(optional)</span></label><input class="form-control" name="station" maxlength="100" placeholder="e.g. GSU Main - GSO"></div>
-  <div class="mb-2"><label class="form-label">Driver <span class="text-muted">(optional)</span></label><input class="form-control" name="assigned_driver" maxlength="100" placeholder="e.g. Mr. Juan Dela Cruz"></div>
-  <div class="mb-2"><label class="form-label">Status</label>
-    <select class="form-select" name="status" required>
-      {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="mb-2"><label class="form-label">Remarks <span class="text-muted">(optional)</span></label><textarea class="form-control" name="remarks" maxlength="255" rows="2"></textarea></div>
+  <div class="mb-2"><label class="form-label">Engine Power (kW)</label>
+    <input type="number" step="0.01" min="0.01" max="1000" class="form-control" name="engine_power_kw" required>
+    <div class="form-text">From the manufacturer's published specifications for this model and fuel type (1 PS = 0.7355 kW; 1 hp = 0.7457 kW).</div></div>
 {% endmacro %}
 
 {% block content %}
@@ -40,16 +27,8 @@
     <div class="d-flex gap-2 flex-wrap align-items-center">
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" class="form-control" id="vehicleSearch" data-search-input="vehiclesTable" placeholder="Search plate, model, station, driver...">
+        <input type="text" class="form-control" id="vehicleSearch" data-search-input="vehiclesTable" placeholder="Search plate, model, fuel type...">
       </div>
-      <form method="GET" class="d-flex gap-2">
-        <select name="status" id="statusFilter" class="form-select" onchange="this.form.submit()">
-          <option value="">All Statuses</option>
-          {% for s in statuses %}
-          <option value="{{ s }}" {{ 'selected' if request.args.get('status')==s }}>{{ s }}</option>
-          {% endfor %}
-        </select>
-      </form>
       <span class="live-badge" id="vehLive"><span class="live-dot"></span><span id="vehLiveText">Live</span></span>
     </div>
     {% if is_admin %}
@@ -63,24 +42,18 @@
     <table class="table-fleet" id="vehiclesTable">
       <thead>
         <tr>
-          <th>No.</th><th>Vehicle Model</th><th>Plate Number</th><th>Seats</th><th>Station</th><th>Driver</th>
-          <th>Type</th><th>Fuel Type</th><th>Odometer</th><th>Trips</th><th>Status</th><th>Actions</th>
+          <th>No.</th><th>Plate Number</th><th>Vehicle Model</th><th>Fuel Type</th><th>Engine Power</th><th>Trips</th><th>Actions</th>
         </tr>
       </thead>
       <tbody id="vehiclesBody">
         {% for v in vehicles %}
         <tr data-record='{{ v|tojson }}'>
           <td>#{{ v.num }}</td>
-          <td>{{ v.brand_model }}</td>
           <td><strong>{{ v.plate_number }}</strong></td>
-          <td>{{ v.seating_capacity or '—' }}</td>
-          <td>{{ v.station or '—' }}</td>
-          <td>{{ v.assigned_driver or '—' }}</td>
-          <td>{{ v.vehicle_type }}</td>
+          <td>{{ v.brand_model }}</td>
           <td>{{ v.fuel_type }}</td>
-          <td>{{ v.odometer }} km</td>
+          <td>{{ (v.engine_power_kw ~ ' kW') if v.engine_power_kw else '—' }}</td>
           <td>{{ v.trip_count }}</td>
-          <td><span class="badge-status badge-{{ v.status|lower }}">{{ v.status }}</span></td>
           <td>
             <button class="action-btn" title="View" data-bs-toggle="modal" data-bs-target="#viewVehicleModal"><i class="fa-solid fa-eye"></i></button>
             {% if is_admin %}
@@ -93,7 +66,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="12" class="text-center text-muted py-4">No vehicles registered yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No vehicles registered yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -108,21 +81,12 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <div class="row g-2">
-          <div class="col-6"><div class="summary-item"><div class="label">Vehicle Model</div><div class="value" data-field="brand_model"></div></div></div>
           <div class="col-6"><div class="summary-item"><div class="label">Plate Number</div><div class="value" data-field="plate_number"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Seating Capacity</div><div class="value" data-field="seating_capacity"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Station</div><div class="value" data-field="station"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Driver</div><div class="value" data-field="assigned_driver"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Vehicle Type</div><div class="value" data-field="vehicle_type"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Engine Displacement</div><div class="value" data-field="engine_displacement" data-suffix=" L"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Vehicle Model</div><div class="value" data-field="brand_model"></div></div></div>
           <div class="col-6"><div class="summary-item"><div class="label">Fuel Type</div><div class="value" data-field="fuel_type"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Year Model</div><div class="value" data-field="year_model"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Current Odometer</div><div class="value" data-field="odometer" data-suffix=" km"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Status</div><div class="value" data-field="status"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Engine Power</div><div class="value" data-field="engine_power_kw" data-suffix=" kW"></div></div></div>
           <div class="col-6"><div class="summary-item"><div class="label">Trip Records</div><div class="value" data-field="trip_count"></div></div></div>
-          <div class="col-6"><div class="summary-item"><div class="label">Fuel Records</div><div class="value" data-field="fuel_count"></div></div></div>
-          <div class="col-12"><div class="summary-item"><div class="label">Last Trip</div><div class="value" data-field="last_trip_date" data-empty="No trips yet"></div></div></div>
-          <div class="col-12"><div class="summary-item"><div class="label">Remarks</div><div class="value" data-field="remarks"></div></div></div>
+          <div class="col-6"><div class="summary-item"><div class="label">Last Trip</div><div class="value" data-field="last_trip_date" data-empty="No trips yet"></div></div></div>
         </div>
       </div>
     </div>
@@ -171,40 +135,52 @@
 const IS_ADMIN = {{ is_admin|tojson }};
 const DELETE_URL_TEMPLATE = {{ url_for('delete_vehicle', vehicle_id=0)|tojson }};
 const CSRF_TOKEN = {{ csrf_token()|tojson }};
+const REOPEN = {{ reopen|tojson if reopen else 'null' }};
 
-// Deleting a vehicle also deletes its trip and fuel records (database
-// cascade), so the confirmation spells out exactly what will be lost.
+// After a rejected save, open the same form again with what the user typed.
+if (REOPEN) {
+  const modalEl = document.getElementById(REOPEN.modal);
+  if (modalEl) {
+    const form = modalEl.querySelector('form');
+    if (REOPEN.vehicle_id) {
+      form.action = form.dataset.actionTemplate.replace('/0/', '/' + REOPEN.vehicle_id + '/');
+      const row = [...document.querySelectorAll('#vehiclesBody tr[data-record]')].find(function (tr) { return JSON.parse(tr.dataset.record).id === REOPEN.vehicle_id; });
+      modalEl.querySelectorAll('[data-field="plate_number"]').forEach(function (el) { el.textContent = row ? JSON.parse(row.dataset.record).plate_number : ''; });
+    }
+    Object.keys(REOPEN.values).forEach(function (k) {
+      const field = form.elements[k];
+      if (field && field.type !== 'hidden') field.value = REOPEN.values[k];
+    });
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+}
+
+// Deleting a vehicle also deletes its trip records (database cascade), so the
+// confirmation spells out exactly what will be lost.
 document.getElementById('vehiclesBody').addEventListener('submit', function (e) {
   const form = e.target.closest('form[data-delete-vehicle]');
   if (!form) return;
   const rec = JSON.parse(form.closest('tr').dataset.record);
   let msg = 'Delete vehicle ' + rec.plate_number + '?';
-  if (rec.trip_count || rec.fuel_count) {
-    msg += '\n\nThis will ALSO permanently delete its ' + rec.trip_count + ' trip record(s) and ' + rec.fuel_count +
-      ' fuel record(s), and the fuel prediction model will retrain without them.' +
-      '\n\nTip: set the status to "Inactive" instead to keep its history.';
+  if (rec.trip_count) {
+    msg += '\n\nThis will ALSO permanently delete its ' + rec.trip_count +
+      ' trip record(s), and the fuel prediction model will retrain without them.';
   }
   msg += '\n\nThis cannot be undone.';
   if (!window.confirm(msg)) e.preventDefault();
 });
 
-// ---- Real-time: refresh the table every 5s (keeps filter + search) ----
-function badgeClass(status) { return 'badge-status badge-' + String(status).toLowerCase(); }
+// ---- Real-time: refresh the table every 5s (keeps the search) ----
 function vehicleRow(v) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(v);
   tr.innerHTML =
     '<td>#' + v.num + '</td>' +
-    '<td>' + escapeHtml(v.brand_model) + '</td>' +
     '<td><strong>' + escapeHtml(v.plate_number) + '</strong></td>' +
-    '<td>' + (v.seating_capacity === '' ? '—' : escapeHtml(String(v.seating_capacity))) + '</td>' +
-    '<td>' + (v.station ? escapeHtml(v.station) : '—') + '</td>' +
-    '<td>' + (v.assigned_driver ? escapeHtml(v.assigned_driver) : '—') + '</td>' +
-    '<td>' + escapeHtml(v.vehicle_type) + '</td>' +
+    '<td>' + escapeHtml(v.brand_model) + '</td>' +
     '<td>' + escapeHtml(v.fuel_type) + '</td>' +
-    '<td>' + escapeHtml(v.odometer) + ' km</td>' +
+    '<td>' + (v.engine_power_kw ? escapeHtml(v.engine_power_kw) + ' kW' : '—') + '</td>' +
     '<td>' + v.trip_count + '</td>' +
-    '<td><span class="' + badgeClass(v.status) + '">' + escapeHtml(v.status) + '</span></td>' +
     '<td>' +
       '<button class="action-btn" title="View" data-bs-toggle="modal" data-bs-target="#viewVehicleModal"><i class="fa-solid fa-eye"></i></button> ' +
       (IS_ADMIN ? '<button class="action-btn" title="Edit" data-bs-toggle="modal" data-bs-target="#editVehicleModal"><i class="fa-solid fa-pen"></i></button> ' +
@@ -219,10 +195,10 @@ let lastVehiclesJson = null;
 function refreshVehicles() {
   // Don't swap rows under an open modal (it is filled from its row).
   if (document.querySelector('.modal.show')) return;
-  const status = document.getElementById('statusFilter').value;
-  fetch('/api/vehicles?status=' + encodeURIComponent(status))
+  fetch('/api/vehicles')
     .then(function (res) { return res.json(); })
     .then(function (d) {
+      if (!d || !Array.isArray(d.vehicles)) throw new Error('unexpected answer');  // keep the rows on screen
       const badge = document.getElementById('vehLive');
       badge.className = 'live-badge'; document.getElementById('vehLiveText').textContent = 'Live';
       const json = JSON.stringify(d.vehicles);
@@ -231,7 +207,7 @@ function refreshVehicles() {
       const body = document.getElementById('vehiclesBody');
       body.innerHTML = '';
       if (!d.vehicles.length) {
-        body.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">No vehicles registered yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No vehicles registered yet.</td></tr>';
       } else {
         d.vehicles.forEach(function (v) { body.appendChild(vehicleRow(v)); });
       }

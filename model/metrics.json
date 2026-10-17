@@ -1,69 +1,67 @@
 {
-  "model_version": "v20261016182301",
-  "r2_score": 0.9934,
-  "mae": 0.2013,
-  "rmse": 0.3049,
+  "model_version": "v20261017214444",
+  "r2_score": 0.9512,
+  "mae": 0.7556,
+  "rmse": 1.2753,
   "cv_folds": 5,
-  "cv_mean_r2": 0.9932,
-  "cv_std_r2": 0.0025,
-  "train_size": 1507,
-  "test_size": 377,
-  "total_records": 1884,
-  "trained_at": "2026-10-16T18:23:01",
+  "cv_mean_r2": 0.9515,
+  "cv_std_r2": 0.0026,
+  "cv_mean_mae": 0.7761,
+  "cv_std_mae": 0.0142,
+  "cv_mean_rmse": 1.3399,
+  "cv_std_rmse": 0.0453,
+  "train_size": 4715,
+  "test_size": 1179,
+  "total_records": 5894,
+  "trained_at": "2026-10-17T21:44:44",
   "status": "active",
-  "vif_threshold": 5.0,
-  "corr_threshold": 0.1,
-  "correlations": {
-    "distance_km": 0.994,
-    "duration_minutes": 0.981,
-    "avg_speed_kmh": 0.38,
-    "engine_displacement": 0.328,
-    "year_model": 0.606
-  },
-  "vif_initial": {
-    "distance_km": 40.84,
-    "duration_minutes": 35.65,
-    "avg_speed_kmh": 1.86,
-    "engine_displacement": 1.79,
-    "year_model": 2.52
-  },
-  "vif_final": {
-    "distance_km": 1.87,
-    "avg_speed_kmh": 1.25,
-    "engine_displacement": 1.79,
-    "year_model": 2.52
-  },
-  "removed_features": [
-    {
-      "feature": "duration_minutes",
-      "vif": 35.65,
-      "r": 0.981,
-      "reason": "VIF above 5"
-    }
+  "equation_terms": [
+    "distance_km",
+    "engine_power_kw",
+    "fuel_type_code",
+    "distance_x_power"
   ],
+  "intercept": 8.80582,
+  "coefficients": {
+    "distance_km": 0.0789038,
+    "engine_power_kw": -0.00384403,
+    "fuel_type_code": -3.57792,
+    "distance_x_power": 4.24674e-06
+  },
+  "centering": {
+    "distance_km": 62.6558,
+    "engine_power_kw": 124.0176
+  },
+  "raw_intercept": 4.37177,
+  "raw_coefficients": {
+    "distance_km": 0.0783771,
+    "engine_power_kw": -0.00411011,
+    "fuel_type_code": -3.57792,
+    "distance_x_power": 4.24674e-06
+  },
+  "vif_threshold": 5.0,
+  "vif": {
+    "distance_km": 1.04,
+    "engine_power_kw": 1.12,
+    "fuel_type_code": 1.43,
+    "distance_x_power": 1.26
+  },
+  "correlations": {
+    "distance_km": 0.973,
+    "engine_power_kw": -0.081,
+    "fuel_type_code": -0.257,
+    "distance_x_power": -0.107
+  },
   "selected_numeric_features": [
     "distance_km",
-    "avg_speed_kmh",
-    "engine_displacement",
-    "year_model"
+    "engine_power_kw",
+    "fuel_type_code",
+    "distance_x_power"
   ],
-  "selected_categorical_features": [
-    "departure_period",
-    "vehicle_type",
-    "fuel_type"
-  ],
-  "dropped_in_merge": [
-    "odometer_reading",
-    "passenger_cargo_load_kg",
-    "rated_efficiency_l_per_100km",
-    "trip_type",
-    "route",
-    "road_type",
-    "terrain_classification"
-  ],
+  "selected_categorical_features": [],
   "data_sources": {
-    "supplementary": 1794,
-    "system": 90
+    "supplementary": 5801,
+    "system": 93
   },
   "diagnostics": {
     "tests": [
@@ -71,147 +69,137 @@
         "key": "linearity",
         "assumption": "Linearity",
         "test": "Ramsey RESET test",
-        "statistic": 167.536,
-        "p_value": 0.0,
-        "passed": false,
+        "statistic": 2.065,
+        "p_value": 0.1508,
+        "passed": true,
         "rule": "p > 0.05",
-        "meaning": "Fuel use is a straight-line function of the predictors."
+        "meaning": "Fuel consumed is a straight-line function of the predictors."
       },
       {
         "key": "independence",
         "assumption": "Independence of errors",
         "test": "Durbin-Watson statistic",
-        "statistic": 2.07,
+        "statistic": 1.655,
         "p_value": null,
         "passed": true,
-        "rule": "1.5 to 2.5 (2 = no autocorrelation)",
-        "meaning": "One trip's error does not depend on another's."
+        "rule": "1.5 to 2.5 (close to 2 = independent)",
+        "meaning": "Residuals of the 93 local trips arranged by date of travel."
       },
       {
         "key": "normality",
         "assumption": "Normality of errors",
         "test": "Jarque-Bera test",
-        "statistic": 3121.134,
+        "statistic": 31892.809,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
-        "meaning": "Residuals follow a normal distribution (skew -0.71, kurtosis 9.91)."
+        "meaning": "Residuals follow a normal distribution (skew 1.16, kurtosis 15.53)."
       },
       {
         "key": "equal_variance",
         "assumption": "Equal variance of errors",
         "test": "Breusch-Pagan test",
-        "statistic": 192.558,
+        "statistic": 1091.171,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
-        "meaning": "The spread of errors is the same for small and large trips."
+        "meaning": "The spread of errors is the same for short and long trips."
       },
       {
         "key": "multicollinearity",
         "assumption": "No multicollinearity",
         "test": "Variance Inflation Factor",
-        "statistic": 2.52,
+        "statistic": 1.43,
         "p_value": null,
         "passed": true,
         "rule": "every VIF \u2264 5",
-        "meaning": "Predictors do not carry the same information."
+        "meaning": "Predictors do not carry the same information (an interaction term usually shares information with the predictors it is built from)."
       }
     ],
     "coefficients": [
       {
         "feature": "Intercept",
-        "coef": 71.75,
-        "std_err": 15.54,
+        "coef": 8.806,
+        "std_err": 0.3458,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "distance_km",
-        "coef": 0.09669,
-        "std_err": 0.0004188,
+        "coef": 0.0789,
+        "std_err": 0.0006909,
         "p_value": 0.0,
         "significant": true
       },
       {
-        "feature": "avg_speed_kmh",
-        "coef": -0.02571,
-        "std_err": 0.00082,
+        "feature": "engine_power_kw",
+        "coef": -0.003844,
+        "std_err": 0.002063,
+        "p_value": 0.0624,
+        "significant": false
+      },
+      {
+        "feature": "fuel_type_code",
+        "coef": -3.578,
+        "std_err": 0.3519,
         "p_value": 0.0,
         "significant": true
       },
       {
-        "feature": "engine_displacement",
-        "coef": 0.6375,
-        "std_err": 0.06969,
-        "p_value": 0.0,
-        "significant": true
-      },
-      {
-        "feature": "year_model",
-        "coef": -0.03546,
-        "std_err": 0.00775,
-        "p_value": 0.0,
-        "significant": true
+        "feature": "distance_x_power",
+        "coef": 4.247e-06,
+        "std_err": 6.147e-05,
+        "p_value": 0.9449,
+        "significant": false
       }
     ],
-    "ols_r2": 0.9942,
-    "ols_adj_r2": 0.9941,
-    "alpha": 0.05
+    "constant_terms": [],
+    "ols_r2": 0.952,
+    "ols_adj_r2": 0.9519,
+    "alpha": 0.05,
+    "std_err_type": "HC3 (heteroskedasticity-robust)"
   },
   "feature_ranges": {
-    "odometer_reading": [
-      0.0,
-      16120.0
-    ],
     "distance_km": [
-      1.51,
-      338.0
+      1.5,
+      689.99
     ],
-    "duration_minutes": [
-      3.15,
-      507.0
-    ],
-    "avg_speed_kmh": [
-      9.7,
-      84.5
-    ],
-    "passenger_cargo_load_kg": [
-      0.0,
-      0.0
-    ],
-    "engine_displacement": [
-      1.6,
-      2.5
-    ],
-    "year_model": [
-      2011.0,
-      2020.0
-    ],
-    "rated_efficiency_l_per_100km": [
-      0.0,
-      0.0
+    "engine_power_kw": [
+      95.0,
+      147.0
     ]
   },
   "category_values": {
-    "departure_period": [
-      "Afternoon",
-      "Early Morning",
-      "Evening",
-      "Morning",
-      "Night"
-    ],
-    "vehicle_type": [
-      "SUV",
-      "Sedan",
-      "Van"
-    ],
     "fuel_type": [
       "Diesel",
       "Gasoline"
     ]
   },
-  "data_fingerprint": "1792118737-1792124618-93-188796647316",
+  "ranges_by_fuel": {
+    "Diesel": {
+      "distance_km": [
+        32.0,
+        372.0
+      ],
+      "engine_power_kw": [
+        95.0,
+        95.0
+      ],
+      "records": 93
+    },
+    "Gasoline": {
+      "distance_km": [
+        1.5,
+        689.99
+      ],
+      "engine_power_kw": [
+        104.0,
+        147.0
+      ],
+      "records": 5801
+    }
+  },
+  "data_fingerprint": "1792242382-1792242548-93-213348207797",
   "system_records": 93,
   "supplementary_kind": "trips"
 }

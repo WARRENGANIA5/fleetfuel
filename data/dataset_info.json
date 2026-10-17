@@ -1,5 +1,5 @@
 {
-  "note": "SHA-256 fingerprints of the SYNTHETIC demo datasets produced by data/generate_dataset.py. While data/historical_fleet_data.csv or data/supplementary_data.csv still match these, the app labels every model result as demo data. Replace the files with the collected GSU records and the online supplementary dataset (same column names) and the label disappears automatically.",
+  "note": "SHA-256 fingerprints of the earlier SYNTHETIC demo datasets. If data/historical_fleet_data.csv or data/supplementary_data.csv ever match these again, the app labels every model result as demo data.",
   "synthetic_sha256": {
     "historical_fleet_data.csv": "602a37e6f470a1735d16589f143e31ed87cca02688dde87b8a1c6eab2b602deb",
     "supplementary_data.csv": "14efe96f09690b413d508b7abae14cfb9b3e41d45465ffe2e9d1c00929c2d2af"

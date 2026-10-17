@@ -17,7 +17,11 @@ import sys
 import pandas as pd
 
 SRC, OUT = sys.argv[1], sys.argv[2]
-PER_MODEL = 200          # trips sampled per vehicle model (15 models -> 3,000 trips)
+# Trips are sampled per vehicle model AND per distance band, so the training data
+# covers short city trips as well as the long inter-campus / provincial trips the
+# fleet makes (a plain random sample is almost all short city trips).
+DISTANCE_BANDS = [(1, 10), (10, 30), (30, 100), (100, 1000)]   # km
+PER_MODEL_BAND = 150     # trips per vehicle model per band (all of them when fewer)
 SEED = 42
 
 # Vehicle model -> the web application's vehicle types (body style of each model).
@@ -26,6 +30,26 @@ VEHICLE_TYPES = {
     "Volkswagen-Magotan": "Sedan", "Volkswagen-Passat": "Sedan",
     "Chevrolet-Captiva": "SUV", "Hyundai-Beijingix35": "SUV",
     "Buick-GL8": "Van", "Honda-Odyssey": "Van",
+}
+# Engine power (Max Power, kW) of every engine code, from the dataset's own
+# "Vehicle information.xlsx" (same Mendeley record, SHA-256 3d5b80eb...7339293).
+# The study's predictors are distance traveled, engine power and fuel type.
+ENGINE_POWER_KW = {
+    "0230320": 132,  # Audi A6L 2.0T (2014)
+    "0B2020W": 123,  # Buick GL8 2.4L (2014)
+    "0B2021Y": 147,  # Buick GL8 2.5L (2017)
+    "3K10409": 123,  # Chevrolet Captiva 2.4L (2014)
+    "0H3082Y": 114,  # Honda Accord 2.0L (2015)
+    "0H3011H": 137,  # Honda Odyssey 2.4L (2015)
+    "3J1020O": 121,  # Hyundai ix35 2.0L (2013)
+    "2X1080Q": 104,  # Nissan Teana 2.0L (2013)
+    "2X10829": 110,  # Nissan Teana 2.0L (2016)
+    "2X10608": 140,  # Nissan Tiida 1.6L (2011), as published in the dataset
+    "0X3050M": 118,  # Volkswagen Magotan 1.8T (2012)
+    "0X3050X": 118,  # Volkswagen Magotan 1.8T (2013)
+    "0X2072R": 118,  # Volkswagen Passat 1.8T (2015)
+    "0X2072S": 118,  # Volkswagen Passat 1.8T (2015)
+    "0X2072T": 118,  # Volkswagen Passat 1.8T (2015)
 }
 # Spellings used in the dataset's English Model column -> the model's proper name
 # (as listed in the dataset's Vehicle information.xlsx).
@@ -62,6 +86,9 @@ df = pd.DataFrame({
     "actual_fuel_consumption": raw["fuel consumption (L)"],  # liters per trip
 })
 df["vehicle_type"] = df["model_key"].map(VEHICLE_TYPES)
+df["engine_power_kw"] = df["engine_code"].map(ENGINE_POWER_KW)
+unmatched = sorted(df.loc[df["engine_power_kw"].isna(), "engine_code"].unique())
+assert not unmatched, f"engine codes without a published power: {unmatched}"
 unknown = sorted(df.loc[df["vehicle_type"].isna(), "model_key"].unique())
 assert not unknown, f"vehicle models without a type: {unknown}"
 df["fuel_type"] = "Gasoline"
@@ -78,20 +105,22 @@ l_per_100 = df["actual_fuel_consumption"] / df["distance_km"] * 100
 df = df[l_per_100.between(3, 40)]
 print(f"complete, plausible trips: {len(df):,}")
 
-# Same number of trips from every vehicle model (fixed seed, reproducible).
-key = df["model_key"] + "-" + df["engine_code"] + "-" + df["year_model"].astype(int).astype(str)
-sample = (df.assign(_k=key).groupby("model_key", group_keys=False)
-          .apply(lambda g: g.sample(min(PER_MODEL, len(g)), random_state=SEED)))
+# Same number of trips from every vehicle model in every distance band (fixed seed, reproducible).
+df["band"] = pd.cut(df["distance_km"], [b[0] for b in DISTANCE_BANDS] + [DISTANCE_BANDS[-1][1]],
+                    labels=[f"{a}-{b} km" for a, b in DISTANCE_BANDS], include_lowest=True)
+sample = (df.dropna(subset=["band"]).groupby(["model_key", "band"], group_keys=False, observed=True)
+          .apply(lambda g: g.sample(min(PER_MODEL_BAND, len(g)), random_state=SEED)))
+print("trips per distance band:", sample.groupby("band", observed=True).size().to_dict())
 sample = sample.sort_values(["model_key", "start"]).reset_index(drop=True)
 
-columns = ["vehicle_type", "brand_model", "engine_displacement", "fuel_type", "year_model",
-           "distance_km", "duration_minutes", "avg_speed_kmh", "departure_time", "departure_period",
-           "actual_fuel_consumption"]
+# The study's shared variables (distance, engine power, fuel type, fuel consumed),
+# plus the vehicle model and engine code so every row can be traced to its source.
+columns = ["brand_model", "engine_code", "distance_km", "engine_power_kw", "fuel_type", "actual_fuel_consumption"]
 out = sample[columns].copy()
-out["year_model"] = out["year_model"].astype(int)
-for c, n in (("distance_km", 2), ("duration_minutes", 2), ("avg_speed_kmh", 1), ("actual_fuel_consumption", 4)):
+out["engine_power_kw"] = out["engine_power_kw"].astype(int)
+for c, n in (("distance_km", 2), ("actual_fuel_consumption", 4)):
     out[c] = out[c].round(n)
 out.to_csv(OUT, index=False)
 print(f"written {OUT}: {len(out):,} trips")
-print(out.groupby("vehicle_type").size().to_dict())
-print(out[["distance_km", "duration_minutes", "avg_speed_kmh", "actual_fuel_consumption"]].describe().round(2).to_string())
+print(out.groupby("engine_power_kw").size().to_dict())
+print(out[["distance_km", "engine_power_kw", "actual_fuel_consumption"]].describe().round(2).to_string())

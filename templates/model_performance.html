@@ -35,8 +35,10 @@
   </p>
   <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
     <span class="text-muted">Train in Google Colab (<code>notebooks/fuel_consumption_linear_regression.ipynb</code>) with the same data:</span>
-    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='historical_fleet_data') }}">
-      <i class="fa-solid fa-download me-1"></i> historical_fleet_data.csv</a>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
+      <i class="fa-solid fa-download me-1"></i> trip_records.csv</a>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='vehicle_records') }}">
+      <i class="fa-solid fa-download me-1"></i> vehicle_records.csv</a>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='supplementary_data') }}">
       <i class="fa-solid fa-download me-1"></i> supplementary_data.csv</a>
   </div>
@@ -52,16 +54,39 @@
   </div>
 </div>
 
+<div class="card-surface mb-3">
+  <div class="section-title"><i class="fa-solid fa-layer-group text-primary"></i> <span>Train-Test Split vs <span class="mpFolds">{{ metrics.cv_folds }}</span>-Fold Cross-Validation</span></div>
+  <p class="diag-note">The same three measures on the held-back test set and averaged over every fold of the
+    cross-validation; close values mean the accuracy carries over to other partitions of the data.</p>
+  <div class="table-wrap"><table class="table-fleet diag-table">
+    <thead><tr><th>Measure</th><th>Test Set</th><th>CV Mean</th><th>CV Std. Deviation</th></tr></thead>
+    <tbody>
+      <tr><td>R&sup2; Score</td><td id="cvTestR2">{{ metrics.r2_score }}</td><td id="cvMeanR2">{{ metrics.cv_mean_r2 }}</td><td>&plusmn;<span id="cvStdR2">{{ metrics.cv_std_r2 }}</span></td></tr>
+      <tr><td>Mean Absolute Error</td><td><span id="cvTestMae">{{ metrics.mae }}</span> L</td>
+        <td id="cvMeanMae">{{ (metrics.cv_mean_mae ~ ' L') if metrics.cv_mean_mae is not none else '—' }}</td>
+        <td id="cvStdMae">{{ ('±' ~ metrics.cv_std_mae ~ ' L') if metrics.cv_std_mae is not none else '—' }}</td></tr>
+      <tr><td>Root Mean Squared Error</td><td><span id="cvTestRmse">{{ metrics.rmse }}</span> L</td>
+        <td id="cvMeanRmse">{{ (metrics.cv_mean_rmse ~ ' L') if metrics.cv_mean_rmse is not none else '—' }}</td>
+        <td id="cvStdRmse">{{ ('±' ~ metrics.cv_std_rmse ~ ' L') if metrics.cv_std_rmse is not none else '—' }}</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
 <div class="row g-3 mb-3">
   <div class="col-12">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-filter text-primary"></i> Variable Selection (VIF)</div>
-      <p class="diag-note">Two steps before training: <strong>(1)</strong> predictors with no measurable link to fuel use
-        (|r| &lt; <strong id="corrThreshold">0.1</strong> with fuel consumption) are removed; <strong>(2)</strong> predictors with a
-        Variance Inflation Factor above <strong id="vifThreshold">5</strong> carry the same information as others and are removed one at a time.</p>
+      <div class="section-title"><i class="fa-solid fa-square-root-variable text-primary"></i> Regression Equation and Multicollinearity (VIF)</div>
+      <p class="diag-note">ŷ = β<sub>0</sub> + β<sub>1</sub>(Distance) + β<sub>2</sub>(Engine Power) + β<sub>3</sub>(Fuel Type) + β<sub>4</sub>(Distance × Engine Power),
+        with fuel type encoded 1 = Gasoline, 0 = Diesel. Distance and engine power are mean-centered before the interaction term
+        is formed, which removes the collinearity between the interaction and the predictors it is built from without changing any prediction.</p>
+      <div class="diag-note mb-1">Fitted (centered):</div>
+      <div class="equation-box mb-2" id="equationText" style="font-family:monospace;font-size:13px;overflow-x:auto;white-space:nowrap;">—</div>
+      <div class="diag-note mb-1">The same equation in the original units:</div>
+      <div class="equation-box mb-2" id="equationRaw" style="font-family:monospace;font-size:13px;overflow-x:auto;white-space:nowrap;">—</div>
+      <p class="diag-note">A Variance Inflation Factor above <strong id="vifThreshold">5</strong> indicates high collinearity.</p>
       <p class="diag-note" id="mergeNote"></p>
       <div class="table-wrap"><table class="table-fleet diag-table">
-        <thead><tr><th>Predictor</th><th>r with Fuel</th><th>Initial VIF</th><th>Final VIF</th><th>Result</th></tr></thead>
+        <thead><tr><th>Term</th><th>Coefficient</th><th>r with Fuel</th><th>VIF</th><th>Collinearity</th></tr></thead>
         <tbody id="vifBody"></tbody>
       </table></div>
     </div>
@@ -69,7 +94,8 @@
   <div class="col-12">
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Regression Assumption Checks</div>
-      <p class="diag-note">LINE conditions tested on the training residuals (statsmodels, α = <span id="diagAlpha">0.05</span>).</p>
+      <p class="diag-note">LINE conditions tested on the training residuals (statsmodels, α = <span id="diagAlpha">0.05</span>);
+        Durbin-Watson on the residuals of the local trips arranged by date of travel.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Assumption</th><th>Test</th><th>Statistic</th><th>p-value</th><th>Rule</th><th>Result</th></tr></thead>
         <tbody id="diagBody"></tbody>
@@ -79,8 +105,9 @@
   </div>
   <div class="col-12">
     <div class="card-surface">
-      <div class="section-title"><i class="fa-solid fa-square-root-variable text-primary"></i> Regression Coefficients (numeric predictors)</div>
-      <p class="diag-note">Average change in fuel consumption (L) per one-unit change in a predictor, holding the others constant. OLS fit on the training set with categorical predictors dummy-coded (R² <span id="olsR2">—</span>, adjusted R² <span id="olsAdjR2">—</span>).</p>
+      <div class="section-title"><i class="fa-solid fa-list-ol text-primary"></i> Regression Coefficients (significance)</div>
+      <p class="diag-note">Change in fuel consumed (L) per one-unit change in a term, holding the others constant. OLS fit of the same (centered) equation on the training set (R² <span id="olsR2">—</span>, adjusted R² <span id="olsAdjR2">—</span>).
+        Standard errors and p-values are heteroskedasticity-robust (HC3), so they stay valid although the equal-variance condition is not met.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Term</th><th>Coefficient</th><th>Std. Error</th><th>p-value</th><th>Significant (p &lt; 0.05)</th></tr></thead>
         <tbody id="coefBody"></tbody>
@@ -104,14 +131,14 @@
   </div>
   <div class="col-md-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-chart-column text-primary"></i> Fuel Consumption Distribution</div>
+      <div class="section-title"><i class="fa-solid fa-chart-column text-primary"></i> Histogram of Residuals</div>
       <canvas id="distChart" height="240"></canvas>
       <div class="dist-stats" id="distStats"></div>
     </div>
   </div>
   <div class="col-md-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-table-cells text-primary"></i> Feature Correlation Heatmap</div>
+      <div class="section-title"><i class="fa-solid fa-table-cells text-primary"></i> Correlation Heatmap of the Terms</div>
       <div id="corrHeatmap" class="corr-heatmap"></div>
       <div class="corr-legend">
         <span>−1 Negative</span><div class="corr-legend-bar"></div><span>+1 Positive</span>
@@ -129,6 +156,7 @@
 // No model yet: watch for the first training to finish, then show the results.
 setInterval(function () {
   fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
+    if (!document.getElementById('noModelText')) return;  // the user moved to another page meanwhile
     if (st.retraining) document.getElementById('noModelText').textContent = 'Training the Linear Regression model now…';
     else if (st.model_version) window.location.reload();
   }).catch(function () {});
@@ -140,6 +168,7 @@ setInterval(function () {
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = "#9698a9";
+Chart.defaults.animation = false;  // charts appear at once, no draw-in
 const gridColor = "rgba(255,255,255,0.06)";
 const axis = function (title) {
   return { grid: { color: gridColor }, ticks: { color: '#9698a9' },
@@ -151,9 +180,8 @@ function onlyPoints(item) { return item.datasetIndex === 0; }
 function signed(v) { return (v > 0 ? '+' : '') + Number(v).toFixed(2); }
 
 const FEATURE_NAMES = {
-  odometer_reading: 'Odometer (km)', distance_km: 'Distance (km)', duration_minutes: 'Duration (min)',
-  avg_speed_kmh: 'Avg Speed (km/h)', passenger_cargo_load_kg: 'Load (kg)', engine_displacement: 'Engine Size (L)',
-  year_model: 'Year Model', rated_efficiency_l_per_100km: 'Rated Eff. (L/100km)', actual_fuel_consumption: 'Fuel Used (L)'
+  distance_km: 'Distance (km)', engine_power_kw: 'Engine Power (kW)', fuel_type_code: 'Fuel Type (1 = Gasoline)',
+  distance_x_power: 'Distance × Engine Power', actual_fuel_consumption: 'Fuel Consumed (L)'
 };
 const TARGET = 'actual_fuel_consumption';
 function featureName(key) { return FEATURE_NAMES[key] || key.replace(/_/g, ' '); }
@@ -207,7 +235,7 @@ function renderHeatmap(c) {
 }
 
 function renderDistSummary(c) {
-  const st = c.dist_stats;
+  const st = c.resid_stats;
   if (!st) return;
   const box = document.getElementById('distStats');
   if (box) {
@@ -215,12 +243,11 @@ function renderDistSummary(c) {
       return '<div class="dist-stat"><div class="dist-stat-value">' + value + '</div><div class="dist-stat-label">' + label + '</div></div>';
     };
     box.innerHTML =
-      tile('Average per Trip', st.mean + ' L') +
-      tile('Median per Trip', st.median + ' L') +
-      tile('Most Common Range', escapeHtml(st.mode_range) + ' L<small>' + st.mode_count + ' trips</small>') +
-      tile('Lowest – Highest', st.min + ' – ' + st.max + ' L') +
+      tile('Mean Residual', signed(st.mean) + ' L') +
       tile('Std. Deviation', '±' + st.std + ' L') +
-      tile('Trips Counted', st.records);
+      tile('Lowest – Highest', signed(st.min) + ' – ' + signed(st.max) + ' L') +
+      tile('Within ±1 L', st.within_1 + '%') +
+      tile('Test Trips', st.records);
   }
 }
 
@@ -261,10 +288,10 @@ function drawCharts(c) {
     });
     distChart = new Chart(document.getElementById('distChart'), {
       type: 'bar',
-      data: { labels: c.dist_labels, datasets: [
-        { type: 'line', label: 'Shape', data: c.dist_counts, borderColor: '#26e5c5',
+      data: { labels: c.resid_labels, datasets: [
+        { type: 'line', label: 'Shape', data: c.resid_counts, borderColor: '#26e5c5',
           backgroundColor: 'rgba(38,229,197,0.12)', fill: true, tension: 0.35, pointRadius: 0 },
-        { label: 'Trips', data: c.dist_counts, backgroundColor: 'rgba(38,151,255,0.55)',
+        { label: 'Trips', data: c.resid_counts, backgroundColor: 'rgba(38,151,255,0.55)',
           borderColor: '#2697ff', borderWidth: 1, borderRadius: 4 }
       ] },
       options: {
@@ -277,12 +304,12 @@ function drawCharts(c) {
               title: function (items) { return items[0].label + ' L'; },
               label: function (item) {
                 const total = distChart.data.datasets[1].data.reduce(function (a, b) { return a + b; }, 0) || 1;
-                return ' ' + item.parsed.y + ' trips (' + (item.parsed.y / total * 100).toFixed(1) + '%)';
+                return ' ' + item.parsed.y + ' test trips (' + (item.parsed.y / total * 100).toFixed(1) + '%)';
               }
             }
           }
         },
-        scales: { x: axis('Fuel Used per Trip (L)'), y: Object.assign(axis('Number of Trips'), { beginAtZero: true }) }
+        scales: { x: axis('Residual (Actual − Predicted, L)'), y: Object.assign(axis('Number of Test Trips'), { beginAtZero: true }) }
       }
     });
   } else {
@@ -292,9 +319,9 @@ function drawCharts(c) {
     residualChart.data.datasets[0].data = c.residual_points;
     residualChart.data.datasets[1].data = [{ x: c.residual_range[0], y: 0 }, { x: c.residual_range[1], y: 0 }];
     residualChart.update();
-    distChart.data.labels = c.dist_labels;
-    distChart.data.datasets[0].data = c.dist_counts;
-    distChart.data.datasets[1].data = c.dist_counts;
+    distChart.data.labels = c.resid_labels;
+    distChart.data.datasets[0].data = c.resid_counts;
+    distChart.data.datasets[1].data = c.resid_counts;
     distChart.update();
   }
   renderDistSummary(c);
@@ -308,24 +335,36 @@ function renderDiagnostics(m) {
   const num = function (v) { const a = Math.abs(v); return (a !== 0 && a < 0.001) ? Number(v).toExponential(3) : String(v); };
   const fmtVif = function (v) { return v == null ? '—' : (v >= 1000 ? '&gt;1000' : Number(v).toFixed(2)); };
   const vifBody = document.getElementById('vifBody');
-  if (vifBody && m.vif_initial) {
-    document.getElementById('vifThreshold').textContent = m.vif_threshold;
-    if (m.corr_threshold != null) document.getElementById('corrThreshold').textContent = m.corr_threshold;
-    const removed = {}; (m.removed_features || []).forEach(function (r) { removed[r.feature] = r; });
-    const corr = m.correlations || {};
-    // Predictors with the same value in every record never get a VIF, so list them separately.
-    const constant = (m.removed_features || []).filter(function (r) { return r.reason === 'constant value'; })
-      .map(function (r) { return r.feature; }).filter(function (f) { return !(f in m.vif_initial); });
-    vifBody.innerHTML = Object.keys(m.vif_initial).concat(constant).map(function (f) {
-      const r = removed[f];
-      let result = badge(true, 'Kept', '');
-      if (r) result = badge(false, '', r.reason === 'constant value' ? 'Removed (same value in every record)'
-        : r.reason && r.reason.indexOf('weak') === 0 ? 'Removed (weak link to fuel)' : 'Removed (VIF ' + fmtVif(r.vif) + ')');
-      return '<tr><td>' + escapeHtml(name(f)) + '</td><td>' + (corr[f] == null ? '—' : Number(corr[f]).toFixed(3)) + '</td><td>' +
-        fmtVif(m.vif_initial[f]) + '</td><td>' + (r ? '—' : fmtVif((m.vif_final || {})[f])) + '</td><td>' + result + '</td></tr>';
-    }).join('');
+  const terms = m.equation_terms || [];
+  if (vifBody && terms.length) {
+    const threshold = m.vif_threshold != null ? m.vif_threshold : 5;
+    document.getElementById('vifThreshold').textContent = threshold;
+    const coef = m.coefficients || {}, vif = m.vif || {}, corr = m.correlations || {};
+    // ŷ = b0 + b1(Distance) + ... with the fitted values, centered and in the original units.
+    const c = m.centering || {};
+    const D = c.distance_km != null ? '(D − ' + c.distance_km + ')' : 'D';
+    const P = c.engine_power_kw != null ? '(P − ' + c.engine_power_kw + ')' : 'P';
+    const equation = function (b0, b, symbols) {
+      return 'ŷ = ' + num(b0) + terms.map(function (t) {
+        const v = Number(b[t] || 0);
+        return (v < 0 ? ' − ' : ' + ') + num(Math.abs(v)) + symbols[t];
+      }).join('');
+    };
+    document.getElementById('equationText').textContent = equation(m.intercept, coef,
+      { distance_km: D, engine_power_kw: P, fuel_type_code: '(FuelType)', distance_x_power: D + P });
+    document.getElementById('equationRaw').textContent = m.raw_coefficients
+      ? equation(m.raw_intercept, m.raw_coefficients, { distance_km: '(Distance)', engine_power_kw: '(Power)', fuel_type_code: '(FuelType)', distance_x_power: '(Distance × Power)' })
+      : '—';
+    vifBody.innerHTML = '<tr><td>Intercept (β<sub>0</sub>)</td><td>' + num(m.intercept) + '</td><td>—</td><td>—</td><td>—</td></tr>' +
+      terms.map(function (t, i) {
+        const v = vif[t];
+        const level = v == null ? '<span class="text-muted">Same value in every record</span>'
+          : badge(v <= threshold, 'Low', 'High (VIF &gt; ' + threshold + ')');
+        return '<tr><td>' + escapeHtml(name(t)) + ' (β<sub>' + (i + 1) + '</sub>)</td><td>' + num(coef[t]) + '</td><td>' +
+          (corr[t] == null ? '—' : Number(corr[t]).toFixed(3)) + '</td><td>' + fmtVif(v) + '</td><td>' + level + '</td></tr>';
+      }).join('');
   } else if (vifBody) {
-    vifBody.innerHTML = '<tr><td colspan="5" class="text-muted">VIF is computed at the next automatic retrain.</td></tr>';
+    vifBody.innerHTML = '<tr><td colspan="5" class="text-muted">The equation and VIF are computed at the next automatic retrain.</td></tr>';
   }
   const mergeNote = document.getElementById('mergeNote');
   if (mergeNote) {
@@ -334,12 +373,7 @@ function renderDiagnostics(m) {
                          supplementary: 'supplementary dataset records' };
     const parts = Object.keys(src).map(function (k) { return src[k] + ' ' + (sourceName[k] || k + ' records'); });
     let text = parts.length ? 'Training data: ' + parts.join(', ') + ' (after cleaning). ' : '';
-    text += m.supplementary_kind === 'trips'
-      ? 'Supplementary dataset: online trip records merged into the training data. '
-      : 'Supplementary dataset: rated fuel efficiency per vehicle type. ';
-    text += (m.dropped_in_merge && m.dropped_in_merge.length)
-      ? 'Dropped during merging (absent from the online dataset): ' + m.dropped_in_merge.map(name).join(', ') + '.'
-      : 'No predictors were dropped during merging.';
+    text += 'Local trips are merged with the vehicle records by plate number; the supplementary dataset has the same variables.';
     mergeNote.textContent = text;
   }
   const d = m.diagnostics;
@@ -388,6 +422,10 @@ function refreshModelPerformance() {
           document.getElementById('mpStatus').className = 'badge-status ' + (m.status === 'active' ? 'badge-active' : 'badge-maintenance');
         }
         document.querySelectorAll('.mpFolds').forEach(function (el) { el.textContent = m.cv_folds; });
+        const liters = function (v, sign) { return v == null ? '—' : (sign ? '±' : '') + v + ' L'; };
+        setText('cvTestR2', m.r2_score); setText('cvMeanR2', m.cv_mean_r2); setText('cvStdR2', m.cv_std_r2);
+        setText('cvTestMae', m.mae); setText('cvMeanMae', liters(m.cv_mean_mae)); setText('cvStdMae', liters(m.cv_std_mae, true));
+        setText('cvTestRmse', m.rmse); setText('cvMeanRmse', liters(m.cv_mean_rmse)); setText('cvStdRmse', liters(m.cv_std_rmse, true));
         renderDiagnostics(m);
       }
       const key = JSON.stringify(data.charts);

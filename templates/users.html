@@ -204,10 +204,12 @@ let lastUsersJson = JSON.stringify([...document.querySelectorAll('#usersBody tr[
 setInterval(function () {
   if (document.querySelector('.modal.show')) return;
   fetch('/api/users').then(function (r) {
+    if (!document.getElementById('usersBody')) return null;  // the user moved to another page meanwhile
     if (r.status === 403) { window.location.href = '/dashboard'; return null; }
     return r.json();
   }).then(function (d) {
     if (!d) return;
+    if (!Array.isArray(d.users)) throw new Error('unexpected answer');  // keep the rows on screen
     document.getElementById('userLive').className = 'live-badge';
     document.getElementById('userLiveText').textContent = 'Live';
     const badge = document.getElementById('pendingBadge');

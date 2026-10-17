@@ -16,27 +16,29 @@
   };
 })();
 
-document.addEventListener('DOMContentLoaded', function () {
-  // ---- Loading bar for page changes (links and forms inside the system) ----
-  const progress = document.getElementById('pageProgress');
-  if (progress) {
-    document.addEventListener('click', function (e) {
-      const a = e.target.closest('a[href]');
-      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey ||
-          a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#') ||
-          a.origin !== location.origin || a.dataset.bsToggle) return;
-      progress.classList.add('is-loading');
-    });
-    document.addEventListener('submit', function (e) {
-      if (!e.defaultPrevented) progress.classList.add('is-loading');
-    });
-    // Back/forward restores the old page from cache: hide the bar again.
-    window.addEventListener('pageshow', function () { progress.classList.remove('is-loading'); });
-  }
+// ---- Page timers ----
+// Pages switch without a reload (see "In-app page switching" below), so every
+// repeating timer a page starts (its 5-second live refresh) is remembered and
+// stopped when the user moves to another page. The shell's own timers (bell,
+// clock, account sync) use shellInterval and keep running.
+const shellInterval = window.setInterval.bind(window);
+const pageIntervals = new Set();
+window.setInterval = function () {
+  const id = shellInterval.apply(null, arguments);
+  pageIntervals.add(id);
+  return id;
+};
+function stopPageTimers() {
+  pageIntervals.forEach(function (id) { clearInterval(id); });
+  pageIntervals.clear();
+}
 
-  // ---- Tables on phones: each cell carries its column name (data-label), so
+// ---- Everything inside the page area that needs wiring up. Runs on the first
+// load and again after every in-app page switch (on the new content). ----
+function initPage() {
+  // Tables on phones: each cell carries its column name (data-label), so
   // style.css can show every row as a card. Rows redrawn by the live refresh
-  // are labelled again as they arrive. ----
+  // are labelled again as they arrive.
   document.querySelectorAll('table.table-fleet').forEach(function (table) {
     const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
     const label = function () {
@@ -52,9 +54,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // ---- Shared record modals (Trip / Fuel Records) ----
-  // Each page has ONE view/edit modal; when it opens, fill it from the
-  // clicked row's data-record JSON and point the form at that record.
+  // Shared record modals (Trip / Fuel Records): each page has ONE view/edit
+  // modal; when it opens, fill it from the clicked row's data-record JSON and
+  // point the form at that record.
   document.querySelectorAll('.modal[data-record-modal]').forEach(function (modal) {
     modal.addEventListener('show.bs.modal', function (e) {
       const row = e.relatedTarget && e.relatedTarget.closest('[data-record]');
@@ -76,6 +78,296 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Flash messages -> Bootstrap toasts
+  const flashData = document.getElementById('flashData');
+  if (flashData) {
+    try {
+      const messages = JSON.parse(flashData.dataset.messages);
+      messages.forEach(([category, text]) => showToast(text, category));
+    } catch (err) { /* no-op */ }
+    flashData.remove();  // shown once
+  }
+
+  // Password show/hide toggles
+  document.querySelectorAll('.password-toggle').forEach(function (icon) {
+    const targetId = icon.getAttribute('data-target');
+    const input = document.getElementById(targetId);
+    if (!input) return;
+
+    icon.addEventListener('click', function () {
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    });
+
+    // Only show the reveal icon once the field actually has typed content.
+    const syncVisibility = function () {
+      icon.classList.toggle('d-none', input.value.length === 0);
+    };
+    syncVisibility();
+    input.addEventListener('input', syncVisibility);
+  });
+
+  // Global loading overlay on form submit (data-loading attr)
+  document.querySelectorAll('form[data-loading]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (form.checkValidity && !form.checkValidity()) return;
+      showLoading(form.getAttribute('data-loading') || 'Processing...');
+    });
+  });
+
+  // Bootstrap client-side validation
+  document.querySelectorAll('form.needs-validation').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+        hideLoading();
+      }
+      form.classList.add('was-validated');
+    }, false);
+  });
+
+  // Profile photo upload (Settings page)
+  initAvatarControls();
+
+  // Generic table search filter (data-search-input + data-search-table)
+  document.querySelectorAll('[data-search-input]').forEach(function (input) {
+    const tableId = input.getAttribute('data-search-input');
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const apply = function () {
+      const term = input.value.toLowerCase();
+      table.querySelectorAll('tbody tr').forEach(function (row) {
+        row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none';
+      });
+    };
+    input.addEventListener('keyup', apply);
+    input.addEventListener('search', apply);
+    if (input.value) apply();  // opened with a search already filled in (e.g. a month from the dashboard)
+  });
+
+  // Date pickers whose latest allowed day is "today" move on at midnight, since
+  // the pages stay open and refresh by themselves.
+  const loadedToday = phToday();
+  const pickers = Array.prototype.filter.call(document.querySelectorAll('input[type="date"][max]'),
+    function (el) { return el.max === loadedToday; });
+  if (pickers.length) {
+    setInterval(function () {
+      const today = phToday();
+      pickers.forEach(function (el) { if (el.max !== today) el.max = today; });
+    }, 60000);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  // ---- Loading bar for page changes ----
+  const progress = document.getElementById('pageProgress');
+  let navTimer = null;
+  const startNav = function () {
+    if (!progress) return;
+    progress.classList.add('is-loading');
+    clearTimeout(navTimer);
+    navTimer = setTimeout(endNav, 10000);  // safety net: never leave it running
+  };
+  const endNav = function () {
+    clearTimeout(navTimer);
+    if (progress) progress.classList.remove('is-loading');
+  };
+  document.addEventListener('submit', function (e) {
+    if (!e.defaultPrevented) startNav();
+  });
+  // Back/forward restores a page from cache: hide the bar again.
+  window.addEventListener('pageshow', endNav);
+
+  // ---- In-app page switching (like a single-page app) ----
+  // A click on a link inside the system swaps only the page area: the sidebar,
+  // top bar, bell and clock stay as they are, the chosen menu item lights up
+  // at once, and pages are fetched ahead while the pointer rests on a link.
+  // Anything unusual (file downloads, the login page, errors) falls back to a
+  // normal page load.
+  const main = document.querySelector('main.content-area');
+  const pageScripts = document.getElementById('pageScripts');
+  if (main && pageScripts && window.DOMParser && history.pushState) {
+    const pageCache = new Map();  // url -> { promise, at }
+    const loadedScripts = new Set(Array.from(document.scripts).filter(function (s) { return s.src; }).map(function (s) { return s.src; }));
+    let navToken = 0;
+
+    const pageUrl = function (a, e) {
+      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return null;
+      if (a.target === '_blank' || a.hasAttribute('download') || a.dataset.bsToggle || a.dataset.noSwap !== undefined) return null;
+      const href = a.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return null;
+      if (a.origin !== location.origin) return null;
+      if (/export|\.csv$|^\/(static|api)\/|^\/logout/i.test(a.pathname)) return null;  // files and actions, not pages
+      if (a.pathname === location.pathname && a.search === location.search && a.hash) return null;
+      return a.href.split('#')[0];
+    };
+
+    const fetchPage = function (url) {
+      const hit = pageCache.get(url);
+      if (hit && Date.now() - hit.at < 15000) return hit.promise;
+      const promise = fetch(url, { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
+        .then(function (res) {
+          return res.text().then(function (html) {
+            return { url: res.url, html: html, type: res.headers.get('Content-Type') || '' };
+          });
+        });
+      pageCache.set(url, { promise: promise, at: Date.now() });
+      promise.catch(function () { pageCache.delete(url); });
+      return promise;
+    };
+
+    const loadScript = function (src) {
+      if (loadedScripts.has(src)) return Promise.resolve();
+      return new Promise(function (resolve) {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = s.onerror = function () { loadedScripts.add(src); resolve(); };
+        document.head.appendChild(s);
+      });
+    };
+
+    const swapPage = function (doc, newMain, finalUrl, push) {
+      // Leave the old page: stop its timers, charts and any open dialog.
+      stopPageTimers();
+      window.refreshBeforePrint = undefined;
+      if (window.Chart && Chart.instances) Object.values(Chart.instances).forEach(function (c) { c.destroy(); });
+      document.querySelectorAll('.modal.show').forEach(function (m) {
+        const inst = window.bootstrap && bootstrap.Modal.getInstance(m);
+        if (inst) inst.hide();
+      });
+      document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+
+      if (push) history.pushState(null, '', finalUrl);
+      else history.replaceState(null, '', finalUrl);
+      document.title = doc.title;
+      const h1 = document.querySelector('.topbar-title h1');
+      const newH1 = doc.querySelector('.topbar-title h1');
+      if (h1 && newH1) h1.textContent = newH1.textContent;
+      const nav = document.querySelector('.sidebar-nav');
+      const newNav = doc.querySelector('.sidebar-nav');
+      if (nav && newNav) nav.innerHTML = newNav.innerHTML;  // active item and badges
+
+      const newScripts = Array.from(newMain.querySelectorAll('script'));
+      const extra = doc.getElementById('pageScripts');
+      if (extra) newScripts.push.apply(newScripts, Array.from(extra.querySelectorAll('script')));
+      newMain.querySelectorAll('script').forEach(function (s) { s.remove(); });
+      main.innerHTML = newMain.innerHTML;
+      pageScripts.innerHTML = '';
+      window.scrollTo(0, 0);
+
+      // Run the new page's scripts in their own scope (so a page can be opened
+      // again without "already declared" errors), after any library it needs.
+      const externals = newScripts.filter(function (s) { return s.src; });
+      const inline = newScripts.filter(function (s) { return !s.src && (!s.type || /javascript/.test(s.type)); })
+        .map(function (s) { return s.textContent; }).join('\n;\n');
+      return externals.reduce(function (p, s) { return p.then(function () { return loadScript(s.src); }); }, Promise.resolve())
+        .then(function () {
+          if (inline.trim()) {
+            const el = document.createElement('script');
+            el.textContent = '(function () {\n' + inline + '\n})();';
+            pageScripts.appendChild(el);
+          }
+          initPage();
+        });
+    };
+
+    const navigate = function (url, push) {
+      const token = ++navToken;
+      startNav();
+      const slow = setTimeout(function () { if (token === navToken) main.classList.add('is-switching'); }, 150);
+      // Safety net: if the page has not arrived in 8 seconds, load it the normal way.
+      const stuck = setTimeout(function () { if (token === navToken) { pageCache.delete(url); window.location.href = url; } }, 8000);
+      fetchPage(url)
+        .then(function (r) {
+          pageCache.delete(url);  // used once: the next visit gets fresh data
+          if (token !== navToken) return;
+          if (!/text\/html/i.test(r.type)) { window.location.href = url; return; }
+          const doc = new DOMParser().parseFromString(r.html, 'text/html');
+          const newMain = doc.querySelector('main.content-area');
+          if (!newMain || !doc.getElementById('pageScripts')) { window.location.href = r.url; return; }  // e.g. the login page
+          return swapPage(doc, newMain, r.url, push);
+        })
+        .catch(function () { if (token === navToken) window.location.href = url; })
+        .then(function () {
+          clearTimeout(slow); clearTimeout(stuck);
+          if (token === navToken) { main.classList.remove('is-switching'); endNav(); }
+        });
+    };
+    window.navigateTo = function (url) { navigate(new URL(url, location.href).href, true); };
+
+    // Light up the chosen menu item and show its name in the top bar at once.
+    const markNav = function (navLink) {
+      if (!navLink) return;
+      document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(function (l) { l.classList.remove('active'); });
+      navLink.classList.add('active');
+      const label = navLink.querySelector('span');
+      const h1 = document.querySelector('.topbar-title h1');
+      if (label && h1) h1.textContent = label.textContent;
+    };
+
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[href]');
+      const url = pageUrl(a, e);
+      if (!url) return;
+      e.preventDefault();
+      markNav(a.closest('.sidebar-nav .nav-link'));
+      const sb = document.getElementById('sidebar');
+      if (sb) sb.classList.remove('open');  // phones: close the menu right away
+      // Close any open dropdown (e.g. the bell) so it doesn't stay over the new page.
+      document.querySelectorAll('[data-bs-toggle="dropdown"].show').forEach(function (t) {
+        const dd = window.bootstrap && bootstrap.Dropdown.getInstance(t);
+        if (dd) dd.hide();
+      });
+      navigate(url, true);
+    });
+
+    // Fetch a page ahead while the pointer rests on its link (or a finger touches it).
+    let hoverTimer = null;
+    const prefetch = function (e) {
+      const a = e.target.closest && e.target.closest('a[href]');
+      const url = a && pageUrl(a, { defaultPrevented: false, button: 0 });
+      if (!url || url === location.href.split('#')[0]) return;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () { fetchPage(url).catch(function () {}); }, e.type === 'touchstart' ? 0 : 80);
+    };
+    document.addEventListener('mouseover', prefetch);
+    document.addEventListener('touchstart', prefetch, { passive: true });
+    document.addEventListener('mouseout', function () { clearTimeout(hoverTimer); });
+
+    // Back / Forward: show that page in place (a change of #hash alone is ignored).
+    let shownPage = location.pathname + location.search;
+    const origPushState = history.pushState.bind(history);
+    const origReplaceState = history.replaceState.bind(history);
+    history.pushState = function (s, t, u) { origPushState(s, t, u); shownPage = location.pathname + location.search; };
+    history.replaceState = function (s, t, u) { origReplaceState(s, t, u); shownPage = location.pathname + location.search; };
+    window.addEventListener('popstate', function () {
+      if (location.pathname + location.search === shownPage) return;
+      shownPage = location.pathname + location.search;
+      markNav(Array.from(document.querySelectorAll('.sidebar-nav .nav-link')).find(function (l) { return l.pathname === location.pathname; }));
+      navigate(location.href, false);
+    });
+  } else {
+    // No in-app switching (older browser): still show the loading bar on clicks.
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[href]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey ||
+          a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#') ||
+          a.origin !== location.origin || a.dataset.bsToggle || /export|\.csv$/i.test(a.pathname)) return;
+      startNav();
+    });
+  }
+
   // ---- Sidebar toggle (mobile) ----
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebarToggle');
@@ -92,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // ---- Notifications bell (real time): badge refreshes every 10s; staff get a
+  // ---- Notifications bell (real time): badge refreshes every 5s; staff get a
   // toast when a fuel request is approved/rejected, admins when a new request arrives.
   const notifBtn = document.getElementById('notifBtn');
   const notifList = document.getElementById('notifList');
@@ -111,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (clearAllBtn) clearAllBtn.hidden = !items.length;
       if (!items.length) { notifList.innerHTML = '<div class="notif-empty text-muted small">No notifications right now.</div>'; return; }
       notifList.innerHTML = items.map(function (n) {
-        const tone = n.kind === 'maintenance' ? 'warn' : (n.status === 'rejected' ? 'bad' : (n.kind === 'decision' ? 'good' : 'info'));
+        const tone = n.status === 'rejected' ? 'bad' : (n.kind === 'decision' ? 'good' : 'info');
         return '<div class="notif-row" data-key="' + escapeHtml(n.key) + '">' +
           '<a class="notif-item notif-' + tone + (n.new ? ' is-new' : '') + '" href="' + escapeHtml(n.url) + '">' +
           '<div class="notif-item-icon"><i class="fa-solid ' + escapeHtml(n.icon) + '"></i></div>' +
@@ -127,8 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!data) return;
       setDot(data.count);
       renderList(data.notifications);
-      knownKeys = data.notifications.filter(function (n) { return n.kind !== 'maintenance'; })
-        .map(function (n) { return n.kind + ':' + n.id + ':' + (n.status || ''); });
+      knownKeys = data.notifications.map(function (n) { return n.kind + ':' + n.id + ':' + (n.status || ''); });
     }
     function dismiss(path, body) {
       return fetch(path, { method: 'POST', body: body,
@@ -166,12 +457,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const el = document.getElementById(b[0]);
             if (el && b[1] !== undefined) { el.textContent = b[1]; el.hidden = !b[1]; }
           });
-          const keys = data.notifications.filter(function (n) { return n.kind !== 'maintenance'; })
-            .map(function (n) { return n.kind + ':' + n.id + ':' + (n.status || ''); });
+          const keys = data.notifications.map(function (n) { return n.kind + ':' + n.id + ':' + (n.status || ''); });
           if (knownKeys && showToasts) {
             data.notifications.forEach(function (n) {
               const key = n.kind + ':' + n.id + ':' + (n.status || '');
-              if (n.kind !== 'maintenance' && knownKeys.indexOf(key) === -1 && typeof showToast === 'function') {
+              if (knownKeys.indexOf(key) === -1 && typeof showToast === 'function') {
                 showToast(n.text + (n.sub ? ' — ' + n.sub : ''), n.status === 'rejected' ? 'danger' : (n.kind === 'request' ? 'info' : 'success'));
               }
             });
@@ -181,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(function () { /* offline: retry on the next tick */ });
     }
     pollNotifications(false);
-    setInterval(function () { if (!document.hidden) pollNotifications(true); }, 5000);
+    shellInterval(function () { if (!document.hidden) pollNotifications(true); }, 5000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) pollNotifications(true); });
     notifBtn.addEventListener('shown.bs.dropdown', function () {
       pollNotifications(false).then(function () {
@@ -224,280 +514,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('load', function () {
       setTimeout(function () { stampPrintTime(); window.print(); }, 600);
     });
-  }
-
-  // ---- Flash messages -> Bootstrap toasts ----
-  const flashData = document.getElementById('flashData');
-  if (flashData) {
-    try {
-      const messages = JSON.parse(flashData.dataset.messages);
-      messages.forEach(([category, text]) => showToast(text, category));
-    } catch (err) { /* no-op */ }
-  }
-
-  // ---- Password show/hide toggles ----
-  document.querySelectorAll('.password-toggle').forEach(function (icon) {
-    const targetId = icon.getAttribute('data-target');
-    const input = document.getElementById(targetId);
-    if (!input) return;
-
-    icon.addEventListener('click', function () {
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-      } else {
-        input.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
-      }
-    });
-
-    // Only show the reveal icon once the field actually has typed content.
-    const syncVisibility = function () {
-      icon.classList.toggle('d-none', input.value.length === 0);
-    };
-    syncVisibility();
-    input.addEventListener('input', syncVisibility);
-  });
-
-  // ---- Global loading overlay on form submit (data-loading attr) ----
-  document.querySelectorAll('form[data-loading]').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      if (form.checkValidity && !form.checkValidity()) return;
-      showLoading(form.getAttribute('data-loading') || 'Processing...');
-    });
-  });
-
-  // ---- Bootstrap client-side validation ----
-  document.querySelectorAll('form.needs-validation').forEach(function (form) {
-    form.addEventListener('submit', function (event) {
-      if (!form.checkValidity()) {
-        event.preventDefault();
-        event.stopPropagation();
-        hideLoading();
-      }
-      form.classList.add('was-validated');
-    }, false);
-  });
-
-  // ---- Topbar quick-jump search ----
-  const quickJump = document.getElementById('quickJump');
-  if (quickJump) {
-    const destinations = Array.from(document.querySelectorAll('.sidebar-nav .nav-link')).map(function (link) {
-      return { label: link.textContent.trim(), url: link.getAttribute('href') };
-    });
-    quickJump.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter') return;
-      const term = quickJump.value.trim().toLowerCase();
-      if (!term) return;
-      // Match word by word, ignoring plurals: "trips" -> Trip Records, "users" -> User Accounts.
-      const stem = w => w.replace(/(es|s)$/, '');
-      const termWords = term.split(/\s+/).map(stem);
-      const match = destinations.find(d => d.label.toLowerCase().includes(term)) ||
-        destinations.find(function (d) {
-          const words = d.label.toLowerCase().split(/[\s&]+/).filter(Boolean).map(stem);
-          return termWords.every(t => words.some(w => w.startsWith(t) || t.startsWith(w)));
-        });
-      if (match) {
-        window.location.href = match.url;
-      } else {
-        showToast(`No page matched "${quickJump.value}". Try Vehicles, Trips, Fuel Records...`, 'info');
-      }
-    });
-  }
-
-  // ---- Profile photo upload (Settings page) ----
-  const avatarInput = document.getElementById('avatarInput');
-  if (avatarInput) {
-    const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
-    if (uploadPhotoBtn) {
-      uploadPhotoBtn.addEventListener('click', function () { avatarInput.click(); });
-    }
-
-    avatarInput.addEventListener('change', function () {
-      const file = avatarInput.files[0];
-      if (file) uploadAvatarFile(file);
-      avatarInput.value = '';
-    });
-
-    // ---- Take Photo (webcam capture) ----
-    const cameraModalEl = document.getElementById('cameraModal');
-    const cameraVideo = document.getElementById('cameraVideo');
-    const cameraCanvas = document.getElementById('cameraCanvas');
-    const cameraError = document.getElementById('cameraError');
-    const takePhotoBtn = document.getElementById('takePhotoBtn');
-    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-    let cameraStream = null;
-
-    function stopCamera() {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(function (track) { track.stop(); });
-        cameraStream = null;
-      }
-    }
-
-    if (cameraModalEl && takePhotoBtn) {
-      const cameraModal = new bootstrap.Modal(cameraModalEl);
-
-      takePhotoBtn.addEventListener('click', function () {
-        cameraError.textContent = '';
-        cameraModal.show();
-        // Browsers only allow the camera on HTTPS or localhost; over the office
-        // network (http://<PC-IP>:5000) mediaDevices does not exist.
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          cameraError.textContent = 'The camera is only available when the system is opened on this computer ' +
-            '(http://127.0.0.1:5000) or over HTTPS. Please use "Upload Photo" instead.';
-          return;
-        }
-        navigator.mediaDevices.getUserMedia({ video: true })
-          .then(function (stream) {
-            cameraStream = stream;
-            cameraVideo.srcObject = stream;
-          })
-          .catch(function () {
-            cameraError.textContent = 'Could not access the camera. Check your browser/device permissions.';
-          });
-      });
-
-      cameraModalEl.addEventListener('hidden.bs.modal', stopCamera);
-
-      capturePhotoBtn.addEventListener('click', function () {
-        if (!cameraStream) return;
-        cameraCanvas.width = cameraVideo.videoWidth;
-        cameraCanvas.height = cameraVideo.videoHeight;
-        cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
-        cameraCanvas.toBlob(function (blob) {
-          if (!blob) return;
-          cameraModal.hide();
-          uploadAvatarFile(new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' }));
-        }, 'image/jpeg', 0.92);
-      });
-    }
-
-    // ---- See Profile Picture / Remove Profile Picture (event-delegated: these
-    // menu items are only present in the DOM once a photo exists) ----
-    const avatarDropdownMenu = document.getElementById('avatarDropdownMenu');
-    const viewPhotoModalEl = document.getElementById('viewPhotoModal');
-    if (avatarDropdownMenu) {
-      avatarDropdownMenu.addEventListener('click', function (e) {
-        if (e.target.closest('#viewPhotoBtn')) {
-          const preview = document.getElementById('avatarPreview');
-          if (!preview || preview.tagName !== 'IMG') return;
-          document.getElementById('viewPhotoImg').src = preview.src;
-          bootstrap.Modal.getOrCreateInstance(viewPhotoModalEl).show();  // reuse: no stacked backdrops
-        } else if (e.target.closest('#removePhotoBtn')) {
-          if (!window.confirm('Remove your profile picture?')) return;
-          const csrfToken = document.getElementById('avatarCsrfToken').value;
-          showLoading('Removing photo...');
-          fetch('/settings/photo/remove', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrfToken },
-          })
-            .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-            .then(function (result) {
-              hideLoading();
-              if (!result.ok || !result.data.success) {
-                showToast((result.data && result.data.message) || 'Could not remove photo.', 'danger');
-                return;
-              }
-              setAvatarToInitial();
-              showToast('Profile photo removed.', 'success');
-            })
-            .catch(function () {
-              hideLoading();
-              showToast('Could not remove photo. Please try again.', 'danger');
-            });
-        }
-      });
-    }
-  }
-
-  function showViewRemoveMenuItems() {
-    const menu = document.getElementById('avatarDropdownMenu');
-    if (!menu || document.getElementById('viewPhotoItem')) return;
-    menu.insertAdjacentHTML('beforeend',
-      '<li id="viewPhotoItem"><button type="button" class="dropdown-item" id="viewPhotoBtn"><i class="fa-regular fa-eye me-2"></i>See Profile Picture</button></li>' +
-      '<li id="removePhotoItem"><button type="button" class="dropdown-item text-danger" id="removePhotoBtn"><i class="fa-solid fa-trash me-2"></i>Remove Profile Picture</button></li>'
-    );
-  }
-
-  function hideViewRemoveMenuItems() {
-    ['viewPhotoItem', 'removePhotoItem'].forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    });
-  }
-
-  function setAvatarToInitial() {
-    const initialLetter = (document.querySelector('.user-name') ? document.querySelector('.user-name').textContent.trim().charAt(0) : 'U').toUpperCase();
-    [['avatarPreview', 'avatarPreview'], ['topbarAvatarImg', 'topbarAvatarInitial']].forEach(function (pair) {
-      const el = document.getElementById(pair[0]);
-      if (!el || el.tagName !== 'IMG') return;
-      const div = document.createElement('div');
-      div.id = pair[1];
-      div.className = el.className.replace('user-avatar-img', '').trim();
-      div.textContent = initialLetter;
-      el.replaceWith(div);
-    });
-    hideViewRemoveMenuItems();
-  }
-
-  function uploadAvatarFile(file) {
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-      showToast('Only PNG, JPG, or WEBP images are allowed.', 'danger');
-      return;
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      showToast('Image must be smaller than 3 MB.', 'danger');
-      return;
-    }
-
-    const csrfToken = document.getElementById('avatarCsrfToken').value;
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('csrf_token', csrfToken);
-
-    showLoading('Uploading photo...');
-    fetch('/settings/photo', { method: 'POST', body: formData })
-      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-      .then(function (result) {
-        hideLoading();
-        if (!result.ok || !result.data.success) {
-          showToast(result.data.message || 'Could not upload photo.', 'danger');
-          return;
-        }
-        const url = result.data.url;
-        ['avatarPreview', 'topbarAvatarImg'].forEach(function (id) {
-          const el = document.getElementById(id);
-          if (!el) return;
-          if (el.tagName === 'IMG') {
-            el.src = url;
-          } else {
-            const img = document.createElement('img');
-            img.id = el.id;
-            img.className = el.className + ' user-avatar-img';
-            img.src = url;
-            img.alt = 'Profile photo';
-            el.replaceWith(img);
-          }
-        });
-        const initial = document.getElementById('topbarAvatarInitial');
-        if (initial) {
-          const img = document.createElement('img');
-          img.id = 'topbarAvatarImg';
-          img.className = 'user-avatar user-avatar-img';
-          img.src = url;
-          img.alt = 'Profile photo';
-          initial.replaceWith(img);
-        }
-        showViewRemoveMenuItems();
-        showToast('Profile photo updated.', 'success');
-      })
-      .catch(function () {
-        hideLoading();
-        showToast('Could not upload photo. Please try again.', 'danger');
-      });
   }
 
   // ---- Real-time account sync (every page) ----
@@ -561,23 +577,206 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(function () { /* offline: try again on the next tick */ });
   }
   if (document.querySelector('.user-chip')) {
-    setInterval(syncAccount, 5000);
+    shellInterval(syncAccount, 5000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) syncAccount(); });
   }
 
-  // ---- Generic table search filter (data-search-input + data-search-table) ----
-  document.querySelectorAll('[data-search-input]').forEach(function (input) {
-    const tableId = input.getAttribute('data-search-input');
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    input.addEventListener('keyup', function () {
-      const term = input.value.toLowerCase();
-      table.querySelectorAll('tbody tr').forEach(function (row) {
-        row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none';
-      });
-    });
-  });
+  initPage();
 });
+
+// ---- Profile photo (Settings page) ----
+function initAvatarControls() {
+  const avatarInput = document.getElementById('avatarInput');
+  if (!avatarInput) return;
+  const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+  if (uploadPhotoBtn) {
+    uploadPhotoBtn.addEventListener('click', function () { avatarInput.click(); });
+  }
+
+  avatarInput.addEventListener('change', function () {
+    const file = avatarInput.files[0];
+    if (file) uploadAvatarFile(file);
+    avatarInput.value = '';
+  });
+
+  // ---- Take Photo (webcam capture) ----
+  const cameraModalEl = document.getElementById('cameraModal');
+  const cameraVideo = document.getElementById('cameraVideo');
+  const cameraCanvas = document.getElementById('cameraCanvas');
+  const cameraError = document.getElementById('cameraError');
+  const takePhotoBtn = document.getElementById('takePhotoBtn');
+  const capturePhotoBtn = document.getElementById('capturePhotoBtn');
+  let cameraStream = null;
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function (track) { track.stop(); });
+      cameraStream = null;
+    }
+  }
+
+  if (cameraModalEl && takePhotoBtn) {
+    const cameraModal = new bootstrap.Modal(cameraModalEl);
+
+    takePhotoBtn.addEventListener('click', function () {
+      cameraError.textContent = '';
+      cameraModal.show();
+      // Browsers only allow the camera on HTTPS or localhost; over the office
+      // network (http://<PC-IP>:5000) mediaDevices does not exist.
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        cameraError.textContent = 'The camera is only available when the system is opened on this computer ' +
+          '(http://127.0.0.1:5000) or over HTTPS. Please use "Upload Photo" instead.';
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function (stream) {
+          cameraStream = stream;
+          cameraVideo.srcObject = stream;
+        })
+        .catch(function () {
+          cameraError.textContent = 'Could not access the camera. Check your browser/device permissions.';
+        });
+    });
+
+    cameraModalEl.addEventListener('hidden.bs.modal', stopCamera);
+
+    capturePhotoBtn.addEventListener('click', function () {
+      if (!cameraStream) return;
+      cameraCanvas.width = cameraVideo.videoWidth;
+      cameraCanvas.height = cameraVideo.videoHeight;
+      cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+      cameraCanvas.toBlob(function (blob) {
+        if (!blob) return;
+        cameraModal.hide();
+        uploadAvatarFile(new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  // ---- See Profile Picture / Remove Profile Picture (event-delegated: these
+  // menu items are only present in the DOM once a photo exists) ----
+  const avatarDropdownMenu = document.getElementById('avatarDropdownMenu');
+  const viewPhotoModalEl = document.getElementById('viewPhotoModal');
+  if (avatarDropdownMenu) {
+    avatarDropdownMenu.addEventListener('click', function (e) {
+      if (e.target.closest('#viewPhotoBtn')) {
+        const preview = document.getElementById('avatarPreview');
+        if (!preview || preview.tagName !== 'IMG') return;
+        document.getElementById('viewPhotoImg').src = preview.src;
+        bootstrap.Modal.getOrCreateInstance(viewPhotoModalEl).show();  // reuse: no stacked backdrops
+      } else if (e.target.closest('#removePhotoBtn')) {
+        if (!window.confirm('Remove your profile picture?')) return;
+        const csrfToken = document.getElementById('avatarCsrfToken').value;
+        showLoading('Removing photo...');
+        fetch('/settings/photo/remove', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+        })
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (result) {
+            hideLoading();
+            if (!result.ok || !result.data.success) {
+              showToast((result.data && result.data.message) || 'Could not remove photo.', 'danger');
+              return;
+            }
+            setAvatarToInitial();
+            showToast('Profile photo removed.', 'success');
+          })
+          .catch(function () {
+            hideLoading();
+            showToast('Could not remove photo. Please try again.', 'danger');
+          });
+      }
+    });
+  }
+}
+
+function showViewRemoveMenuItems() {
+  const menu = document.getElementById('avatarDropdownMenu');
+  if (!menu || document.getElementById('viewPhotoItem')) return;
+  menu.insertAdjacentHTML('beforeend',
+    '<li id="viewPhotoItem"><button type="button" class="dropdown-item" id="viewPhotoBtn"><i class="fa-regular fa-eye me-2"></i>See Profile Picture</button></li>' +
+    '<li id="removePhotoItem"><button type="button" class="dropdown-item text-danger" id="removePhotoBtn"><i class="fa-solid fa-trash me-2"></i>Remove Profile Picture</button></li>'
+  );
+}
+
+function hideViewRemoveMenuItems() {
+  ['viewPhotoItem', 'removePhotoItem'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+}
+
+function setAvatarToInitial() {
+  const initialLetter = (document.querySelector('.user-name') ? document.querySelector('.user-name').textContent.trim().charAt(0) : 'U').toUpperCase();
+  [['avatarPreview', 'avatarPreview'], ['topbarAvatarImg', 'topbarAvatarInitial']].forEach(function (pair) {
+    const el = document.getElementById(pair[0]);
+    if (!el || el.tagName !== 'IMG') return;
+    const div = document.createElement('div');
+    div.id = pair[1];
+    div.className = el.className.replace('user-avatar-img', '').trim();
+    div.textContent = initialLetter;
+    el.replaceWith(div);
+  });
+  hideViewRemoveMenuItems();
+}
+
+function uploadAvatarFile(file) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    showToast('Only PNG, JPG, or WEBP images are allowed.', 'danger');
+    return;
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    showToast('Image must be smaller than 3 MB.', 'danger');
+    return;
+  }
+
+  const csrfToken = document.getElementById('avatarCsrfToken').value;
+  const formData = new FormData();
+  formData.append('photo', file);
+  formData.append('csrf_token', csrfToken);
+
+  showLoading('Uploading photo...');
+  fetch('/settings/photo', { method: 'POST', body: formData })
+    .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+    .then(function (result) {
+      hideLoading();
+      if (!result.ok || !result.data.success) {
+        showToast(result.data.message || 'Could not upload photo.', 'danger');
+        return;
+      }
+      const url = result.data.url;
+      ['avatarPreview', 'topbarAvatarImg'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.tagName === 'IMG') {
+          el.src = url;
+        } else {
+          const img = document.createElement('img');
+          img.id = el.id;
+          img.className = el.className + ' user-avatar-img';
+          img.src = url;
+          img.alt = 'Profile photo';
+          el.replaceWith(img);
+        }
+      });
+      const initial = document.getElementById('topbarAvatarInitial');
+      if (initial) {
+        const img = document.createElement('img');
+        img.id = 'topbarAvatarImg';
+        img.className = 'user-avatar user-avatar-img';
+        img.src = url;
+        img.alt = 'Profile photo';
+        initial.replaceWith(img);
+      }
+      showViewRemoveMenuItems();
+      showToast('Profile photo updated.', 'success');
+    })
+    .catch(function () {
+      hideLoading();
+      showToast('Could not upload photo. Please try again.', 'danger');
+    });
+}
 
 function escapeHtml(value) {
   const div = document.createElement('div');
@@ -636,9 +835,6 @@ const PH_TZ = 'Asia/Manila';
 function phToday() {   // YYYY-MM-DD
   return new Intl.DateTimeFormat('en-CA', { timeZone: PH_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
-function phTimeHHMM() {   // HH:MM, 24-hour
-  return new Intl.DateTimeFormat('en-GB', { timeZone: PH_TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
-}
 
 // Live clock in the top bar, ticking every second.
 (function () {
@@ -649,34 +845,13 @@ function phTimeHHMM() {   // HH:MM, 24-hour
   const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: PH_TZ, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   function tick() { const now = new Date(); t.textContent = timeFmt.format(now); d.textContent = dateFmt.format(now); }
   tick();
-  setInterval(tick, 1000);
+  shellInterval(tick, 1000);
 })();
 
-// "Add" forms start with today's date and the current time already filled in
-// (still editable); edit forms keep the record's own values.
+// "Add" forms start with today's date already filled in (still editable);
+// edit forms keep the record's own values.
 document.addEventListener('show.bs.modal', function (e) {
   const modal = e.target;
   if (!modal.id || !/^add/i.test(modal.id)) return;
   modal.querySelectorAll('input[type="date"]').forEach(function (el) { if (!el.value) el.value = phToday(); });
-  modal.querySelectorAll('input[name="departure_time"]').forEach(function (el) { if (!el.value) el.value = phTimeHHMM(); });
 });
-document.addEventListener('DOMContentLoaded', function () {
-  // Prediction form: the departure time starts at the current time.
-  const predictForm = document.getElementById('predictBtn') && document.getElementById('predictBtn').form;
-  if (predictForm && predictForm.elements.departure_time && !predictForm.elements.departure_time.value) {
-    predictForm.elements.departure_time.value = phTimeHHMM();
-  }
-});
-
-// Date pickers whose latest allowed day is "today" move on at midnight, since
-// the pages stay open and refresh by themselves.
-(function () {
-  const loadedToday = phToday();
-  const pickers = Array.prototype.filter.call(document.querySelectorAll('input[type="date"][max]'),
-    function (el) { return el.max === loadedToday; });
-  if (!pickers.length) return;
-  setInterval(function () {
-    const today = phToday();
-    pickers.forEach(function (el) { if (el.max !== today) el.max = today; });
-  }, 60000);
-})();

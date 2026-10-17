@@ -37,15 +37,8 @@
         <option value="Gasoline" {{ 'selected' if request.args.get('fuel_type')=='Gasoline' }}>Gasoline</option>
       </select>
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Trip Type</label>
-      <select class="form-select" name="trip_type">
-        <option value="">All</option>
-        {% for t in trip_types %}<option value="{{ t }}" {{ 'selected' if request.args.get('trip_type')==t }}>{{ t }}</option>{% endfor %}
-      </select>
-    </div>
     {% set ok = generated and not report.errors %}
-    <div class="col-md-6 d-flex align-items-end gap-2 flex-wrap">
+    <div class="col-md-9 d-flex align-items-end gap-2 flex-wrap">
       <button type="submit" class="btn btn-blue"><i class="fa-solid fa-magnifying-glass-chart me-1"></i> Generate Report</button>
       <a class="btn btn-outline-navy" id="exportBtn" download href="{{ url_for('export_report_csv', **request.args) if ok else '#' }}" {{ '' if ok else 'hidden' }}><i class="fa-solid fa-file-csv me-1"></i> Export CSV</a>
       <button type="button" class="btn btn-outline-navy" id="printBtn" data-print {{ '' if ok else 'hidden' }}><i class="fa-solid fa-print me-1"></i> Print</button>
@@ -94,7 +87,7 @@
 <script>
 // Only the filters that apply to the chosen report are enabled.
 const REPORT_FILTERS = {{ report_filters|tojson }};
-const FILTER_LABELS = { date_from: 'Date From', date_to: 'Date To', vehicle_id: 'Vehicle', fuel_type: 'Fuel Type', trip_type: 'Trip Type' };
+const FILTER_LABELS = { date_from: 'Date From', date_to: 'Date To', vehicle_id: 'Vehicle', fuel_type: 'Fuel Type' };
 const reportForm = document.getElementById('reportForm');
 function syncFilters() {
   const allowed = REPORT_FILTERS[document.getElementById('reportType').value] || [];

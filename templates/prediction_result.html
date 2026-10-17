@@ -68,30 +68,17 @@
   </div>
 
   <div class="col-lg-7">
-    <div class="card-surface mb-3">
-      <div class="section-title"><i class="fa-solid fa-truck text-primary"></i> Vehicle Information</div>
+    <div class="card-surface">
+      <div class="section-title"><i class="fa-solid fa-truck text-primary"></i> Trip and Vehicle</div>
       <div class="row g-2">
         <div class="col-6"><div class="summary-item"><div class="label">Vehicle</div><div class="value">{{ pred.plate_number or 'Manual Entry' }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Vehicle Type</div><div class="value">{{ pred.vehicle_type }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Fuel Type</div><div class="value">{{ pred.fuel_type }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Engine Displacement</div><div class="value">{{ pred.engine_displacement }} L</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Year Model</div><div class="value">{{ pred.year_model }}</div></div></div>
+        <div class="col-6"><div class="summary-item"><div class="label">Vehicle Model</div><div class="value">{{ pred.brand_model or '—' }}</div></div></div>
+        <div class="col-6"><div class="summary-item"><div class="label">Distance Traveled</div><div class="value">{{ pred.distance_km }} km</div></div></div>
+        <div class="col-6"><div class="summary-item"><div class="label">Engine Power</div><div class="value">{{ ('%g'|format(pred.engine_power_kw|float) ~ ' kW') if pred.engine_power_kw is not none else 'Not recorded' }}</div></div></div>
+        <div class="col-6"><div class="summary-item"><div class="label">Fuel Type</div><div class="value">{{ pred.fuel_type or '—' }}</div></div></div>
         <div class="col-6"><div class="summary-item"><div class="label">Prediction Date</div><div class="value">{{ pred.created_at.strftime('%B %d, %Y %I:%M %p') }}</div></div></div>
       </div>
-    </div>
-
-    <div class="card-surface">
-      <div class="section-title"><i class="fa-solid fa-road text-primary"></i> Trip Information</div>
-      <div class="row g-2">
-        <div class="col-6"><div class="summary-item"><div class="label">Distance</div><div class="value">{{ pred.distance_km }} km</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Duration</div><div class="value">{{ pred.duration_minutes }} mins</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Average Speed</div><div class="value">{{ pred.avg_speed_kmh }} km/h</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Trip Type</div><div class="value">{{ pred.trip_type }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Route</div><div class="value">{{ pred.route }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Road / Terrain</div><div class="value">{{ pred.road_type }} / {{ pred.terrain_classification }}</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Load</div><div class="value">{{ pred.passenger_cargo_load_kg }} kg</div></div></div>
-        <div class="col-6"><div class="summary-item"><div class="label">Odometer</div><div class="value">{{ pred.odometer_reading }} km</div></div></div>
-      </div>
+      <p class="text-muted small mt-3 mb-0">Compare this figure with the fuel request before approval.</p>
     </div>
   </div>
 </div>
@@ -114,12 +101,19 @@
     return reviewForm && (reviewForm.contains(document.activeElement) ||
       [].some.call(reviewForm.elements, function (el) { return el.value !== el.defaultValue; }));
   }
-  function setLive(cls, text) { document.getElementById('resLive').className = 'live-badge no-print' + cls; document.getElementById('resLiveText').textContent = text; }
+  // Pages switch in place, so an answer can arrive after the user moved on:
+  // only act while this request is still the page on screen.
+  const here = location.pathname;
+  function stillHere() { return location.pathname === here && document.getElementById('resLive'); }
+  function setLive(cls, text) { if (!stillHere()) return; document.getElementById('resLive').className = 'live-badge no-print' + cls; document.getElementById('resLiveText').textContent = text; }
   function check() {
     fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!stillHere()) return;
+      // Only a clear "does not exist" means deleted; any other unexpected answer is a connection problem.
+      if (!d || (d.exists !== false && !d.signature)) throw new Error('unexpected answer');
       setLive('', 'Live');
-      if (!d.exists) { setLive(' is-offline', 'Deleted'); if (typeof showToast === 'function') showToast('This fuel request was deleted.', 'danger');
-        setTimeout(function () { window.location.href = {{ url_for('prediction_history')|tojson }}; }, 2500); known = 'deleted'; return; }
+      if (d.exists === false) { setLive(' is-offline', 'Deleted'); if (typeof showToast === 'function') showToast('This fuel request was deleted.', 'danger');
+        setTimeout(function () { if (stillHere()) window.location.href = {{ url_for('prediction_history')|tojson }}; }, 2500); known = 'deleted'; return; }
       if (known === null) { known = d.signature; return; }
       if (d.signature !== known && known !== 'deleted' && !busy()) window.location.reload();
     }).catch(function () { setLive(' is-offline', 'Reconnecting…'); });

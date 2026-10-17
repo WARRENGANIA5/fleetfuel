@@ -19,22 +19,22 @@
 <div class="row g-3 mb-4">
   {% if is_admin %}
   <div class="col-6 col-lg-3">
-    <div class="stat-card">
+    <a class="stat-card stat-card-link" href="{{ url_for('vehicles') }}" title="Open the vehicle list">
       <div class="stat-icon navy"><i class="fa-solid fa-truck"></i></div>
       <div>
         <div class="stat-value" id="statTotalVehicles">{{ stats.total_vehicles }}</div>
         <div class="stat-label">Total Vehicles</div>
       </div>
-    </div>
+    </a>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card">
+    <a class="stat-card stat-card-link" href="{{ url_for('trips') }}" title="Open the trip records">
       <div class="stat-icon blue"><i class="fa-solid fa-road"></i></div>
       <div>
         <div class="stat-value" id="statTotalTrips">{{ stats.total_trips }}</div>
         <div class="stat-label">Total Trip Records</div>
       </div>
-    </div>
+    </a>
   </div>
   <div class="col-6 col-lg-3">
     <a class="stat-card stat-card-link" href="{{ url_for('prediction_history', status='pending') }}" title="Review the fuel requests waiting for approval">
@@ -46,13 +46,13 @@
     </a>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="stat-card">
+    <a class="stat-card stat-card-link" href="{{ url_for('trips') }}" title="Open the trip records">
       <div class="stat-icon amber"><i class="fa-solid fa-chart-simple"></i></div>
       <div>
         <div class="stat-value"><span id="statAvgFuel">{{ stats.avg_fuel }}</span> L</div>
         <div class="stat-label">Avg. Fuel Consumption / Trip</div>
       </div>
-    </div>
+    </a>
   </div>
   {% else %}
   <div class="col-6 col-lg-3">
@@ -97,9 +97,10 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-8">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-chart-area text-primary"></i> Monthly Fuel Consumption Trend</div>
-      <div id="fuelTrendWrap" {{ 'hidden' if not fuel_trend_labels }}><canvas id="fuelTrendChart" height="110"></canvas></div>
-      <p class="text-muted mb-0" id="fuelTrendEmpty" {{ 'hidden' if fuel_trend_labels }}>No fuel records yet. Add fuel records to see the consumption trend.</p>
+      <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-chart-area text-primary"></i> <span>Monthly Fuel Consumption Trend</span>
+        <a href="{{ url_for('trips') }}" class="ms-auto small fw-normal">View all</a></div>
+      <div id="fuelTrendWrap" {{ 'hidden' if not fuel_trend_labels }} title="Click a month to see its trip records"><canvas id="fuelTrendChart" height="110"></canvas></div>
+      <p class="text-muted mb-0" id="fuelTrendEmpty" {{ 'hidden' if fuel_trend_labels }}>No trip records yet. Add trip records to see the consumption trend.</p>
     </div>
   </div>
   <div class="col-lg-4">
@@ -114,7 +115,8 @@
       <hr>
       <div class="section-title d-flex align-items-center gap-2" style="font-size:14px;"><i class="fa-solid fa-brain text-primary"></i> Model Status
         <a href="{{ url_for('model_performance') }}" class="ms-auto small fw-normal">Details</a></div>
-      <div id="modelSummaryBox" {{ 'hidden' if not model_summary }}>
+      <div id="modelSummaryBox" class="model-summary-link" role="link" tabindex="0" data-href="{{ url_for('model_performance') }}"
+           title="Open Model Performance" {{ 'hidden' if not model_summary }}>
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">R&sup2; Score</span><strong id="modelR2">{{ model_summary.r2_score if model_summary }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">MAE</span><strong><span id="modelMae">{{ model_summary.mae if model_summary }}</span> L</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
@@ -124,7 +126,7 @@
       {% else %}
       <a href="{{ url_for('prediction') }}" class="btn btn-blue mb-2"><i class="fa-solid fa-gas-pump me-1"></i> Request Fuel (New Prediction)</a>
       <a href="{{ url_for('prediction_history') }}" class="btn btn-outline-navy mb-2"><i class="fa-solid fa-clock-rotate-left me-1"></i> My Fuel Requests</a>
-      <a href="{{ url_for('trips') }}" class="btn btn-outline-navy"><i class="fa-solid fa-road me-1"></i> Add Trip Record</a>
+      <a href="{{ url_for('trips', add=1) }}" class="btn btn-outline-navy"><i class="fa-solid fa-road me-1"></i> Add Trip Record</a>
       <hr>
       <p class="text-muted small mb-0">After your trip, encode the trip ticket in <strong>Trip Records</strong> &mdash; the actual
         fuel of your request is then recorded automatically.</p>
@@ -136,20 +138,23 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-bullseye text-primary"></i> {{ 'Actual vs Predicted Fuel Consumption' if is_admin else 'My Requests: Actual vs Predicted Fuel' }}</div>
-      <div id="avpWrap" {{ 'hidden' if not avp_predicted }}><canvas id="avpChart" height="140"></canvas></div>
+      <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-bullseye text-primary"></i> <span>{{ 'Actual vs Predicted Fuel Consumption' if is_admin else 'My Requests: Actual vs Predicted Fuel' }}</span>
+        <a href="{{ url_for('prediction_history') }}" class="ms-auto small fw-normal">View all</a></div>
+      <div id="avpWrap" {{ 'hidden' if not avp_predicted }} title="Click a point to open that fuel request"><canvas id="avpChart" height="140"></canvas></div>
       <p class="text-muted small mb-0 mt-2" id="avpMissing" {{ 'hidden' if not avp_missing }}>
-        <span id="avpMissingCount">{{ avp_missing }}</span> of these predictions have no actual fuel yet &mdash; it is filled in automatically once the trip ticket is
-        encoded in <a href="{{ url_for('trips') }}">Trip Records</a>.</p>
+        <span id="avpMissingCount">{{ avp_missing }}</span> of these predictions have no actual fuel yet &mdash; it is filled in automatically once the trip ticket
+        of the same vehicle is encoded in <a href="{{ url_for('trips') }}">Trip Records</a>; for a request made without a vehicle (manual entry), record it
+        in <a href="{{ url_for('prediction_history') }}">{{ 'Prediction History' if is_admin else 'My Fuel Requests' }}</a>.</p>
       <p class="text-muted mb-0" id="avpEmpty" {{ 'hidden' if avp_predicted }}>No fuel requests yet. Make one in <a href="{{ url_for('prediction') }}">Prediction</a>; after the trip, encode the
         trip ticket in <a href="{{ url_for('trips') }}">Trip Records</a> and its actual fuel appears here automatically.</p>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-chart-pie text-primary"></i> Fleet Usage Composition</div>
+      <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-chart-pie text-primary"></i> <span>Fleet Usage Composition</span>
+        <a href="{{ url_for('trips') }}" class="ms-auto small fw-normal">View all</a></div>
       <div id="usageWrap" {{ 'hidden' if not vehicle_usage }}>
-      <div class="insight-chart-wrap mb-3">
+      <div class="insight-chart-wrap mb-3" title="Click a vehicle to see its trip records">
         <canvas id="usageChart" width="220" height="220"></canvas>
         <div class="insight-chart-center">
           <div class="insight-total" id="usageTotalValue">{{ vehicle_usage_values|sum }}</div>
@@ -158,11 +163,11 @@
       </div>
       <div id="usageLegendList">
         {% for u in vehicle_usage %}
-        <div class="legend-row">
+        <a class="legend-row legend-link" href="{{ url_for('trips') if u.plate_number.startswith('Others (') else url_for('trips', q=u.plate_number) }}">
           <span class="legend-dot" style="background: {{ usage_colors[loop.index0 % usage_colors|length] }}"></span>
           <span class="legend-label">{{ u.plate_number }}</span>
           <span class="legend-value">{{ u.trip_count }}</span>
-        </div>
+        </a>
         {% endfor %}
       </div>
       </div>
@@ -187,7 +192,7 @@
         {% for p in recent_predictions %}
         <tr class="row-link" data-href="{{ p.url }}" title="Open this prediction">
           <td><a href="{{ p.url }}">{{ p.created_at_display }}</a></td>
-          <td>{{ p.plate_number }} &middot; {{ p.vehicle_type }}</td>
+          <td>{{ p.plate_number }}{% if p.vehicle_model %} &middot; {{ p.vehicle_model }}{% endif %}</td>
           <td>{{ p.distance_km }} km</td>
           <td>{{ p.fuel_type }}</td>
           <td><strong>{{ p.predicted_fuel }} L</strong></td>
@@ -215,8 +220,8 @@ let fuelTrendChartInstance = null;
 let avpChartInstance = null;
 let usageChartInstance = null;
 let lastDashboardData = {{ {
-  "fuel_trend_labels": fuel_trend_labels, "fuel_trend_values": fuel_trend_values,
-  "avp_labels": avp_labels, "avp_actual": avp_actual, "avp_predicted": avp_predicted, "avp_missing": avp_missing,
+  "fuel_trend_labels": fuel_trend_labels, "fuel_trend_values": fuel_trend_values, "fuel_trend_months": fuel_trend_months,
+  "avp_labels": avp_labels, "avp_actual": avp_actual, "avp_predicted": avp_predicted, "avp_missing": avp_missing, "avp_urls": avp_urls,
   "vehicle_usage_labels": vehicle_usage_labels, "vehicle_usage_values": vehicle_usage_values
 }|tojson }};
 const lastSeen = {};
@@ -240,8 +245,19 @@ function renderFuelTrend(d) {
       data: { labels: [], datasets: [{ label: 'Liters Consumed', data: [], borderColor: '#2697ff',
         backgroundColor: 'rgba(38,151,255,0.12)', fill: true, tension: 0.35, pointRadius: 3 }] },
       options: {
+        // Click anywhere in a month's column to open that month's trip records.
+        interaction: { mode: 'index', intersect: false },
+        onClick: function (evt, items) {
+          const month = items.length && (lastDashboardData.fuel_trend_months || [])[items[0].index];
+          if (!month) return;
+          const url = {{ url_for('trips')|tojson }} + '?q=' + encodeURIComponent(month);
+          if (window.navigateTo) window.navigateTo(url); else window.location.href = url;
+        },
+        onHover: function (evt, items) { evt.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
         plugins: { legend: { display: false },
-          tooltip: { callbacks: { label: function (item) { return ' ' + item.parsed.y.toFixed(2) + ' L consumed'; } } } },
+          tooltip: { callbacks: {
+            label: function (item) { return ' ' + item.parsed.y.toFixed(2) + ' L consumed'; },
+            footer: function () { return 'Click to see this month\'s trip records'; } } } },
         scales: {
           y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
           x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
@@ -271,7 +287,22 @@ function renderAvp(d) {
       ] },
       options: {
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { display: true } },
+        // Click a request's column to open that fuel request.
+        onClick: function (evt, items) {
+          const url = items.length && (lastDashboardData.avp_urls || [])[items[0].index];
+          if (!url) return;
+          if (window.navigateTo) window.navigateTo(url); else window.location.href = url;
+        },
+        onHover: function (evt, items) { evt.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
+        plugins: { legend: { display: true },
+          tooltip: { callbacks: {
+            label: function (item) { return ' ' + item.dataset.label + ': ' + Number(item.raw).toFixed(2); },
+            // Chart.js leaves a missing (null) actual out of the tooltip, so say it here.
+            footer: function (items) {
+              const i = items.length ? items[0].dataIndex : -1;
+              const noActual = i >= 0 && (lastDashboardData.avp_actual || [])[i] == null;
+              return (noActual ? 'Actual fuel: not recorded yet\n' : '') + 'Click to open this fuel request';
+            } } } },
         scales: {
           y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
           x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
@@ -285,6 +316,12 @@ function renderAvp(d) {
   avpChartInstance.update();
 }
 
+// A vehicle's trip records (the "Others" group opens all of them).
+const TRIPS_URL = {{ url_for('trips')|tojson }};
+function usageUrl(plate) {
+  return /^Others \(/.test(plate) ? TRIPS_URL : TRIPS_URL + '?q=' + encodeURIComponent(plate);
+}
+
 function renderUsage(d) {
   const has = d.vehicle_usage_labels.length > 0;
   show('usageWrap', has); show('usageEmpty', !has);
@@ -294,11 +331,11 @@ function renderUsage(d) {
   const legendList = document.getElementById('usageLegendList');
   if (legendList) {
     legendList.innerHTML = d.vehicle_usage_labels.map(function (label, i) {
-      return '<div class="legend-row">' +
+      return '<a class="legend-row legend-link" href="' + escapeHtml(usageUrl(label)) + '">' +
         '<span class="legend-dot" style="background: ' + usageColors[i % usageColors.length] + '"></span>' +
         '<span class="legend-label">' + escapeHtml(label) + '</span>' +
         '<span class="legend-value">' + d.vehicle_usage_values[i] + '</span>' +
-        '</div>';
+        '</a>';
     }).join('');
   }
   if (!has || !window.Chart) return;
@@ -306,7 +343,19 @@ function renderUsage(d) {
     usageChartInstance = new Chart(document.getElementById('usageChart'), {
       type: 'doughnut',
       data: { labels: [], datasets: [{ data: [], backgroundColor: usageColors, borderColor: '#2a2d3e', borderWidth: 3 }] },
-      options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: true } } }
+      options: {
+        cutout: '72%',
+        // Click a vehicle's slice to open its trip records.
+        onClick: function (evt, items) {
+          if (!items.length) return;
+          const url = usageUrl(usageChartInstance.data.labels[items[0].index]);
+          if (window.navigateTo) window.navigateTo(url); else window.location.href = url;
+        },
+        onHover: function (evt, items) { evt.native.target.style.cursor = items.length ? 'pointer' : 'default'; },
+        plugins: { legend: { display: false }, tooltip: { enabled: true, callbacks: {
+          label: function (item) { return ' ' + item.label + ': ' + item.raw + ' trips'; },
+          footer: function () { return 'Click to see these trip records'; } } } }
+      }
     });
   }
   usageChartInstance.data.labels = d.vehicle_usage_labels;
@@ -315,8 +364,8 @@ function renderUsage(d) {
 }
 
 function renderCharts(d, force) {
-  if (force || changed('trend', [d.fuel_trend_labels, d.fuel_trend_values])) renderFuelTrend(d);
-  if (force || changed('avp', [d.avp_labels, d.avp_actual, d.avp_predicted, d.avp_missing])) renderAvp(d);
+  if (force || changed('trend', [d.fuel_trend_labels, d.fuel_trend_values, d.fuel_trend_months])) renderFuelTrend(d);
+  if (force || changed('avp', [d.avp_labels, d.avp_actual, d.avp_predicted, d.avp_missing, d.avp_urls])) renderAvp(d);
   if (force || changed('usage', [d.vehicle_usage_labels, d.vehicle_usage_values])) renderUsage(d);
 }
 
@@ -365,7 +414,7 @@ function refreshDashboard() {
             const st = ST[p.status] || ['badge-maintenance', 'Pending'];
             return '<tr class="row-link" data-href="' + escapeHtml(p.url) + '" title="Open this prediction">' +
               '<td><a href="' + escapeHtml(p.url) + '">' + escapeHtml(p.created_at_display) + '</a></td>' +
-              '<td>' + escapeHtml(p.plate_number) + ' &middot; ' + escapeHtml(p.vehicle_type) + '</td>' +
+              '<td>' + escapeHtml(p.plate_number) + (p.vehicle_model ? ' &middot; ' + escapeHtml(p.vehicle_model) : '') + '</td>' +
               '<td>' + p.distance_km + ' km</td>' +
               '<td>' + escapeHtml(p.fuel_type) + '</td>' +
               '<td><strong>' + p.predicted_fuel + ' L</strong></td>' +
@@ -379,21 +428,32 @@ function refreshDashboard() {
     .catch(function () { /* silent retry on next interval */ });
 }
 setInterval(refreshDashboard, 5000);
+// Clicking (or Enter on) the Model Status figures opens Model Performance.
+const modelBox = document.getElementById('modelSummaryBox');
+if (modelBox) {
+  const openModel = function () {
+    if (window.navigateTo) window.navigateTo(modelBox.dataset.href); else window.location.href = modelBox.dataset.href;
+  };
+  modelBox.addEventListener('click', openModel);
+  modelBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') openModel(); });
+}
 // Clicking anywhere on a recent prediction opens it.
 document.getElementById('recentPredictionsBody').addEventListener('click', function (e) {
   const tr = e.target.closest('tr[data-href]');
-  if (tr && !e.target.closest('a')) window.location.href = tr.dataset.href;
+  if (tr && !e.target.closest('a')) {
+    if (window.navigateTo) window.navigateTo(tr.dataset.href); else window.location.href = tr.dataset.href;
+  }
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = "#9698a9";
-Chart.defaults.animation.duration = 300;  // quick draw on each visit
+Chart.defaults.animation = false;  // charts appear at once, no draw-in
 renderCharts(lastDashboardData, true);
 // Seed the change-tracker with what is on screen so the first poll doesn't redraw.
-changed('trend', [lastDashboardData.fuel_trend_labels, lastDashboardData.fuel_trend_values]);
-changed('avp', [lastDashboardData.avp_labels, lastDashboardData.avp_actual, lastDashboardData.avp_predicted, lastDashboardData.avp_missing]);
+changed('trend', [lastDashboardData.fuel_trend_labels, lastDashboardData.fuel_trend_values, lastDashboardData.fuel_trend_months]);
+changed('avp', [lastDashboardData.avp_labels, lastDashboardData.avp_actual, lastDashboardData.avp_predicted, lastDashboardData.avp_missing, lastDashboardData.avp_urls]);
 changed('usage', [lastDashboardData.vehicle_usage_labels, lastDashboardData.vehicle_usage_values]);
 </script>
 {% endblock %}
