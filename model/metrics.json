@@ -1,5 +1,5 @@
 {
-  "model_version": "v20261017214444",
+  "model_version": "v20261017220124",
   "r2_score": 0.9512,
   "mae": 0.7556,
   "rmse": 1.2753,
@@ -13,7 +13,7 @@
   "train_size": 4715,
   "test_size": 1179,
   "total_records": 5894,
-  "trained_at": "2026-10-17T21:44:44",
+  "trained_at": "2026-10-17T22:01:24",
   "status": "active",
   "equation_terms": [
     "distance_km",
