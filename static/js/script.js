@@ -17,6 +17,23 @@
 })();
 
 document.addEventListener('DOMContentLoaded', function () {
+  // ---- Loading bar for page changes (links and forms inside the system) ----
+  const progress = document.getElementById('pageProgress');
+  if (progress) {
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[href]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey ||
+          a.target === '_blank' || a.hasAttribute('download') || a.getAttribute('href').startsWith('#') ||
+          a.origin !== location.origin || a.dataset.bsToggle) return;
+      progress.classList.add('is-loading');
+    });
+    document.addEventListener('submit', function (e) {
+      if (!e.defaultPrevented) progress.classList.add('is-loading');
+    });
+    // Back/forward restores the old page from cache: hide the bar again.
+    window.addEventListener('pageshow', function () { progress.classList.remove('is-loading'); });
+  }
+
   // ---- Tables on phones: each cell carries its column name (data-label), so
   // style.css can show every row as a card. Rows redrawn by the live refresh
   // are labelled again as they arrive. ----

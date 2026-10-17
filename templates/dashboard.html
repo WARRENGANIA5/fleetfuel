@@ -389,6 +389,7 @@ document.getElementById('recentPredictionsBody').addEventListener('click', funct
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = "#9698a9";
+Chart.defaults.animation.duration = 300;  // quick draw on each visit
 renderCharts(lastDashboardData, true);
 // Seed the change-tracker with what is on screen so the first poll doesn't redraw.
 changed('trend', [lastDashboardData.fuel_trend_labels, lastDashboardData.fuel_trend_values]);
