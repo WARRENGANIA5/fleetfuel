@@ -301,6 +301,9 @@ ORG_DEFAULTS = {
 }
 ORG_LIMITS = {"org_name": 120, "org_short": 15, "office_name": 120, "office_short": 15}
 _ORG_TABLE_READY = {"ok": False}
+# The names rarely change, so each page doesn't ask the (cloud) database again.
+_ORG_CACHE = {"value": None, "at": 0.0}
+ORG_CACHE_SECONDS = 60
 
 
 def _ensure_org_table():
@@ -320,12 +323,16 @@ def get_org():
     Never fails: error pages render even when the database is down."""
     if "org" in g:
         return g.org
+    if _ORG_CACHE["value"] is not None and time.time() - _ORG_CACHE["at"] < ORG_CACHE_SECONDS:
+        g.org = dict(_ORG_CACHE["value"])
+        return g.org
     org = dict(ORG_DEFAULTS)
     try:
         _ensure_org_table()
         for row in db.query_all("SELECT setting_key, setting_value FROM app_settings"):
             if row["setting_key"] in org and row["setting_value"].strip():
                 org[row["setting_key"]] = row["setting_value"]
+        _ORG_CACHE.update(value=dict(org, system_short=f"{org['org_short']} FleetFuel"), at=time.time())
     except Exception:
         app.logger.exception("Could not load organization settings; using defaults")
     org["system_short"] = f"{org['org_short']} FleetFuel"
@@ -440,15 +447,9 @@ def build_notifications(limit=8):
     return {"count": count, "notifications": items}
 
 
-@app.before_request
-def load_notifications():
-    if request.endpoint == "static":  # no DB work for CSS/JS/image requests
-        return
-    if session.get("user_id"):
-        try:
-            g.notif_count = build_notifications()["count"]
-        except Exception:
-            g.notif_count = 0
+# Pages don't build the notification list themselves: the bell in the top bar
+# asks /api/notifications as soon as the page has loaded (and every 5 seconds),
+# which saves four database round trips on every click.
 
 
 @app.route("/api/notifications")
@@ -652,8 +653,17 @@ def build_dashboard_context():
     is_admin = session.get("role") == "admin"
     # Scope of the fuel-request figures: everyone's for the admin, own for staff.
     mine_sql, mine_params = ("", ()) if is_admin else (" AND p.user_id = %s", (session.get("user_id"),))
-    total_vehicles = db.query_one("SELECT COUNT(*) AS c FROM vehicles")["c"]
-    total_trips = db.query_one("SELECT COUNT(*) AS c FROM trip_records")["c"]
+    # The fleet-wide figures in one round trip (each query to the cloud database
+    # costs about a tenth of a second).
+    fleet = db.query_one("""
+        SELECT (SELECT COUNT(*) FROM vehicles) AS total_vehicles,
+               (SELECT COUNT(*) FROM trip_records) AS total_trips,
+               (SELECT AVG(actual_fuel_consumption) FROM trip_records
+                 WHERE actual_fuel_consumption IS NOT NULL) AS avg_actual,
+               (SELECT AVG(predicted_fuel) FROM predictions) AS avg_predicted,
+               (SELECT MAX(fuel_date) FROM fuel_records) AS latest_fuel_date,
+               (SELECT COUNT(*) FROM fuel_records) AS fuel_records""")
+    total_vehicles, total_trips = fleet["total_vehicles"], fleet["total_trips"]
     req = db.query_one(f"""
         SELECT COUNT(*) AS total, SUM(p.approval_status = 'pending') AS pending,
                SUM(p.approval_status = 'approved') AS approved, SUM(p.approval_status = 'rejected') AS rejected
@@ -661,23 +671,19 @@ def build_dashboard_context():
     total_predictions = int(req["total"] or 0)
     requests_summary = {k: int(req[k] or 0) for k in ("pending", "approved", "rejected")}
 
-    avg_row = db.query_one(
-        "SELECT AVG(actual_fuel_consumption) AS avg_fuel FROM trip_records WHERE actual_fuel_consumption IS NOT NULL"
-    )
-    avg_fuel = avg_row["avg_fuel"]
-    if avg_fuel is None:
-        avg_row2 = db.query_one("SELECT AVG(predicted_fuel) AS avg_fuel FROM predictions")
-        avg_fuel = avg_row2["avg_fuel"]
+    avg_fuel = fleet["avg_actual"] if fleet["avg_actual"] is not None else fleet["avg_predicted"]
     avg_fuel = round(float(avg_fuel), 2) if avg_fuel is not None else 0.0
 
-    recent_predictions_rows = db.query_all(f"""
+    # The 10 latest requests serve both the Recent list (first 5) and the chart.
+    latest_rows = db.query_all(f"""
         SELECT p.*, v.plate_number, u.full_name
         FROM predictions p
         LEFT JOIN vehicles v ON p.vehicle_id = v.id
         LEFT JOIN users u ON p.user_id = u.id
         WHERE 1=1{mine_sql}
-        ORDER BY p.created_at DESC LIMIT 5
+        ORDER BY p.created_at DESC, p.id DESC LIMIT 10
     """, mine_params)
+    recent_predictions_rows = latest_rows[:5]
     recent_predictions = [{
         "id": r["id"], "status": r["approval_status"],
         "url": url_for("prediction_result", prediction_id=r["id"]),
@@ -693,7 +699,7 @@ def build_dashboard_context():
     # Last 6 calendar months up to the latest month with fuel records (the
     # logs are often encoded months later), with months that have no fuel
     # records shown as 0 instead of silently skipped.
-    latest = db.query_one("SELECT MAX(fuel_date) AS d FROM fuel_records")["d"] or today_local()
+    latest = fleet["latest_fuel_date"] or today_local()
     months = []
     y, m = latest.year, latest.month
     for _ in range(6):
@@ -707,19 +713,14 @@ def build_dashboard_context():
         GROUP BY ym
     """, (first_month,))
     totals = {r["ym"]: float(r["total"]) for r in trend_rows}
-    has_fuel_records = db.query_one("SELECT COUNT(*) AS c FROM fuel_records")["c"] > 0
+    has_fuel_records = fleet["fuel_records"] > 0
     fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months] if has_fuel_records else []
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
 
     # The 10 latest predictions: the predicted liters show as soon as a
     # prediction is made, the actual liters once they are recorded in
     # Prediction History (None = not recorded yet, drawn as a gap).
-    avp_rows = db.query_all(f"""
-        SELECT p.actual_fuel, p.predicted_fuel, p.created_at FROM predictions p
-        WHERE 1=1{mine_sql}
-        ORDER BY p.created_at DESC, p.id DESC LIMIT 10
-    """, mine_params)
-    avp_rows = list(reversed(avp_rows))
+    avp_rows = list(reversed(latest_rows))
     avp_labels = [r["created_at"].strftime("%b %d, %I:%M %p") for r in avp_rows]
     avp_actual = [float(r["actual_fuel"]) if r["actual_fuel"] is not None else None for r in avp_rows]
     avp_predicted = [float(r["predicted_fuel"]) for r in avp_rows]
@@ -2836,6 +2837,7 @@ def update_organization():
         db.execute("""INSERT INTO app_settings (setting_key, setting_value) VALUES (%s, %s)
                       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)""", (key, value))
     g.pop("org", None)
+    _ORG_CACHE["value"] = None  # show the new names right away
     flash("Organization details saved. Every page now shows the new name.", "success")
     return redirect(url_for("settings"))
 
