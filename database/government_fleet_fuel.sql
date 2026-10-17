@@ -83,24 +83,6 @@ CREATE TABLE IF NOT EXISTS predictions (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- model_metrics
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS model_metrics (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    model_version VARCHAR(50) NOT NULL,
-    r2_score DECIMAL(6,4) NOT NULL,
-    mae DECIMAL(8,4) NOT NULL,
-    rmse DECIMAL(8,4) NOT NULL,
-    cv_folds INT NOT NULL,
-    cv_mean_r2 DECIMAL(6,4) NOT NULL,
-    cv_std_r2 DECIMAL(6,4) NOT NULL,
-    train_size INT NOT NULL,
-    test_size INT NOT NULL,
-    status ENUM('active', 'archived') NOT NULL DEFAULT 'active',
-    trained_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
 -- NOTE: The default administrator account is created by
 -- running `python seed_data.py` after this schema is imported.
 -- Password hashing (werkzeug scrypt) must be generated in Python,
