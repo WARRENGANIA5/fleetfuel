@@ -1085,7 +1085,8 @@ VEHICLE_EXTRA_COLUMNS = (
 # Columns from the earlier design that the study no longer collects (the
 # vehicle records are plate number, model, fuel type and engine power; the
 # Monthly Report of Official Travel records date, distance and fuel consumed).
-# They stay in the database with their old values but are no longer required.
+# In a database from that design (e.g. an older XAMPP copy) they are made
+# optional, so the current forms can save without them.
 OPTIONAL_LEGACY_COLUMNS = {
     "vehicles": ("vehicle_type", "engine_displacement", "year_model"),
     "trip_records": ("trip_type", "departure_time", "route", "road_type", "terrain_classification",
@@ -1264,7 +1265,7 @@ def delete_vehicle(vehicle_id):
     try:
         # The vehicle's trip records cascade in the database schema.
         db.execute("DELETE FROM vehicles WHERE id = %s", (vehicle_id,))
-        compact_ids("vehicles", "trip_records", "fuel_records", "predictions")
+        compact_ids("vehicles", "trip_records", "predictions")
         flash(f"Vehicle {v['plate_number']} and its trip records were deleted.", "success")
     except Exception:
         app.logger.exception("Deleting vehicle failed")
@@ -1674,13 +1675,6 @@ def delete_trip(trip_id):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
     try:
-        # The old auto-logged fuel record of this trip (from the earlier design)
-        # describes the same trip, so it goes too. A database created from the
-        # current schema has no fuel_records table.
-        try:
-            db.execute("DELETE FROM fuel_records WHERE trip_record_id = %s", (trip_id,))
-        except Exception:
-            pass
         # A fuel request whose actual fuel came from this trip loses it (and may
         # be matched again to another trip below); manual entries are kept.
         _ensure_prediction_link_columns()
@@ -1688,7 +1682,7 @@ def delete_trip(trip_id):
                       WHERE trip_record_id = %s AND actual_source = 'trip'""", (trip_id,))
         db.execute("UPDATE predictions SET trip_record_id = NULL WHERE trip_record_id = %s", (trip_id,))
         db.execute("DELETE FROM trip_records WHERE id = %s", (trip_id,))
-        compact_ids("trip_records", "fuel_records")
+        compact_ids("trip_records")
         flash("Trip record deleted successfully.", "success")
         _link_actuals_quietly()
     except Exception:
