@@ -564,8 +564,36 @@ a { text-decoration: none; color: inherit; }
   box-shadow: 0 8px 24px rgba(38, 151, 255, 0.35);
 }
 .login-logo img { width: 100%; height: 100%; display: block; }
-.login-title { text-align: center; font-weight: 800; color: var(--text-dark); font-size: 19px; margin-bottom: 24px; }
-.login-sub { text-align: center; color: var(--text-muted); font-size: 13px; margin-bottom: 26px; }
+.login-title { text-align: center; font-weight: 800; color: var(--text-dark); font-size: 22px; margin-bottom: 4px; }
+.login-sub { text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 24px; }
+.caps-warning { margin-top: 6px; font-size: 12px; color: var(--warning); }
+.auth-help { margin-top: 10px; text-align: center; font-size: 11.5px; color: var(--text-muted); }
+.login-page { flex-direction: column; }
+.login-footer { position: relative; z-index: 1; margin-top: 18px; text-align: center; font-size: 11.5px; color: var(--text-muted); }
+
+/* ---------------- Dashboard: greeting ---------------- */
+.welcome-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;
+  padding: 18px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(120deg, rgba(38, 151, 255, 0.16), rgba(38, 229, 197, 0.08));
+}
+.welcome-title { font-size: 20px; font-weight: 800; color: var(--text-dark); }
+.welcome-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; max-width: 680px; }
+.welcome-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.welcome-role, .welcome-date {
+  font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06); color: var(--text-dark); white-space: nowrap;
+}
+@media (max-width: 575px) { .welcome-banner { padding: 14px 16px; } .welcome-title { font-size: 17px; } }
+
+/* ---------------- Logout confirmation ---------------- */
+.logout-icon {
+  width: 56px; height: 56px; margin: 0 auto; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--blue-500); background: var(--blue-100);
+}
 /* Floating inputs and the Login button share one height (Bootstrap input default is 58px). */
 .login-card .form-floating > .form-control {
   height: 46px;

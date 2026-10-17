@@ -635,7 +635,9 @@ def logout():
     # Only a POST (with the CSRF token) logs out, so another website can't
     # sign users out by linking to /logout.
     if request.method == "POST":
+        name = session.get("full_name")
         session.clear()
+        flash(f"You have been logged out{', ' + name if name else ''}. See you next time!", "success")
         return redirect(url_for("login"))
     return redirect(url_for("dashboard") if session.get("user_id") else url_for("login"))
 
@@ -756,7 +758,10 @@ def dashboard():
     ctx = build_dashboard_context()
     usage_rows = [{"plate_number": p, "trip_count": v}
                    for p, v in zip(ctx["vehicle_usage_labels"], ctx["vehicle_usage_values"])]
-    return render_template("dashboard.html", active="dashboard", vehicle_usage=usage_rows, **ctx)
+    hour = now_local().hour
+    greeting = "Good morning" if hour < 12 else ("Good afternoon" if hour < 18 else "Good evening")
+    return render_template("dashboard.html", active="dashboard", vehicle_usage=usage_rows,
+                           greeting=greeting, today_long=now_local().strftime("%A, %B %d, %Y"), **ctx)
 
 
 @app.route("/api/dashboard-data")

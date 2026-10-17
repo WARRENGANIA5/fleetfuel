@@ -9,13 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=9) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=10) }}" rel="stylesheet">
 </head>
 <body>
 <div class="login-page">
   <div class="login-card">
     <div class="login-logo"><img src="{{ url_for('static', filename='images/logo.svg', v=2) }}" alt="{{ org.system_short }} logo"></div>
-    <div class="login-title">Government Fleet Fuel Prediction System</div>
+    <div class="login-title">{{ org.system_short }}</div>
+    <div class="login-sub">Fuel Consumption Prediction System<br>{{ org.org_name }} &middot; {{ org.office_name }}</div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -47,6 +48,7 @@
           <i class="fa-regular fa-eye password-toggle" data-target="password"></i>
           <div class="invalid-feedback">Password is required.</div>
         </div>
+        <div class="caps-warning" id="capsWarning" hidden><i class="fa-solid fa-triangle-exclamation me-1"></i> Caps Lock is on.</div>
       </div>
 
       <button type="submit" class="btn btn-navy w-100 py-2">
@@ -54,10 +56,23 @@
       </button>
     </form>
     <div class="auth-switch">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></div>
+    <div class="auth-help">Forgot your password? Ask the administrator to reset it in <strong>User Accounts</strong>.</div>
   </div>
+  <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='js/script.js', v=8) }}"></script>
+<script>
+// Warn before a wrong password is typed with Caps Lock on.
+(function () {
+  const pw = document.getElementById('password'), warn = document.getElementById('capsWarning');
+  const check = function (e) { if (e.getModifierState) warn.hidden = !e.getModifierState('CapsLock'); };
+  pw.addEventListener('keydown', check);
+  pw.addEventListener('keyup', check);
+  pw.addEventListener('blur', function () { warn.hidden = true; });
+  document.getElementById('username').focus();
+})();
+</script>
 </body>
 </html>
