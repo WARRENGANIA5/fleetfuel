@@ -1104,8 +1104,10 @@ PUBLISHED_ENGINE_POWER_KW = {
     "SFA 1173": 128,  # Toyota Innova 2.8 diesel (1GD-FTV), 174 PS
     "SEF 535": 51,    # Mitsubishi L300 2.5 diesel (4D56), 70 hp
     "SJC 955": 62,    # Isuzu Crosswind 2.5 diesel (4JA1-L), 85 PS
-    "SGF 810": 63,    # Toyota Revo diesel (2L-II), 85 PS (to be confirmed)
-    "SFA 1741": 209,  # Hino bus 7.7 L diesel (J08E), 280 hp (to be confirmed)
+    "SGF 810": 63,    # Toyota Revo 2.4 diesel (2L-II), 85 PS
+    # Hino bus: the exact model is not on record; Hino's FG midi bus (J08E-WF,
+    # 237 hp), the bus line commonly bought by Philippine universities, is assumed.
+    "SFA 1741": 177,
 }
 _VEHICLE_COLUMNS_READY = {"ok": False}
 
