@@ -46,7 +46,14 @@ def main():
     os.makedirs(BACKUP_DIR, exist_ok=True)
     target = os.path.join(BACKUP_DIR, f"{Config.MYSQL_DB}_{now_local():%Y-%m-%d_%H%M%S}.sql")
     cmd = [dump, f"--host={Config.MYSQL_HOST}", f"--port={Config.MYSQL_PORT}", f"--user={Config.MYSQL_USER}",
-           "--single-transaction", "--routines", "--default-character-set=utf8mb4", Config.MYSQL_DB]
+           "--default-character-set=utf8mb4"]
+    if Config.MYSQL_SSL:
+        # Cloud database (TiDB): encrypted connection; it has no stored routines and
+        # no savepoints, which mysqldump's --single-transaction relies on.
+        cmd += ["--ssl", "--skip-lock-tables", "--no-tablespaces"]
+    else:
+        cmd += ["--single-transaction", "--routines"]
+    cmd.append(Config.MYSQL_DB)
     env = dict(os.environ)
     if Config.MYSQL_PASSWORD:
         env["MYSQL_PWD"] = Config.MYSQL_PASSWORD  # keeps the password off the command line
