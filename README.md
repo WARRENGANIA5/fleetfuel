@@ -31,6 +31,7 @@ gov-fleets/
 │   └── metrics.json            (generated)
 ├── data/
 │   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from the online dataset
+│   ├── add_eea_diesel_vans.py        Adds the EEA diesel vans to supplementary_data.csv
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
 │   └── supplementary_data.csv        Online trips: distance, engine power, fuel type, fuel consumed
 ├── templates/                  Jinja2 templates (login, dashboard, ...)
@@ -56,8 +57,9 @@ with fuel type encoded **1 = Gasoline, 0 = Diesel**.
 * **Local data:** the GSO Monthly Report of Official Travel — date of travel, vehicle, distance traveled
   (km) and fuel consumed (L) — entered in **Trip Records**, merged with the **vehicle records** (plate number,
   vehicle model, fuel type, engine power in kW) using the plate number.
-* **Supplementary dataset:** `data/supplementary_data.csv`, real-world trips from an open online dataset with
-  the same variables (see `data/SUPPLEMENTARY_DATASET_SOURCE.md`).
+* **Supplementary dataset:** `data/supplementary_data.csv`, real-world records with the same variables from two
+  open online datasets: gasoline trips (Fan & Song 2022) and diesel vans of many engine sizes (EEA 2024)
+  (see `data/SUPPLEMENTARY_DATASET_SOURCE.md`).
 
 ## 4. Setup Instructions (Windows / VS Code)
 

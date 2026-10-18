@@ -5,7 +5,7 @@ Files in this folder:
   fuel_consumption_linear_regression.ipynb        asks you to upload the 3 CSV files below
   trip_records.csv          Monthly Report of Official Travel: date, plate number, distance (km), fuel consumed (L)
   vehicle_records.csv       plate number, vehicle model, fuel type, engine power (kW)
-  supplementary_data.csv    online dataset (Fan & Song 2022, Mendeley Data, CC BY 4.0), same variables
+  supplementary_data.csv    online data, same variables: gasoline trips (Fan & Song 2022) + diesel vans (EEA 2024)
 
 EASIEST WAY (AUTO version):
   1. Open https://colab.research.google.com (signed in to your Google account).
@@ -17,7 +17,7 @@ EASIEST WAY (AUTO version):
      Model Performance page of the web app.
   6. Optional: folder icon on the left > right-click linear_regression_pipeline.joblib > Download.
 
-The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 6,000 online trips).
+The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 7,260 online records).
 For newer records, download the three CSV files again from the web app
 (Model Performance > Training Details) and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

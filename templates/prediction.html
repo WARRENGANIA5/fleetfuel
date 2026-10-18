@@ -19,13 +19,11 @@
 <div class="card-surface">
   <div class="model-info-line" id="modelInfo">
     <span class="live-badge" id="predLive"><span class="live-dot"></span><span id="predLiveText">Live</span></span>
-    Using model <strong id="predModelVersion">{{ model_metrics.model_version if model_metrics else '—' }}</strong>
-    &middot; R&sup2; <strong id="predModelR2">{{ model_metrics.r2_score if model_metrics else '—' }}</strong>
+    Model R&sup2; <strong id="predModelR2">{{ model_metrics.r2_score if model_metrics else '—' }}</strong>
     &middot; typical error ±<strong id="predModelMae">{{ model_metrics.mae if model_metrics else '—' }}</strong> L
   </div>
 
-  <p class="text-muted small mb-3">Select the vehicle and enter the distance of the planned trip. The system takes the vehicle's
-    engine power and fuel type from its record, predicts the fuel needed, and saves the prediction as a fuel request for approval.</p>
+  <p class="text-muted small mb-3">Select the vehicle and enter the trip distance.</p>
 
   <form method="POST" action="{{ url_for('prediction') }}" class="needs-validation" novalidate data-loading="Running Linear Regression model...">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -108,7 +106,6 @@ function refreshPredictionOptions() {
     .then(function (d) {
       if (!d || !d.model || !Array.isArray(d.vehicles)) throw new Error('unexpected answer');
       const m = d.model;
-      document.getElementById('predModelVersion').textContent = m.version || '—';
       document.getElementById('predModelR2').textContent = m.r2 != null ? m.r2 : '—';
       document.getElementById('predModelMae').textContent = m.mae != null ? m.mae : '—';
       document.getElementById('modelUnavailable').hidden = m.available;

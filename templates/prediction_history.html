@@ -57,10 +57,8 @@
     <button type="button" data-print class="btn btn-outline-navy no-print"><i class="fa-solid fa-print me-1"></i> Print</button>
   </div>
   <p class="diag-note no-print">
-    Every prediction is a <strong>fuel request</strong>: staff select the vehicle and enter the trip distance, the model gives the predicted fuel, and
-    {{ 'you approve or reject it using that figure as the reference.' if is_admin else 'an administrator approves or rejects it using that figure as the reference.' }}
-    After the trip, record the actual fuel used; it is flagged <span class="text-danger fw-semibold">outside the predicted range</span>
-    when it differs from the prediction by more than the model's typical error (RMSE ±<span id="histTol">{{ summary.tolerance }}</span> L).
+    Actual fuel more than ±<span id="histTol">{{ summary.tolerance }}</span> L (RMSE) from the prediction is shown in
+    <span class="text-danger fw-semibold">red</span>.
   </p>
 
   <div class="table-wrap">

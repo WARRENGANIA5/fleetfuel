@@ -6,8 +6,7 @@
 {% if not metrics %}
 <div class="alert alert-warning">
   <i class="fa-solid fa-triangle-exclamation me-1"></i>
-  <span id="noModelText">No trained model yet. The system trains it automatically from the trip records with actual
-  fuel consumption; this page opens the results by itself as soon as training finishes.</span>
+  <span id="noModelText">No trained model yet. The results appear here once training finishes.</span>
 </div>
 {% else %}
 
@@ -30,11 +29,10 @@
   <div class="section-title"><i class="fa-solid fa-circle-info text-primary"></i> Training Details</div>
   <p class="text-muted mb-3" style="font-size:12.5px;">
     <span class="live-badge" id="mpLive"><span class="live-dot"></span><span id="mpLiveText">Live</span></span>
-    Retrains automatically when trip records or vehicles change. Includes
-    <strong id="mpSystem">{{ metrics.system_records|default(0) }}</strong> trip records from the system<span id="mpCleanNote"></span>.
+    <span id="mpSources"></span>
   </p>
   <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
-    <span class="text-muted">Train in Google Colab (<code>colab/fuel_consumption_linear_regression.ipynb</code>) with the same data:</span>
+    <span class="text-muted">Data for Google Colab:</span>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
       <i class="fa-solid fa-download me-1"></i> trip_records.csv</a>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='vehicle_records') }}">
@@ -45,19 +43,13 @@
   <div class="row g-2">
     <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Set Size</div><div class="value"><span id="mpTrain">{{ metrics.train_size }}</span> records</div></div></div>
     <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Testing Set Size</div><div class="value"><span id="mpTest">{{ metrics.test_size }}</span> records</div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Cross-Validation Folds</div><div class="value"><span class="mpFolds">{{ metrics.cv_folds }}</span></div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">CV Std. Deviation</div><div class="value">±<span id="mpCvStd">{{ metrics.cv_std_r2 }}</span></div></div></div>
+    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Total Records</div><div class="value"><span id="mpTotal">{{ metrics.total_records }}</span></div></div></div>
     <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Date</div><div class="value"><span id="mpTrained">{{ metrics.trained_at_display }}</span></div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Model Version</div><div class="value"><span id="mpVersion">{{ metrics.model_version }}</span></div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Total Dataset Records</div><div class="value"><span id="mpTotal">{{ metrics.total_records }}</span></div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Model Status</div><div class="value"><span class="badge-status badge-active" id="mpStatus">{{ metrics.status|capitalize }}</span></div></div></div>
   </div>
 </div>
 
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-layer-group text-primary"></i> <span>Train-Test Split vs <span class="mpFolds">{{ metrics.cv_folds }}</span>-Fold Cross-Validation</span></div>
-  <p class="diag-note">The same three measures on the held-back test set and averaged over every fold of the
-    cross-validation; close values mean the accuracy carries over to other partitions of the data.</p>
   <div class="table-wrap"><table class="table-fleet diag-table">
     <thead><tr><th>Measure</th><th>Test Set</th><th>CV Mean</th><th>CV Std. Deviation</th></tr></thead>
     <tbody>
@@ -76,17 +68,10 @@
   <div class="col-12">
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-square-root-variable text-primary"></i> Regression Equation and Multicollinearity (VIF)</div>
-      <p class="diag-note">ŷ = β<sub>0</sub> + β<sub>1</sub>(Distance) + β<sub>2</sub>(Engine Power) + β<sub>3</sub>(Fuel Type) + β<sub>4</sub>(Distance × Engine Power),
-        with fuel type encoded 1 = Gasoline, 0 = Diesel. Distance and engine power are mean-centered before the interaction term
-        is formed, which removes the collinearity between the interaction and the predictors it is built from without changing any prediction.</p>
-      <div class="diag-note mb-1">Fitted (centered):</div>
-      <div class="equation-box mb-2" id="equationText" style="font-family:monospace;font-size:13px;overflow-x:auto;white-space:nowrap;">—</div>
-      <div class="diag-note mb-1">The same equation in the original units:</div>
       <div class="equation-box mb-2" id="equationRaw" style="font-family:monospace;font-size:13px;overflow-x:auto;white-space:nowrap;">—</div>
-      <p class="diag-note">A Variance Inflation Factor above <strong id="vifThreshold">5</strong> indicates high collinearity.</p>
-      <p class="diag-note" id="mergeNote"></p>
+      <p class="diag-note">Fuel Type: 1 = Gasoline, 0 = Diesel. VIF above <strong id="vifThreshold">5</strong> = high collinearity.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
-        <thead><tr><th>Term</th><th>Coefficient</th><th>r with Fuel</th><th>VIF</th><th>Collinearity</th></tr></thead>
+        <thead><tr><th>Term</th><th>Coefficient</th><th>VIF</th><th>Collinearity</th></tr></thead>
         <tbody id="vifBody"></tbody>
       </table></div>
     </div>
@@ -94,24 +79,12 @@
   <div class="col-12">
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Regression Assumption Checks</div>
-      <p class="diag-note">LINE conditions tested on the training residuals (statsmodels, α = <span id="diagAlpha">0.05</span>);
-        Durbin-Watson on the residuals of the local trips arranged by date of travel.</p>
+      <p class="diag-note">α = <span id="diagAlpha">0.05</span>. Durbin-Watson uses the local trips by date of travel.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Assumption</th><th>Test</th><th>Statistic</th><th>p-value</th><th>Rule</th><th>Result</th></tr></thead>
         <tbody id="diagBody"></tbody>
       </table></div>
       <p class="diag-note mb-0" id="diagSummary"></p>
-    </div>
-  </div>
-  <div class="col-12">
-    <div class="card-surface">
-      <div class="section-title"><i class="fa-solid fa-list-ol text-primary"></i> Regression Coefficients (significance)</div>
-      <p class="diag-note">Change in fuel consumed (L) per one-unit change in a term, holding the others constant. OLS fit of the same (centered) equation on the training set (R² <span id="olsR2">—</span>, adjusted R² <span id="olsAdjR2">—</span>).
-        Standard errors and p-values are heteroskedasticity-robust (HC3), so they stay valid although the equal-variance condition is not met.</p>
-      <div class="table-wrap"><table class="table-fleet diag-table">
-        <thead><tr><th>Term</th><th>Coefficient</th><th>Std. Error</th><th>p-value</th><th>Significant (p &lt; 0.05)</th></tr></thead>
-        <tbody id="coefBody"></tbody>
-      </table></div>
     </div>
   </div>
 </div>
@@ -133,7 +106,6 @@
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-chart-column text-primary"></i> Histogram of Residuals</div>
       <canvas id="distChart" height="240"></canvas>
-      <div class="dist-stats" id="distStats"></div>
     </div>
   </div>
   <div class="col-md-6">
@@ -143,7 +115,6 @@
       <div class="corr-legend">
         <span>−1 Negative</span><div class="corr-legend-bar"></div><span>+1 Positive</span>
       </div>
-      <div class="corr-insights" id="corrInsights"></div>
     </div>
   </div>
 </div>
@@ -219,36 +190,6 @@ function renderHeatmap(c) {
         }).join('') + '</tr>';
     }).join('') + '</tbody></table>';
 
-  const ins = document.getElementById('corrInsights');
-  if (ins && ti >= 0) {
-    const ranked = labels.map(function (l, j) { return { l: l, v: matrix[ti][j] }; })
-      .filter(function (x) { return x.l !== TARGET; })
-      .sort(function (a, b) { return Math.abs(b.v) - Math.abs(a.v); });
-    ins.innerHTML = '<div class="corr-insights-title">What affects fuel use the most</div>' +
-      ranked.slice(0, 4).map(function (x) {
-        return '<div class="corr-insight-row"><span class="legend-dot" style="background:' + corrColor(x.v) + '"></span>' +
-          '<span class="legend-label">' + escapeHtml(featureName(x.l)) + '</span>' +
-          '<span class="corr-insight-strength">' + strength(x.v) + '</span>' +
-          '<span class="legend-value">' + x.v.toFixed(2) + '</span></div>';
-      }).join('');
-  }
-}
-
-function renderDistSummary(c) {
-  const st = c.resid_stats;
-  if (!st) return;
-  const box = document.getElementById('distStats');
-  if (box) {
-    const tile = function (label, value) {
-      return '<div class="dist-stat"><div class="dist-stat-value">' + value + '</div><div class="dist-stat-label">' + label + '</div></div>';
-    };
-    box.innerHTML =
-      tile('Mean Residual', signed(st.mean) + ' L') +
-      tile('Std. Deviation', '±' + st.std + ' L') +
-      tile('Lowest – Highest', signed(st.min) + ' – ' + signed(st.max) + ' L') +
-      tile('Within ±1 L', st.within_1 + '%') +
-      tile('Test Trips', st.records);
-  }
 }
 
 function drawCharts(c) {
@@ -324,7 +265,6 @@ function drawCharts(c) {
     distChart.data.datasets[1].data = c.resid_counts;
     distChart.update();
   }
-  renderDistSummary(c);
   renderHeatmap(c);
 }
 
@@ -339,42 +279,27 @@ function renderDiagnostics(m) {
   if (vifBody && terms.length) {
     const threshold = m.vif_threshold != null ? m.vif_threshold : 5;
     document.getElementById('vifThreshold').textContent = threshold;
-    const coef = m.coefficients || {}, vif = m.vif || {}, corr = m.correlations || {};
-    // ŷ = b0 + b1(Distance) + ... with the fitted values, centered and in the original units.
-    const c = m.centering || {};
-    const D = c.distance_km != null ? '(D − ' + c.distance_km + ')' : 'D';
-    const P = c.engine_power_kw != null ? '(P − ' + c.engine_power_kw + ')' : 'P';
+    const coef = m.raw_coefficients || m.coefficients || {}, vif = m.vif || {};
+    // ŷ = b0 + b1(Distance) + ... with the fitted values in the original units.
     const equation = function (b0, b, symbols) {
       return 'ŷ = ' + num(b0) + terms.map(function (t) {
         const v = Number(b[t] || 0);
         return (v < 0 ? ' − ' : ' + ') + num(Math.abs(v)) + symbols[t];
       }).join('');
     };
-    document.getElementById('equationText').textContent = equation(m.intercept, coef,
-      { distance_km: D, engine_power_kw: P, fuel_type_code: '(FuelType)', distance_x_power: D + P });
     document.getElementById('equationRaw').textContent = m.raw_coefficients
       ? equation(m.raw_intercept, m.raw_coefficients, { distance_km: '(Distance)', engine_power_kw: '(Power)', fuel_type_code: '(FuelType)', distance_x_power: '(Distance × Power)' })
       : '—';
-    vifBody.innerHTML = '<tr><td>Intercept (β<sub>0</sub>)</td><td>' + num(m.intercept) + '</td><td>—</td><td>—</td><td>—</td></tr>' +
+    vifBody.innerHTML = '<tr><td>Intercept (β<sub>0</sub>)</td><td>' + num(m.raw_intercept != null ? m.raw_intercept : m.intercept) + '</td><td>—</td><td>—</td></tr>' +
       terms.map(function (t, i) {
         const v = vif[t];
         const level = v == null ? '<span class="text-muted">Same value in every record</span>'
           : badge(v <= threshold, 'Low', 'High (VIF &gt; ' + threshold + ')');
         return '<tr><td>' + escapeHtml(name(t)) + ' (β<sub>' + (i + 1) + '</sub>)</td><td>' + num(coef[t]) + '</td><td>' +
-          (corr[t] == null ? '—' : Number(corr[t]).toFixed(3)) + '</td><td>' + fmtVif(v) + '</td><td>' + level + '</td></tr>';
+          fmtVif(v) + '</td><td>' + level + '</td></tr>';
       }).join('');
   } else if (vifBody) {
-    vifBody.innerHTML = '<tr><td colspan="5" class="text-muted">The equation and VIF are computed at the next automatic retrain.</td></tr>';
-  }
-  const mergeNote = document.getElementById('mergeNote');
-  if (mergeNote) {
-    const src = m.data_sources || {};
-    const sourceName = { system: 'trip records from the system', historical: 'historical dataset records',
-                         supplementary: 'supplementary dataset records' };
-    const parts = Object.keys(src).map(function (k) { return src[k] + ' ' + (sourceName[k] || k + ' records'); });
-    let text = parts.length ? 'Training data: ' + parts.join(', ') + ' (after cleaning). ' : '';
-    text += 'Local trips are merged with the vehicle records by plate number; the supplementary dataset has the same variables.';
-    mergeNote.textContent = text;
+    vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Computed at the next automatic retrain.</td></tr>';
   }
   const d = m.diagnostics;
   const diagBody = document.getElementById('diagBody');
@@ -386,14 +311,7 @@ function renderDiagnostics(m) {
         badge(t.passed, 'Met', 'Not met') + '</td></tr>';
     }).join('');
     const met = d.tests.filter(function (t) { return t.passed; }).length;
-    document.getElementById('diagSummary').textContent = met + ' of ' + d.tests.length + ' assumptions met. ' +
-      (met < d.tests.length ? 'Unmet conditions are a known limitation of a straight-line model (see Scope and Limitations); report them with the results.' : '');
-    document.getElementById('olsR2').textContent = d.ols_r2;
-    document.getElementById('olsAdjR2').textContent = d.ols_adj_r2;
-    document.getElementById('coefBody').innerHTML = d.coefficients.map(function (c) {
-      return '<tr><td>' + escapeHtml(c.feature === 'Intercept' ? 'Intercept' : name(c.feature)) + '</td><td>' + num(c.coef) + '</td><td>' + num(c.std_err) +
-        '</td><td>' + (c.p_value == null ? '—' : (c.p_value < 0.0001 ? '&lt;0.0001' : c.p_value)) + '</td><td>' + badge(c.significant, 'Yes', 'No') + '</td></tr>';
-    }).join('');
+    document.getElementById('diagSummary').textContent = met + ' of ' + d.tests.length + ' assumptions met.';
   } else if (diagBody) {
     diagBody.innerHTML = '<tr><td colspan="6" class="text-muted">Assumption checks run at the next automatic retrain.</td></tr>';
   }
@@ -409,18 +327,11 @@ function refreshModelPerformance() {
       const setText = function (id, v) { const el = document.getElementById(id); if (el && v !== undefined) el.textContent = v; };
       if (m) {
         setText('mpR2', m.r2_score); setText('mpMae', m.mae + ' L'); setText('mpRmse', m.rmse + ' L');
-        setText('mpCv', m.cv_mean_r2); setText('mpTrained', m.trained_at_display); setText('mpVersion', m.model_version);
-        setText('mpTrain', m.train_size); setText('mpTest', m.test_size); setText('mpCvStd', m.cv_std_r2);
-        setText('mpTotal', m.total_records); setText('mpSystem', m.system_records || 0);
-        // Explain why fewer records were trained on than were entered (invalid rows / outliers removed).
-        const used = (m.data_sources || {}).system;
-        const setAside = (m.system_records || 0) - (used || 0);
-        setText('mpCleanNote', used != null && setAside > 0
-          ? ' (' + used + ' used; ' + setAside + ' set aside as outliers or incomplete during cleaning)' : '');
-        if (m.status) {
-          setText('mpStatus', m.status.charAt(0).toUpperCase() + m.status.slice(1));
-          document.getElementById('mpStatus').className = 'badge-status ' + (m.status === 'active' ? 'badge-active' : 'badge-maintenance');
-        }
+        setText('mpCv', m.cv_mean_r2); setText('mpTrained', m.trained_at_display);
+        setText('mpTrain', m.train_size); setText('mpTest', m.test_size);
+        setText('mpTotal', m.total_records);
+        const src = m.data_sources || {};
+        setText('mpSources', 'Training data: ' + (src.system || 0) + ' local trips + ' + (src.supplementary || 0) + ' supplementary records (after cleaning).');
         document.querySelectorAll('.mpFolds').forEach(function (el) { el.textContent = m.cv_folds; });
         const liters = function (v, sign) { return v == null ? '—' : (sign ? '±' : '') + v + ' L'; };
         setText('cvTestR2', m.r2_score); setText('cvMeanR2', m.cv_mean_r2); setText('cvStdR2', m.cv_std_r2);
