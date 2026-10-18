@@ -917,7 +917,6 @@ def back_to_list(endpoint):
 
 def prediction_history_data(args):
     q = (args.get("q") or "").strip()
-    fuel_type = args.get("fuel_type", "")
     status = args.get("status", "")
     try:
         page = max(int(args.get("page") or 1), 1)
@@ -947,8 +946,6 @@ def prediction_history_data(args):
                 else ["Vehicle deleted"]
             if not any(needle in part.lower() for part in label):
                 return False
-        if fuel_type in FUEL_TYPES and p["fuel_type"] != fuel_type:
-            return False
         if status in ("pending", "approved", "rejected") and p["approval_status"] != status:
             return False
         return not mine or p["user_id"] == session.get("user_id")
@@ -958,8 +955,6 @@ def prediction_history_data(args):
 
     errors_l = [abs(float(p["predicted_fuel"]) - float(p["actual_fuel"])) for p in matching if p["actual_fuel"] is not None]
     stats = {"total": len(matching), "with_actual": len(errors_l),
-             "mae": sum(errors_l) / len(errors_l) if errors_l else None,
-             "within2": sum(e <= 2 for e in errors_l) / len(errors_l) if errors_l else None,
              "pending": sum(p["approval_status"] == "pending" for p in matching),
              "outside": sum(e > tolerance for e in errors_l)}
     total = int(stats["total"] or 0)
@@ -1000,14 +995,12 @@ def prediction_history_data(args):
     with_actual = int(stats["with_actual"] or 0)
     summary = {
         "total": total, "with_actual": with_actual,
-        "mae": f"{float(stats['mae']):.2f}" if stats["mae"] is not None else "—",
-        "within2": f"{float(stats['within2']) * 100:.0f}%" if stats["within2"] is not None else "—",
         "pending": int(stats["pending"] or 0),
         "outside": int(stats["outside"] or 0),
         "tolerance": f"{tolerance:.2f}",
     }
     return {"predictions": records, "page": page, "total_pages": total_pages, "summary": summary,
-            "q": q, "fuel_type": fuel_type if fuel_type in FUEL_TYPES else "",
+            "q": q,
             "status": status if status in ("pending", "approved", "rejected") else "",
             "is_admin": session.get("role") == "admin", "mine": mine}
 

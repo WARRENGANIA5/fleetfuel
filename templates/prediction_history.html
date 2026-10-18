@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row g-3 mb-3">
-{% set tile_col = "col-6 col-md-4 col-xl-2" if is_admin else "col-6 col-md-3" %}
+{% set tile_col = "col-6 col-md-3" %}
   <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histTotal">{{ summary.total }}</div><div class="metric-label">Fuel Requests</div></div>
   </div>
@@ -17,14 +17,6 @@
   <div class="{{ tile_col }}">
     <div class="metric-tile card-surface"><div class="metric-value" id="histOutside">{{ summary.outside }}</div><div class="metric-label">Outside Predicted Range</div></div>
   </div>
-  {% if is_admin %}{# model accuracy figures: the administrator's Model Performance view #}
-  <div class="{{ tile_col }}">
-    <div class="metric-tile card-surface"><div class="metric-value"><span id="histMae">{{ summary.mae }}</span> L</div><div class="metric-label">Average Error</div></div>
-  </div>
-  <div class="{{ tile_col }}">
-    <div class="metric-tile card-surface"><div class="metric-value" id="histWithin2">{{ summary.within2 }}</div><div class="metric-label">Within ±2 L</div></div>
-  </div>
-  {% endif %}
 </div>
 
 <div class="card-surface">
@@ -46,11 +38,6 @@
         <option value="1" {{ 'selected' if mine }}>My requests</option>
       </select>
       {% endif %}
-      <select name="fuel_type" class="form-select" onchange="this.form.submit()">
-        <option value="">All Fuel Types</option>
-        <option value="Diesel" {{ 'selected' if fuel_type=='Diesel' }}>Diesel</option>
-        <option value="Gasoline" {{ 'selected' if fuel_type=='Gasoline' }}>Gasoline</option>
-      </select>
       <button class="btn btn-outline-navy" type="submit"><i class="fa-solid fa-filter"></i> Filter</button>
       <span class="live-badge no-print" id="histLive"><span class="live-dot"></span><span id="histLiveText">Live</span></span>
     </form>
@@ -144,7 +131,7 @@
             </div>
             <label class="form-label">Fuel to release if approved (L)</label>
             <input type="number" step="0.01" min="0.01" max="1000" class="form-control mb-1" name="approved_fuel" id="approvedFuelInput">
-            <div class="form-text mb-3">Starts at the predicted figure; adjust if needed. The predicted range is the reference.</div>
+            <div class="form-text mb-3">Starts at the predicted fuel.</div>
             <label class="form-label">Note (optional)</label>
             <input class="form-control" name="review_note" maxlength="255" placeholder="e.g. Approved as requested">
           </div>
@@ -217,7 +204,7 @@ function renderRows(list) {
 function renderSummary(s) {
   const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
   set('histTotal', s.total); set('histPending', s.pending); set('histWithActual', s.with_actual);
-  set('histOutside', s.outside); set('histMae', s.mae); set('histWithin2', s.within2); set('histTol', s.tolerance);
+  set('histOutside', s.outside); set('histTol', s.tolerance);
 }
 
 // Review: the fuel to release starts at the predicted figure (or the value already approved).
