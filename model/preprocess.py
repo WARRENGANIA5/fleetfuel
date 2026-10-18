@@ -144,12 +144,9 @@ def clean_data(df):
     df = df[(df["distance_km"] > 0) & (df["engine_power_kw"] > 0) & (df[TARGET_COLUMN] > 0)]
 
     # IQR = Q3 - Q1; lower bound = Q1 - 1.5(IQR); upper bound = Q3 + 1.5(IQR).
-    # The spread never counts as less than 25% of the group's median: a group
-    # whose records all share one value (e.g. fuel written down as distance / 10)
-    # would otherwise have an IQR of 0 and reject every real trip added later.
     def within_iqr(per_100km):
         q1, q3 = per_100km.quantile(0.25), per_100km.quantile(0.75)
-        iqr = max(q3 - q1, 0.25 * per_100km.median())
+        iqr = q3 - q1
         return per_100km.between(q1 - 1.5 * iqr, q3 + 1.5 * iqr)
 
     per_100km = df[TARGET_COLUMN] / df["distance_km"] * 100

@@ -37,6 +37,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HISTORICAL_PATH = os.path.join(BASE_DIR, "data", "historical_fleet_data.csv")
 SUPPLEMENTARY_PATH = os.path.join(BASE_DIR, "data", "supplementary_data.csv")
 MODEL_PATH = os.path.join(BASE_DIR, "model", "linear_regression_pipeline.joblib")
+# The cleaned and merged dataset the model is trained on (Pandas output, Chapter III).
+CLEANED_PATH = os.path.join(BASE_DIR, "data", "cleaned_merged_dataset.csv")
 METRICS_PATH = os.path.join(BASE_DIR, "model", "metrics.json")
 
 CV_FOLDS = 5
@@ -63,6 +65,9 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     log("[2/6] Removing records with missing values or zero distance, and IQR outliers per engine power...")
     df = clean_data(df)
     log(f"      Usable records after cleaning: {len(df)}")
+    df.to_csv(CLEANED_PATH + ".tmp", index=False)
+    _replace_with_retry(CLEANED_PATH + ".tmp", CLEANED_PATH)
+    log(f"      Cleaned and merged dataset saved to {CLEANED_PATH}")
 
     X = df[FEATURE_COLUMNS]
     y = df[TARGET_COLUMN]
