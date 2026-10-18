@@ -980,3 +980,6 @@ a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-off
 .model-summary-link { cursor: pointer; border-radius: 8px; margin: -6px; padding: 6px; transition: background 0.15s ease; }
 .model-summary-link:hover { background: rgba(255,255,255,0.05); }
 .model-summary-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+
+/* Error message under a password box that has the show/hide eye */
+.was-validated .password-field-wrap:has(.form-control:invalid) ~ .invalid-feedback { display: block; }

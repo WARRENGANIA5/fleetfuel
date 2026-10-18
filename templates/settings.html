@@ -31,8 +31,7 @@
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-lock text-primary"></i> Change Password</div>
       {% if user.username == admin_account %}
-      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> This is the fixed administrator account.
-        Its username and password cannot be changed in the system.</p>
+      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> The administrator password is fixed.</p>
       {% else %}
       <form method="POST" action="{{ url_for('change_password') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -49,7 +48,8 @@
             <input type="password" class="form-control" id="new_password" name="new_password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" required>
             <i class="fa-regular fa-eye password-toggle" data-target="new_password"></i>
           </div>
-          <div class="form-text">8–128 characters, with at least one letter and one number. Must differ from your current password.</div>
+          <div class="form-text">8–128 characters, with at least one letter and one number.</div>
+          <div class="invalid-feedback" id="newPwFeedback">Use 8–128 characters with a letter and a number.</div>
         </div>
         <div class="mb-3">
           <label class="form-label">Confirm New Password</label>
@@ -57,6 +57,7 @@
             <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" required>
             <i class="fa-regular fa-eye password-toggle" data-target="confirm_password"></i>
           </div>
+          <div class="invalid-feedback">Passwords do not match.</div>
         </div>
         <button type="submit" class="btn btn-navy"><i class="fa-solid fa-key me-1"></i> Update Password</button>
       </form>
@@ -65,4 +66,24 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Check the new password in the browser before it is sent (the server checks again).
+(function () {
+  const cur = document.getElementById('current_password'), pw = document.getElementById('new_password'),
+        confirm = document.getElementById('confirm_password'), feedback = document.getElementById('newPwFeedback');
+  if (!pw) return;
+  function check() {
+    const same = pw.value && pw.value === cur.value;
+    pw.setCustomValidity(same ? 'same' : '');
+    feedback.textContent = same ? 'The new password must be different from the current one.'
+                                : 'Use 8–128 characters with a letter and a number.';
+    confirm.setCustomValidity(confirm.value && confirm.value !== pw.value ? 'mismatch' : '');
+  }
+  [cur, pw, confirm].forEach(function (el) { el.addEventListener('input', check); });
+  pw.form.addEventListener('submit', check, true);
+})();
+</script>
 {% endblock %}
