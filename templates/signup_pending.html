@@ -16,12 +16,11 @@
   <div class="login-card text-center">
     <div class="login-logo"><img src="{{ url_for('static', filename='images/logo.svg', v=4) }}" alt="{{ org.system_short }} logo"></div>
     <div class="login-title">Waiting for approval</div>
-    <div class="login-sub">Fuel Consumption Prediction System<br>{{ org.org_name }} &middot; {{ org.office_name }}</div>
+    <div class="login-sub">Fuel Consumption Prediction System</div>
 
     <div class="pending-spinner" aria-hidden="true"><i class="fa-solid fa-hourglass-half"></i></div>
     <p class="mb-1">Hello, <strong>{{ user.full_name }}</strong> ({{ user.username }}).</p>
-    <p class="text-muted small mb-3">Your account was sent to the administrator of the {{ org.office_name }}.
-      Keep this page open: you are signed in <strong>automatically</strong> as soon as it is approved.</p>
+    <p class="text-muted small mb-3">Keep this page open. You'll be signed in automatically once your account is approved.</p>
     <div class="pending-status" id="pendingStatus" aria-live="polite">
       <span class="pending-dot"></span> Checking for approval&hellip; <span id="pendingChecked"></span>
     </div>
