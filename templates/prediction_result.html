@@ -69,7 +69,7 @@
         <div class="col-6"><div class="summary-item"><div class="label">Fuel Type</div><div class="value">{{ pred.fuel_type or '—' }}</div></div></div>
         <div class="col-6"><div class="summary-item"><div class="label">Prediction Date</div><div class="value">{{ pred.created_at.strftime('%B %d, %Y %I:%M %p') }}</div></div></div>
       </div>
-      <p class="text-muted small mt-3 mb-0">Compare this figure with the fuel request before approval.</p>
+      {% if is_admin %}<p class="text-muted small mt-3 mb-0">Compare this figure with the fuel request before approval.</p>{% endif %}
     </div>
   </div>
 </div>

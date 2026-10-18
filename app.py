@@ -753,10 +753,12 @@ def validate_prediction_form(form):
         return ["Distance traveled must be greater than 0 and at most 1,000 km."], vehicle
     errors = []
     if vehicle["engine_power_kw"] is None or float(vehicle["engine_power_kw"]) <= 0:
-        errors.append(f"{vehicle['plate_number']} has no engine power (kW) in its vehicle record yet. "
-                      "Please add it in Vehicle Management first.")
+        errors.append(f"{vehicle['plate_number']} has no engine power (kW) in its vehicle record yet. " +
+                      ("Please add it in Vehicle Management first." if session.get("role") == "admin"
+                       else "Please ask the administrator to add it."))
     if vehicle["fuel_type"] not in FUEL_TYPES:
-        errors.append(f"{vehicle['plate_number']} has no valid fuel type in its vehicle record.")
+        errors.append(f"{vehicle['plate_number']} has no valid fuel type in its vehicle record." +
+                      ("" if session.get("role") == "admin" else " Please ask the administrator to correct it."))
     return errors, vehicle
 
 
