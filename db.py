@@ -5,9 +5,9 @@ Collections (one document per record):
     users, vehicles, trip_records, predictions, notification_dismissals
 
 Records keep whole-number IDs (1, 2, 3 ...), like the record numbers the pages
-and links use; the next ID of each collection is kept in the `_counters`
-collection and taken inside a Firestore transaction, so two users saving at
-the same moment never get the same number.
+and links use. A new record takes the next number above the highest one in use
+and is saved with Firestore's create(), which refuses a number that is already
+taken (two users saving at the same moment), so the next one is tried.
 
 Real-time sync: while the server runs, a Firestore snapshot listener per
 collection keeps an up-to-date copy of the records in memory. Pages read that
@@ -152,9 +152,6 @@ class FirestoreBackend:
                 new += 1
         raise DatabaseUnavailable(f"No free record number found in {coll}.")
 
-    def set_counter(self, coll, last):
-        self.client.collection(COUNTERS).document(coll).set({"last": int(last)})
-
     def bump(self):
         self.client.collection(COUNTERS).document(CHANGES).set({"n": self._firestore.Increment(1)}, merge=True)
 
@@ -176,7 +173,6 @@ class MemoryBackend:
 
     def __init__(self, config=None):
         self.data = {c: {} for c in COLLECTIONS}
-        self.counters = {}
         self.changes = 0
         self.lock = threading.Lock()
 
@@ -207,8 +203,6 @@ class MemoryBackend:
             table[new] = copy.deepcopy(data)
             return new
 
-    def set_counter(self, coll, last):
-        self.counters[coll] = int(last)
 
     def watch(self, coll, on_change):
         return None
@@ -431,18 +425,6 @@ def _changed(store):
         store.backend.bump()
     except Exception:
         pass  # the record itself is saved; other servers notice at their next change
-
-
-def reset_counter(coll):
-    """After a delete, the next ID continues from the highest ID still in use,
-    so deleting the newest record leaves no gap."""
-    store = _store()
-    with store.lock:
-        highest = max((k for k in store.table(coll) if isinstance(k, int)), default=0)
-    try:
-        store.backend.set_counter(coll, highest)
-    except Exception as e:
-        raise DatabaseUnavailable(str(e)) from e
 
 
 def warm_up():

@@ -115,16 +115,6 @@ def password_signature(password_hash):
     return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
 
 
-def compact_ids(*collections):
-    """After a delete, the next ID continues from the highest ID still in use,
-    so deleting the newest record doesn't leave a gap and IDs keep counting up from 1."""
-    for coll in collections:
-        try:
-            db.reset_counter(coll)
-        except Exception:
-            app.logger.exception("Could not reset the ID counter of %s", coll)
-
-
 def session_ended(reason):
     """Answer for a page's background request after its session ended (logged
     out, deactivated, password changed): script.js sees the header and opens
@@ -1085,7 +1075,6 @@ def delete_prediction(prediction_id):
         flash("That prediction no longer exists.", "danger")
         return back_to_list("prediction_history")
     db.delete("predictions", prediction_id)
-    compact_ids("predictions")
     flash("Prediction record deleted.", "success")
     return back_to_list("prediction_history")
 
@@ -1256,7 +1245,6 @@ def delete_vehicle(vehicle_id):
         for tid in trip_ids:
             db.delete("trip_records", tid)
         db.delete("vehicles", vehicle_id)
-        compact_ids("vehicles", "trip_records", "predictions")
         flash(f"Vehicle {v['plate_number']} and its trip records were deleted.", "success")
     except Exception:
         app.logger.exception("Deleting vehicle failed")
@@ -1489,7 +1477,6 @@ def delete_trip(trip_id):
             else:
                 db.update("predictions", p["id"], trip_record_id=None)
         db.delete("trip_records", trip_id)
-        compact_ids("trip_records")
         flash("Trip record deleted successfully.", "success")
         _link_actuals_quietly()
     except Exception:
@@ -2053,7 +2040,6 @@ def reject_user(user_id):
     db.delete("users", user_id)
     for d in db.find("notification_dismissals", user_id=user_id):
         db.delete("notification_dismissals", d["id"])
-    compact_ids("users")
     flash(f"Sign-up request from {target['username']} was rejected and removed.", "success")
     return redirect(url_for("users"))
 

@@ -72,8 +72,6 @@ def restore(path):
             for r in rows:
                 doc_id = r.pop("id")
                 db.put(coll, doc_id, {k: _restore_value(v) for k, v in r.items()})
-            if coll != "notification_dismissals":
-                db.reset_counter(coll)
     print(f" * Restored {sum(len(v) for v in data.values())} records from {path}.")
     return 0
 

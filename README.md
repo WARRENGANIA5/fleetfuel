@@ -82,7 +82,7 @@ pip install -r requirements-train.txt
    file in this folder as **`firebase-key.json`**. Keep it secret: it is ignored by git.
 
 Firestore needs no tables. The collections `users`, `vehicles`, `trip_records`, `predictions` and
-`notification_dismissals` appear with their first record; `_counters` keeps the next record number of each.
+`notification_dismissals` appear with their first record; `_counters/_changes` counts the saves (see `db.py`).
 
 ### 4.4 Configure environment variables
 Copy `.env.example` to `.env` and set a long random `SECRET_KEY`. The key file is found automatically
