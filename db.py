@@ -27,6 +27,7 @@ import copy
 import json
 import os
 import threading
+import time
 from datetime import date, datetime
 
 from timeutil import LOCAL_TZ, now_local
@@ -34,6 +35,8 @@ from timeutil import LOCAL_TZ, now_local
 COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification_dismissals")
 COUNTERS = "_counters"
 CHANGES = "_changes"   # document in COUNTERS: how many writes so far (see module doc)
+BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
+RECONNECT_SECONDS = 60
 DATE_FIELDS = {"trip_date"}
 
 # Every field of each record, with its default, so a page never meets a
@@ -134,17 +137,20 @@ class FirestoreBackend:
     def delete(self, coll, doc_id):
         self.client.collection(coll).document(str(doc_id)).delete()
 
-    def next_id(self, coll, at_least):
-        ref = self.client.collection(COUNTERS).document(coll)
-
-        @self._firestore.transactional
-        def take(transaction):
-            snap = ref.get(transaction=transaction)
-            last = (snap.to_dict() or {}).get("last", 0) if snap.exists else 0
-            new = max(int(last), at_least) + 1
-            transaction.set(ref, {"last": new})
-            return new
-        return take(self.client.transaction())
+    def create(self, coll, after, data):
+        """Save a new record under the next free ID above `after` (the highest ID
+        in the copy). Firestore's create() refuses an ID that is taken (another
+        computer saved first), so the next one is tried. Needs no read, so new
+        records can be saved even when the daily read quota is used up."""
+        from google.api_core.exceptions import AlreadyExists, Conflict
+        new = int(after) + 1
+        for _ in range(200):
+            try:
+                self.client.collection(coll).document(str(new)).create(data)
+                return new
+            except (AlreadyExists, Conflict):
+                new += 1
+        raise DatabaseUnavailable(f"No free record number found in {coll}.")
 
     def set_counter(self, coll, last):
         self.client.collection(COUNTERS).document(coll).set({"last": int(last)})
@@ -192,10 +198,13 @@ class MemoryBackend:
     def delete(self, coll, doc_id):
         self.data.setdefault(coll, {}).pop(_key(doc_id), None)
 
-    def next_id(self, coll, at_least):
+    def create(self, coll, after, data):
         with self.lock:
-            new = max(self.counters.get(coll, 0), at_least) + 1
-            self.counters[coll] = new
+            table = self.data.setdefault(coll, {})
+            new = int(after) + 1
+            while new in table:
+                new += 1
+            table[new] = copy.deepcopy(data)
             return new
 
     def set_counter(self, coll, last):
@@ -216,6 +225,8 @@ class Store:
         self.loaded = {}          # coll -> threading.Event
         self.watches = {}
         self.mark = None          # change counter when the copy was last loaded (no listeners)
+        self.offline = None       # backup file the copy came from while Firestore reads are blocked
+        self.last_try = 0.0
         self.lock = threading.RLock()
 
     def _apply(self, coll, kind, doc_id, data):
@@ -261,7 +272,7 @@ _STORE = {"store": None}
 _STORE_LOCK = threading.Lock()
 
 
-def _store():
+def _store(refresh=True):
     if _STORE["store"] is None:
         with _STORE_LOCK:
             if _STORE["store"] is None:
@@ -281,7 +292,7 @@ def _store():
                     live = False
                 _STORE["store"] = Store(backend, live)
     store = _STORE["store"]
-    if not store.live:
+    if refresh and not store.live:
         _refresh_per_request(store)
     return store
 
@@ -357,9 +368,8 @@ def insert(coll, data):
     if coll == "vehicles" and record.get("updated_at") is None:
         record["updated_at"] = record["created_at"]
     try:
-        new_id = store.backend.next_id(coll, highest)
         encoded = _encode(record)
-        store.backend.set(coll, new_id, encoded)
+        new_id = store.backend.create(coll, highest, encoded)
     except DatabaseUnavailable:
         raise
     except Exception as e:
@@ -436,18 +446,94 @@ def reset_counter(coll):
 
 
 def warm_up():
-    """Server start: load every collection and open its real-time listener."""
-    store = _store()
+    """Server start: load every collection and open its real-time listener.
+    If Firestore cannot be read (e.g. the free daily read quota is used up),
+    start from the newest backup in backups/ instead; saving still goes to
+    Firestore, and reconnect() switches back once it can be read again."""
+    store = _store(refresh=False)  # the server keeps its copy current with listeners instead
     if not isinstance(store.backend, MemoryBackend):
         store.live = True
+    try:
+        for coll in COLLECTIONS:
+            store.ensure(coll)
+    except DatabaseUnavailable as e:
+        path = _newest_backup() if store.live else None
+        if not path:
+            raise
+        _load_backup(store, path)
+        raise DatabaseUnavailable(f"{e} -- running from the backup {os.path.basename(path)} until Firestore "
+                                  f"can be read again (new records are still saved to Firestore)") from e
+    _open_listeners(store)
+
+
+def _open_listeners(store):
     for coll in COLLECTIONS:
-        store.ensure(coll)
         if store.live and coll not in store.watches:
             try:
                 store.watches[coll] = store.backend.watch(
                     coll, lambda kind, doc_id, data, coll=coll: store._apply(coll, kind, doc_id, data))
             except Exception:
                 pass
+
+
+def _newest_backup():
+    if not os.path.isdir(BACKUP_DIR):
+        return None
+    files = sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith("firestore_") and f.endswith(".json"))
+    return os.path.join(BACKUP_DIR, files[-1]) if files else None
+
+
+def _from_backup(value):
+    if isinstance(value, dict) and "$datetime" in value:
+        return datetime.fromisoformat(value["$datetime"])
+    if isinstance(value, dict) and "$date" in value:
+        return date.fromisoformat(value["$date"])
+    return value
+
+
+def _load_backup(store, path):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    with store.lock:
+        for coll in COLLECTIONS:
+            store.rows[coll] = {}
+            for r in data.get(coll, []):
+                r = dict(r)
+                doc_id = _key(r.pop("id"))
+                store._apply(coll, "ADDED", doc_id, _encode({k: _from_backup(v) for k, v in r.items()}))
+            store.loaded[coll] = threading.Event()
+            store.loaded[coll].set()
+        store.offline = path
+        store.last_try = time.time()
+
+
+def offline_backup():
+    """The backup file the server is running from, or None when Firestore is read normally."""
+    store = _STORE["store"]
+    return store.offline if store else None
+
+
+def reconnect():
+    """Called by the server's background loop: while running from a backup, try
+    Firestore again (once a minute); when it answers, load the real records and
+    open the listeners. Returns True when it switched back."""
+    store = _STORE["store"]
+    if not store or not store.offline or time.time() - store.last_try < RECONNECT_SECONDS:
+        return False
+    store.last_try = time.time()
+    try:
+        fresh = {coll: store.backend.load(coll) for coll in COLLECTIONS}
+    except Exception:
+        return False
+    with store.lock:
+        for coll, raw in fresh.items():
+            store.rows[coll] = {}
+            for doc_id, data in raw.items():
+                store._apply(coll, "ADDED", doc_id, data)
+        store.offline = None
+    _open_listeners(store)
+    return True
+
 
 
 def init_app(app):

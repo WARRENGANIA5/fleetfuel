@@ -1644,6 +1644,8 @@ def _model_watcher_loop():
         _WATCHER_WAKE.wait(WATCHER_INTERVAL_SECONDS)
         _WATCHER_WAKE.clear()
         try:
+            if db.reconnect():  # was running from a backup while Firestore reads were blocked
+                print(" * Firebase Firestore can be read again (real-time sync on).")
             with app.app_context():
                 _check_and_retrain()
         except Exception:
