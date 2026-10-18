@@ -167,14 +167,50 @@ function initPage() {
 }
 
 // ---- Phone showing the desktop layout ("Desktop site" is on in the browser) ----
-// The pages switch to the phone layout by themselves; a phone browser in
-// desktop mode pretends to be a wide screen, so say how to turn it off.
-document.addEventListener('DOMContentLoaded', function () {
+// A phone browser in desktop mode pretends to be a ~980 px wide screen, so the
+// screen-size rules pick the desktop layout. On a touch phone in that mode,
+// every width rule (ours and Bootstrap's) is re-checked against the phone's
+// real width and the page is scaled to fit, so the phone layout is used
+// anyway. If a stylesheet cannot be read, a one-line hint is shown instead.
+function usePhoneLayoutOnDesktopSite() {
   const touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-  const phone = Math.min(window.screen.width, window.screen.height) <= 600;
+  const realWidth = window.screen.width;
+  if (!touch || Math.min(window.screen.width, window.screen.height) > 600) return;
+  const root = document.documentElement;
+  if (!root.classList.contains('force-phone') && window.innerWidth < 900) return;  // normal phone layout already
+  const fits = function (text) {  // would this width rule apply at the phone's real width?
+    let ok = true;
+    text.replace(/\((min|max)-width:\s*([\d.]+)px\)/g, function (_, kind, px) {
+      if (kind === 'min' && realWidth < +px) ok = false;
+      if (kind === 'max' && realWidth > +px) ok = false;
+    });
+    return ok;
+  };
+  let unreadable = false;
+  const rewrite = function (rules) {
+    Array.prototype.forEach.call(rules, function (rule) {
+      if (rule.media && rule.conditionText !== undefined) {
+        if (rule._originalMedia === undefined) rule._originalMedia = rule.media.mediaText;
+        const text = rule._originalMedia;
+        if (/width/.test(text) && !/print/.test(text)) rule.media.mediaText = fits(text) ? 'all' : 'not all';
+      }
+      if (rule.cssRules) rewrite(rule.cssRules);
+    });
+  };
+  Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+    if (!sheet.href || !/bootstrap|style\.css/.test(sheet.href)) return;
+    try { rewrite(sheet.cssRules); } catch (e) { unreadable = true; }
+  });
+  if (unreadable) return showDesktopSiteHint();
+  root.classList.add('force-phone');
+  const zoom = window.innerWidth / realWidth;
+  root.style.zoom = zoom;
+  root.style.setProperty('--fp-zoom', zoom);  // full-height layouts divide by it (style.css)
+}
+function showDesktopSiteHint() {
   let dismissed = false;
   try { dismissed = sessionStorage.getItem('desktopHintClosed') === '1'; } catch (e) { /* storage blocked */ }
-  if (!touch || !phone || window.innerWidth < 900 || dismissed) return;
+  if (dismissed || document.querySelector('.desktop-site-hint')) return;
   const bar = document.createElement('div');
   bar.className = 'desktop-site-hint';
   bar.setAttribute('role', 'note');
@@ -185,7 +221,9 @@ document.addEventListener('DOMContentLoaded', function () {
     try { sessionStorage.setItem('desktopHintClosed', '1'); } catch (e) { /* storage blocked */ }
   });
   document.body.prepend(bar);
-});
+}
+document.addEventListener('DOMContentLoaded', usePhoneLayoutOnDesktopSite);
+window.addEventListener('orientationchange', function () { setTimeout(usePhoneLayoutOnDesktopSite, 300); });
 
 document.addEventListener('DOMContentLoaded', function () {
   // ---- Loading bar for page changes ----

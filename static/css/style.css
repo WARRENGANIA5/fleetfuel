@@ -994,3 +994,9 @@ a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-off
 }
 .desktop-site-hint i { margin-right: 8px; }
 .desktop-site-hint button { border: 0; background: none; font-size: 40px; line-height: 1; color: inherit; padding: 0 6px; }
+
+/* Phone layout forced on a "Desktop site" phone (script.js scales the page by
+   --fp-zoom), so full-screen heights are divided by the same factor. */
+html.force-phone .app-shell,
+html.force-phone .login-page { min-height: calc(100vh / var(--fp-zoom, 1)); }
+html.force-phone .sidebar { height: calc(100vh / var(--fp-zoom, 1)); bottom: auto; }
