@@ -9,7 +9,7 @@
       <label class="form-label">Vehicle</label>
       <select class="form-select" name="vehicle_id" required>
         <option value="" selected disabled>Select vehicle</option>
-        {% for v in vehicles %}<option value="{{ v.id }}">{{ v.plate_number }} - {{ v.brand_model }}</option>{% endfor %}
+        {% for v in vehicles %}<option value="{{ v.id }}">{{ v.plate_number }} — {{ v.brand_model }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-md-6"><label class="form-label">Date of Travel</label><input type="date" class="form-control" name="trip_date" min="2000-01-01" max="{{ today }}" required></div>
