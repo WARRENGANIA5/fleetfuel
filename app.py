@@ -1804,6 +1804,8 @@ def api_model_status():
         "model_version": metrics.get("model_version"),
         "retraining": _WATCHER["retraining"],
         "last_check": _WATCHER["last_check"],
+        # "backup" while Firestore reads are blocked and the server runs from its newest backup
+        "database": "backup" if db.offline_backup() else "live",
     }
 
 
