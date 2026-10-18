@@ -6,10 +6,6 @@
 <div class="welcome-banner mb-4">
   <div>
     <div class="welcome-title">{{ greeting }}, {{ session.get('full_name') or 'there' }}!</div>
-    <div class="welcome-sub">
-      {% if is_admin %}Here is the fleet's fuel overview. Review pending fuel requests using the predicted fuel as your reference.
-      {% else %}Request fuel for your next trip, then encode the trip ticket after it &mdash; the actual fuel is matched to your request automatically.{% endif %}
-    </div>
   </div>
   <div class="welcome-meta">
     <span class="welcome-role"><i class="fa-solid {{ 'fa-user-shield' if is_admin else 'fa-user' }} me-1"></i>{{ 'Administrator' if is_admin else 'GSO / Motorpool Staff' }}</span>
@@ -118,8 +114,7 @@
            title="Open Model Performance" {{ 'hidden' if not model_summary }}>
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">R&sup2; Score</span><strong id="modelR2">{{ model_summary.r2_score if model_summary }}</strong></div>
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">MAE</span><strong><span id="modelMae">{{ model_summary.mae if model_summary }}</span> L</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
-        <div class="d-flex justify-content-between small"><span class="text-muted">Status</span><span class="badge-status {{ 'badge-active' if model_summary and model_summary.status == 'active' else 'badge-maintenance' }}" id="modelStatusBadge">{{ model_summary.status|capitalize if model_summary }}</span></div>
+        <div class="d-flex justify-content-between small"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
       </div>
       <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>Scores appear here once training finishes.</p>
       {% else %}
@@ -155,7 +150,7 @@
     <table class="table-fleet">
       <thead>
         <tr>
-          <th>Date</th><th>Vehicle</th><th>Distance</th><th>Engine Power</th><th>Fuel Type</th><th>Predicted Fuel</th><th>Request</th>{% if is_admin %}<th>Requested By</th>{% endif %}
+          <th>Date</th><th>Vehicle</th><th>Distance</th><th>Predicted Fuel</th><th>Request</th>{% if is_admin %}<th>Requested By</th>{% endif %}
         </tr>
       </thead>
       <tbody id="recentPredictionsBody">
@@ -164,14 +159,12 @@
           <td><a href="{{ p.url }}">{{ p.created_at_display }}</a></td>
           <td>{{ p.plate_number }}{% if p.vehicle_model %} &middot; {{ p.vehicle_model }}{% endif %}</td>
           <td>{{ p.distance_km }} km</td>
-          <td>{{ p.engine_power_kw }}</td>
-          <td>{{ p.fuel_type }}</td>
           <td><strong>{{ p.predicted_fuel }} L</strong></td>
           <td><span class="badge-status {{ {'approved': 'badge-active', 'rejected': 'badge-inactive'}.get(p.status, 'badge-maintenance') }}">{{ {'approved': 'Approved', 'rejected': 'Rejected'}.get(p.status, 'Pending') }}</span></td>
           {% if is_admin %}<td>{{ p.full_name }}</td>{% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 8 if is_admin else 7 }}" class="text-center text-muted py-4">{{ 'No fuel requests yet.' if is_admin else 'You have not requested fuel yet.' }}</td></tr>
+        <tr><td colspan="{{ 6 if is_admin else 5 }}" class="text-center text-muted py-4">{{ 'No fuel requests yet.' if is_admin else 'You have not requested fuel yet.' }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -313,11 +306,6 @@ function refreshDashboard() {
         setText('modelR2', data.model_summary.r2_score);
         setText('modelMae', data.model_summary.mae);
         setText('modelRmse', data.model_summary.rmse);
-        const badge = document.getElementById('modelStatusBadge');
-        if (badge && data.model_summary.status) {
-          badge.textContent = data.model_summary.status.charAt(0).toUpperCase() + data.model_summary.status.slice(1);
-          badge.className = 'badge-status ' + (data.model_summary.status === 'active' ? 'badge-active' : 'badge-maintenance');
-        }
       }
 
       lastDashboardData = data;
@@ -326,7 +314,7 @@ function refreshDashboard() {
       const body = document.getElementById('recentPredictionsBody');
       if (body && changed('recent', data.recent_predictions)) {
         if (data.recent_predictions.length === 0) {
-          body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 8 : 7) + '" class="text-center text-muted py-4">' +
+          body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 6 : 5) + '" class="text-center text-muted py-4">' +
             (IS_ADMIN ? 'No fuel requests yet.' : 'You have not requested fuel yet.') + '</td></tr>';
         } else {
           const ST = { approved: ['badge-active', 'Approved'], rejected: ['badge-inactive', 'Rejected'] };
@@ -336,8 +324,6 @@ function refreshDashboard() {
               '<td><a href="' + escapeHtml(p.url) + '">' + escapeHtml(p.created_at_display) + '</a></td>' +
               '<td>' + escapeHtml(p.plate_number) + (p.vehicle_model ? ' &middot; ' + escapeHtml(p.vehicle_model) : '') + '</td>' +
               '<td>' + p.distance_km + ' km</td>' +
-              '<td>' + escapeHtml(p.engine_power_kw) + '</td>' +
-              '<td>' + escapeHtml(p.fuel_type) + '</td>' +
               '<td><strong>' + p.predicted_fuel + ' L</strong></td>' +
               '<td><span class="badge-status ' + st[0] + '">' + st[1] + '</span></td>' +
               (IS_ADMIN ? '<td>' + escapeHtml(p.full_name) + '</td>' : '') +

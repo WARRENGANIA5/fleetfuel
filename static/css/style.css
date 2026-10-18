@@ -564,7 +564,6 @@ a { text-decoration: none; color: inherit; }
   background: linear-gradient(120deg, rgba(38, 151, 255, 0.16), rgba(38, 229, 197, 0.08));
 }
 .welcome-title { font-size: 20px; font-weight: 800; color: var(--text-dark); }
-.welcome-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; max-width: 680px; }
 .welcome-meta { display: flex; flex-wrap: wrap; gap: 8px; }
 .welcome-role, .welcome-date {
   font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px;
