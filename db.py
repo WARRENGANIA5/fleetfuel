@@ -15,6 +15,11 @@ copy (instant, and the pages that refresh every few seconds cost no Firestore
 reads); every change, from this server or another one, arrives within a moment.
 Writes go to Firestore first and are applied to the copy right away.
 
+Without listeners (serverless hosting, short scripts) every write also adds 1
+to a change counter (`_counters/_changes`); a request reads that one document
+and loads the records again only when it changed, so the pages that refresh
+every few seconds cost 1 read each instead of reading every record.
+
 Values: dates of travel are stored as "YYYY-MM-DD" text and returned as dates;
 times are stored as Firestore timestamps and returned in Philippine time.
 """
@@ -28,6 +33,7 @@ from timeutil import LOCAL_TZ, now_local
 
 COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification_dismissals")
 COUNTERS = "_counters"
+CHANGES = "_changes"   # document in COUNTERS: how many writes so far (see module doc)
 DATE_FIELDS = {"trip_date"}
 
 # Every field of each record, with its default, so a page never meets a
@@ -143,6 +149,13 @@ class FirestoreBackend:
     def set_counter(self, coll, last):
         self.client.collection(COUNTERS).document(coll).set({"last": int(last)})
 
+    def bump(self):
+        self.client.collection(COUNTERS).document(CHANGES).set({"n": self._firestore.Increment(1)}, merge=True)
+
+    def change_mark(self):
+        snap = self.client.collection(COUNTERS).document(CHANGES).get()
+        return (snap.to_dict() or {}).get("n", 0) if snap.exists else 0
+
     def watch(self, coll, on_change):
         """Snapshot listener: on_change(kind, doc_id, data) for every change."""
         def callback(_docs, changes, _read_time):
@@ -158,7 +171,14 @@ class MemoryBackend:
     def __init__(self, config=None):
         self.data = {c: {} for c in COLLECTIONS}
         self.counters = {}
+        self.changes = 0
         self.lock = threading.Lock()
+
+    def bump(self):
+        self.changes += 1
+
+    def change_mark(self):
+        return self.changes
 
     def load(self, coll):
         return copy.deepcopy(self.data.setdefault(coll, {}))
@@ -195,6 +215,7 @@ class Store:
         self.rows = {}            # coll -> {id: decoded row}
         self.loaded = {}          # coll -> threading.Event
         self.watches = {}
+        self.mark = None          # change counter when the copy was last loaded (no listeners)
         self.lock = threading.RLock()
 
     def _apply(self, coll, kind, doc_id, data):
@@ -266,8 +287,10 @@ def _store():
 
 
 def _refresh_per_request(store):
-    """Without listeners (serverless hosting) read each collection again once
-    per request, so a page never shows data older than the request."""
+    """Without listeners (serverless hosting, short scripts): once per request,
+    read the change counter (1 read) and load the records again only when a
+    write happened since the copy was loaded. (Edits typed straight into the
+    Firebase console, which skip the counter, show after the next app write.)"""
     try:
         from flask import g, has_app_context
         if not has_app_context() or isinstance(store.backend, MemoryBackend):
@@ -275,10 +298,18 @@ def _refresh_per_request(store):
         seen = g.setdefault("_db_fresh", set())
     except RuntimeError:
         return
+    if seen:
+        return
+    seen.add("_checked")
+    try:
+        mark = store.backend.change_mark()
+    except Exception as e:
+        raise DatabaseUnavailable(str(e)) from e
+    if mark == store.mark:
+        return
+    store.mark = mark
     for coll in list(store.loaded):
-        if coll not in seen:
-            seen.add(coll)
-            store.ensure(coll, fresh=True)
+        store.ensure(coll, fresh=True)
 
 
 # ------------------------------------------------------------------
@@ -334,6 +365,7 @@ def insert(coll, data):
     except Exception as e:
         raise DatabaseUnavailable(str(e)) from e
     store._apply(coll, "ADDED", new_id, encoded)
+    _changed(store)
     return new_id
 
 
@@ -349,6 +381,7 @@ def put(coll, doc_id, data):
     except Exception as e:
         raise DatabaseUnavailable(str(e)) from e
     store._apply(coll, "ADDED", _key(doc_id), encoded)
+    _changed(store)
 
 
 def update(coll, doc_id, **fields):
@@ -369,6 +402,7 @@ def update(coll, doc_id, **fields):
         raw = _encode({k: v for k, v in current.items() if k != "id"})
         raw.update(encoded)
         store._apply(coll, "MODIFIED", _key(doc_id), raw)
+    _changed(store)
 
 
 def delete(coll, doc_id):
@@ -378,6 +412,15 @@ def delete(coll, doc_id):
     except Exception as e:
         raise DatabaseUnavailable(str(e)) from e
     store._apply(coll, "REMOVED", _key(doc_id), None)
+    _changed(store)
+
+
+def _changed(store):
+    """Tell servers without listeners that the records changed (1 small write)."""
+    try:
+        store.backend.bump()
+    except Exception:
+        pass  # the record itself is saved; other servers notice at their next change
 
 
 def reset_counter(coll):
