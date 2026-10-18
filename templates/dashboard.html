@@ -3,6 +3,17 @@
 {% block page_title %}{{ 'Fleet Overview Dashboard' if is_admin else 'My Dashboard' }}{% endblock %}
 
 {% block content %}
+{% macro avp_card() %}
+    <div class="card-surface h-100">
+      <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-bullseye text-primary"></i> <span>{{ 'Actual vs Predicted Fuel Consumption' if is_admin else 'My Requests: Actual vs Predicted Fuel' }}</span>
+        <a href="{{ url_for('prediction_history') }}" class="ms-auto small fw-normal">View all</a></div>
+      <div id="avpWrap" {{ 'hidden' if not avp_predicted }} title="Click a point to open that fuel request"><canvas id="avpChart" height="90"></canvas></div>
+      <p class="text-muted small mb-0 mt-2" id="avpMissing" {{ 'hidden' if not avp_missing }}>
+        <span id="avpMissingCount">{{ avp_missing }}</span> without actual fuel yet.</p>
+      <p class="text-muted mb-0" id="avpEmpty" {{ 'hidden' if avp_predicted }}>No fuel requests yet.</p>
+    </div>
+{% endmacro %}
+
 <div class="welcome-banner mb-4">
   <div>
     <div class="welcome-title">{{ greeting }}, {{ session.get('full_name') or 'there' }}!</div>
@@ -91,6 +102,7 @@
 </div>
 
 <div class="row g-3 mb-4">
+  {% if is_admin %}
   <div class="col-lg-8">
     <div class="card-surface h-100">
       <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-chart-area text-primary"></i> <span>Monthly Fuel Consumption Trend</span>
@@ -99,6 +111,10 @@
       <p class="text-muted mb-0" id="fuelTrendEmpty" {{ 'hidden' if fuel_trend_labels }}>No trip records yet. Add trip records to see the consumption trend.</p>
     </div>
   </div>
+  {% else %}
+  <div class="col-lg-8">
+{{ avp_card() }}  </div>
+  {% endif %}
   <div class="col-lg-4">
     <div class="card-surface h-100 d-flex flex-column">
       <div class="section-title"><i class="fa-solid fa-bolt text-primary"></i> Quick Actions</div>
@@ -128,18 +144,12 @@
   </div>
 </div>
 
+{% if is_admin %}
 <div class="row g-3 mb-4">
   <div class="col-12">
-    <div class="card-surface h-100">
-      <div class="section-title d-flex align-items-center gap-2"><i class="fa-solid fa-bullseye text-primary"></i> <span>{{ 'Actual vs Predicted Fuel Consumption' if is_admin else 'My Requests: Actual vs Predicted Fuel' }}</span>
-        <a href="{{ url_for('prediction_history') }}" class="ms-auto small fw-normal">View all</a></div>
-      <div id="avpWrap" {{ 'hidden' if not avp_predicted }} title="Click a point to open that fuel request"><canvas id="avpChart" height="90"></canvas></div>
-      <p class="text-muted small mb-0 mt-2" id="avpMissing" {{ 'hidden' if not avp_missing }}>
-        <span id="avpMissingCount">{{ avp_missing }}</span> without actual fuel yet.</p>
-      <p class="text-muted mb-0" id="avpEmpty" {{ 'hidden' if avp_predicted }}>No fuel requests yet.</p>
-    </div>
-  </div>
+{{ avp_card() }}  </div>
 </div>
+{% endif %}
 
 <div class="card-surface">
   <div class="page-toolbar">
@@ -197,6 +207,7 @@ function changed(key, value) {
 }
 
 function renderFuelTrend(d) {
+  if (!document.getElementById('fuelTrendWrap')) return;  // staff dashboards show no fleet trend
   const has = d.fuel_trend_labels.length > 0;
   show('fuelTrendWrap', has); show('fuelTrendEmpty', !has);
   if (!has || !window.Chart) return;

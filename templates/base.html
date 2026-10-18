@@ -31,9 +31,11 @@
       <a href="{{ url_for('prediction') }}" class="nav-link {{ 'active' if active=='prediction' }}">
         <i class="fa-solid fa-gas-pump"></i><span>Prediction</span>
       </a>
+      {% if is_admin %}
       <a href="{{ url_for('vehicles') }}" class="nav-link {{ 'active' if active=='vehicles' }}">
         <i class="fa-solid fa-truck"></i><span>Vehicles</span>
       </a>
+      {% endif %}
       <a href="{{ url_for('trips') }}" class="nav-link {{ 'active' if active=='trips' }}">
         <i class="fa-solid fa-road"></i><span>Trip Records</span>
       </a>

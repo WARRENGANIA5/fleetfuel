@@ -53,7 +53,7 @@
           <td>{{ t.distance_km }}</td>
           <td>{{ t.actual_fuel_consumption or '—' }}</td>
           <td>
-            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
+            {% if t.can_edit %}<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>{% endif %}
             {% if is_admin %}
             <form method="POST" action="{{ url_for('delete_trip', trip_id=t.id) }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -140,7 +140,7 @@ function tripRow(t) {
   const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km, t.actual_fuel_consumption || '—'];
   tr.innerHTML = cells.map(function (c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') +
     '<td>' +
-      '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
+      (t.can_edit ? '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' : '') +
       (IS_ADMIN ? '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
         '<input type="hidden" name="csrf_token" value="' + escapeHtml(TRIP_CSRF) + '">' +
         '<button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>' +

@@ -1171,13 +1171,13 @@ def render_vehicles_page(reopen=None):
 
 
 @app.route("/vehicles")
-@login_required
+@admin_required
 def vehicles():
     return render_vehicles_page()
 
 
 @app.route("/api/vehicles")
-@login_required
+@admin_required
 def api_vehicles():
     return {"vehicles": [vehicle_record(v, i) for i, v in enumerate(query_vehicles(), 1)]}
 
@@ -1272,6 +1272,8 @@ def trip_record(t, num):
         "trip_date": str(t["trip_date"]), "plate_number": t["plate_number"], "brand_model": t["brand_model"],
         "distance_km": str(t["distance_km"]),
         "actual_fuel_consumption": str(t["actual_fuel_consumption"]) if t["actual_fuel_consumption"] is not None else "",
+        # Staff edit only the trips they encoded; the collected records stay with the administrator.
+        "can_edit": session.get("role") == "admin" or t.get("created_by") == session.get("user_id"),
     }
 
 
@@ -1427,7 +1429,7 @@ def add_trip():
         flash("Could not add trip record: " + " ".join(errors), "danger")
         return render_trips_page({"modal": "addTripModal", "values": request.form.to_dict()})
     try:
-        db.insert("trip_records", _trip_payload(request.form))
+        db.insert("trip_records", dict(_trip_payload(request.form), created_by=session["user_id"]))
         flash("Trip record added successfully.", "success")
         for w in warnings:
             flash(w, "warning")
@@ -1441,8 +1443,12 @@ def add_trip():
 @app.route("/trips/<int:trip_id>/edit", methods=["POST"])
 @login_required
 def edit_trip(trip_id):
-    if not db.get("trip_records", trip_id):
+    trip = db.get("trip_records", trip_id)
+    if not trip:
         flash("That trip record no longer exists.", "danger")
+        return redirect(url_for("trips"))
+    if session.get("role") != "admin" and trip.get("created_by") != session.get("user_id"):
+        flash("You can only edit the trip records you encoded.", "danger")
         return redirect(url_for("trips"))
     _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form, trip_id)

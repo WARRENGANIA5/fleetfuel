@@ -47,7 +47,7 @@ FIELDS = {
     "vehicles": {"plate_number": None, "brand_model": None, "fuel_type": None, "engine_power_kw": None,
                  "created_at": None, "updated_at": None},
     "trip_records": {"vehicle_id": None, "trip_date": None, "distance_km": None,
-                     "actual_fuel_consumption": None, "remarks": None, "created_at": None},
+                     "actual_fuel_consumption": None, "remarks": None, "created_by": None, "created_at": None},
     "predictions": {"user_id": None, "vehicle_id": None, "distance_km": None, "engine_power_kw": None,
                     "fuel_type": None, "predicted_fuel": None, "actual_fuel": None, "trip_record_id": None,
                     "actual_source": None, "created_at": None, "approval_status": "pending",
