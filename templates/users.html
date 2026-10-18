@@ -46,6 +46,8 @@
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button>
             </form>
+            {% elif u.locked %}
+            <span class="text-muted small" title="The administrator account is fixed"><i class="fa-solid fa-lock me-1"></i>Locked</span>
             {% else %}
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#resetPwModal" title="Reset Password"><i class="fa-solid fa-key"></i></button>
@@ -196,6 +198,7 @@ function userRow(u) {
     '<td>' + (u.status === 'pending'
       ? '<form method="POST" action="' + APPROVE_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button></form> ' +
         '<form method="POST" action="' + REJECT_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Reject and remove this sign-up request?\')"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button></form>'
+      : u.locked ? '<span class="text-muted small" title="The administrator account is fixed"><i class="fa-solid fa-lock me-1"></i>Locked</span>'
       : '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
         '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#resetPwModal" title="Reset Password"><i class="fa-solid fa-key"></i></button>') + '</td>';
   return tr;

@@ -257,28 +257,9 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; flex-shrink: 0;
 }
-.user-avatar-img { object-fit: cover; }
 .user-meta { display: flex; flex-direction: column; line-height: 1.2; }
 .user-name { font-size: 13.5px; font-weight: 600; }
 .user-role { font-size: 11.5px; color: var(--text-muted); }
-
-.avatar-edit { position: relative; width: 96px; height: 96px; }
-.avatar-edit .avatar-preview {
-  width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
-  background: var(--blue-100); color: var(--blue-600);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 34px; font-weight: 700; border: 2px solid var(--border-soft);
-}
-.avatar-badge {
-  position: absolute; right: 0; bottom: 0; width: 32px; height: 32px; border-radius: 50%;
-  background: var(--blue-600); color: #fff; border: 2px solid var(--card-bg);
-  display: flex; align-items: center; justify-content: center; font-size: 14px;
-  cursor: pointer; padding: 0;
-}
-.avatar-badge:hover { background: var(--blue-500); }
-.avatar-dropdown { min-width: 170px; }
-.camera-video { width: 100%; max-height: 340px; border-radius: 8px; background: #000; }
-.view-photo-img { max-width: 100%; max-height: 60vh; border-radius: 8px; }
 
 .content-area { padding: 26px 28px 60px; }
 
@@ -645,6 +626,11 @@ a { text-decoration: none; color: inherit; }
 /* Eye icon floats inside the password field itself (no separate box/seam). */
 .password-field-wrap { position: relative; }
 .password-field-wrap .form-control { padding-right: 44px; }
+/* The show/hide eye sits where Bootstrap draws its valid/invalid icon: keep only the eye. */
+.password-field-wrap .form-control.is-valid,
+.password-field-wrap .form-control.is-invalid,
+.was-validated .password-field-wrap .form-control:valid,
+.was-validated .password-field-wrap .form-control:invalid { background-image: none; padding-right: 44px; }
 .password-field-wrap .password-toggle {
   position: absolute;
   top: 50%;
@@ -665,18 +651,27 @@ a { text-decoration: none; color: inherit; }
 }
 .login-footer-note { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 22px; }
 
-.agree-terms-row {
-  text-align: center; font-size: 13px; color: var(--text-muted);
-  position: relative; padding-top: 2px;
-}
-.agree-terms-row .form-check-input {
-  position: static; margin: 0 6px 0 0; vertical-align: -2px;
-}
-.agree-terms-row .form-check-label { display: inline; }
-.agree-terms-row a { color: var(--blue-500); font-weight: 700; text-decoration: none; }
-.agree-terms-row a:hover { text-decoration: underline; }
-.agree-terms-row .invalid-feedback { display: none; text-align: center; }
-.agree-terms-row .form-check-input.is-invalid ~ .invalid-feedback { display: block; }
+/* Sign up: real-time checks while typing */
+.auth-note { font-size: 12.5px; color: var(--text-muted); background: var(--blue-100); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 18px; line-height: 1.5; }
+.field-hint { font-size: 12px; margin-top: 5px; color: var(--text-muted); }
+.field-hint:empty { display: none; }
+.field-hint.ok { color: var(--success); }
+.field-hint.bad { color: var(--danger); }
+.pw-rules { list-style: none; padding: 0; margin: 6px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 11.5px; color: var(--text-muted); }
+.pw-rules li::before { content: "\2022"; display: inline-block; width: 14px; }
+.pw-rules li.ok { color: var(--success); }
+.pw-rules li.ok::before { content: "\2713"; }
+.pw-rules li.bad { color: var(--danger); }
+.pw-rules li.bad::before { content: "\2717"; }
+@media (max-width: 400px) { .pw-rules { grid-template-columns: 1fr; } }
+
+/* Waiting for approval (after sign up) */
+.pending-spinner { font-size: 34px; color: var(--warning); margin: 4px 0 14px; animation: pending-flip 2.4s ease-in-out infinite; }
+@keyframes pending-flip { 0%, 40% { transform: rotate(0); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+.pending-status { font-size: 12.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.pending-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pending-pulse 1.4s ease-in-out infinite; }
+@keyframes pending-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pending-spinner, .pending-dot { animation: none; } }
 
 /* ---------------- Prediction result ---------------- */
 .result-hero {
@@ -721,30 +716,7 @@ a { text-decoration: none; color: inherit; }
 
 .chart-card img { width: 100%; border-radius: 10px; background: #fff; padding: 8px; }
 
-/* ---------------- Insight widget (donut + legend, "Storage Details" style) ---------------- */
-.insight-chart-wrap { position: relative; max-width: 220px; margin: 0 auto; }
-.insight-chart-center {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  pointer-events: none;
-  text-align: center;
-}
-.insight-chart-center .insight-total { font-size: 22px; font-weight: 800; color: var(--text-dark); line-height: 1.1; }
-.insight-chart-center .insight-total-label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
-
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-.legend-row:last-child { border-bottom: none; }
-/* Dashboard Fleet Usage rows open that vehicle's trip records. */
-a.legend-link { text-decoration: none; color: inherit; border-radius: 6px; transition: background 0.15s ease; }
-a.legend-link:hover { background: rgba(255,255,255,0.05); }
-a.legend-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+/* Legend rows (Model Performance correlation list) */
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .legend-label { flex: 1; font-size: 13px; color: var(--text-dark); font-weight: 500; }
 .legend-value { font-size: 13px; font-weight: 700; color: var(--text-dark); }
@@ -905,28 +877,10 @@ a.legend-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset
 }
 
 /* ---------------- Reports: meta line + totals ---------------- */
-.report-meta { font-size: 12.5px; color: var(--text-muted); }
-.report-meta strong { color: var(--text-dark); font-weight: 600; }
-.report-totals { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
-.report-totals:empty { display: none; }
-.report-total { background: rgba(255,255,255,0.04); border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 14px; min-width: 120px; }
-.report-total-value { font-size: 15px; font-weight: 700; color: var(--text-dark); }
-.report-total-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-@media print { .report-total { border-color: #ccc; } }
 
 /* ---------------- Model Performance: diagnostics tables ---------------- */
 .diag-note { font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; }
 .diag-table td, .diag-table th { font-size: 12.5px; padding-top: 8px; padding-bottom: 8px; }
-
-/* ---------------- Demo-data banner ---------------- */
-.demo-banner {
-  display: flex; gap: 12px; align-items: flex-start;
-  background: rgba(255, 181, 71, 0.10); border: 1px solid rgba(255, 181, 71, 0.45);
-  color: var(--text-dark); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
-}
-.demo-banner i { color: #ffb547; margin-top: 3px; }
-.demo-banner code { color: #ffb547; }
-@media print { .demo-banner { border-color: #999; } }
 
 /* ---------------- Small phones: keep the top bar on one tidy line ---------------- */
 @media (max-width: 575px) {
@@ -975,11 +929,11 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
   }
   html, body, .app-shell, .main-area, .content-area { background: #ffffff !important; color: #111111 !important; }
   .content-area { padding: 0 !important; }
-  .card-surface, .metric-tile, .summary-item, .report-total, .stat-card, .dist-stat {
+  .card-surface, .metric-tile, .summary-item, .stat-card, .dist-stat {
     background: #ffffff !important; color: #111111 !important; border: 1px solid #bbbbbb !important; box-shadow: none !important;
   }
-  .metric-value, .stat-value, .report-total-value, .section-title, h1, h2, h3, h4, h5, strong { color: #111111 !important; }
-  .metric-label, .report-total-label, .report-meta, .text-muted, .label { color: #444444 !important; }
+  .metric-value, .stat-value, .section-title, h1, h2, h3, h4, h5, strong { color: #111111 !important; }
+  .metric-label, .text-muted, .label { color: #444444 !important; }
   .table-fleet { color: #111111 !important; }
   .table-fleet th { background: #f0f0f0 !important; color: #111111 !important; }
   .table-fleet th, .table-fleet td { border-color: #cccccc !important; }
@@ -991,7 +945,7 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
   .text-danger { color: #b00020 !important; }
   .result-hero { background: #ffffff !important; color: #111111 !important; border: 2px solid #111111; }
   a { color: #111111 !important; text-decoration: none !important; }
-  .page-toolbar, .toast-container, .modal, .modal-backdrop, .live-badge, .nav-badge, .demo-banner { display: none !important; }
+  .page-toolbar, .toast-container, .modal, .modal-backdrop, .live-badge, .nav-badge { display: none !important; }
   .print-header { display: block !important; border-bottom: 2px solid #111111; padding-bottom: 8px; margin-bottom: 16px; }
   .print-org { font-size: 11px; color: #444444; letter-spacing: 0.02em; }
   .print-title { font-size: 20px; font-weight: 800; color: #111111; }
@@ -1019,18 +973,6 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
 .notif-clear { border: none; background: transparent; color: var(--blue-500); font-size: 12px; font-weight: 600; padding: 0; cursor: pointer; }
 .notif-clear:hover { text-decoration: underline; }
 @media (hover: none) { .notif-remove { opacity: 1; } }  /* phones: always visible */
-
-/* ---------------- Live clock (Philippine time) in the top bar ---------------- */
-.live-clock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; margin-right: 4px; white-space: nowrap; }
-.live-clock-time { font-weight: 700; font-size: 14px; color: var(--text-dark); font-variant-numeric: tabular-nums; }
-.live-clock-date { font-size: 11px; color: var(--text-muted); }
-@media (max-width: 575px) {
-  .live-clock-date { display: none; }
-  .live-clock-time { font-size: 12.5px; }
-}
-/* Narrow phones: the page title needs the room more than the clock. */
-@media (max-width: 420px) { .live-clock { display: none; } }
-@media print { .live-clock { display: none; } }
 
 /* Stat cards that open a filtered list (e.g. fuel requests waiting for approval) */
 a.stat-card-link { text-decoration: none; color: inherit; cursor: pointer; }

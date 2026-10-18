@@ -192,7 +192,7 @@ def main():
         sys.exit(1)
 
     # Prefer the web app's loader so the trip records entered in the system
-    # (MySQL) are trained on together with the historical CSV.
+    # (Firebase Firestore) are trained on together with the historical CSV.
     try:
         from app import app, retrain_model
         with app.app_context():
@@ -208,7 +208,7 @@ def main():
         # The historical CSV holds only headers when the model trains on the
         # trip records in the database alone, so there is nothing to fall back on.
         print("Nothing to train on: the historical CSV has no rows and the trip records in the database could "
-              "not be loaded. Start MySQL (start_server.bat) and run this again.")
+              "not be loaded. Check the internet connection and firebase-key.json, then run this again.")
         sys.exit(1)
     return train_and_save(df, extra_metrics={"supplementary_kind": info["kind"]})
 

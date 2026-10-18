@@ -7,11 +7,13 @@ __pycache__/
 .vscode/
 flask_session/
 backups/
-static/images/avatars/*
-!static/images/avatars/.gitkeep
 model/*.tmp
 .claude/
 .vercel/
 
 .vercel
 .env*
+
+# Firebase service account key (secret)
+firebase-key.json
+*-firebase-adminsdk-*.json

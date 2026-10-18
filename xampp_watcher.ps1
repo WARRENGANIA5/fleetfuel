@@ -1,8 +1,8 @@
 # FleetFuel watcher - runs hidden in the background (installed by install_autostart.bat).
 # Keeps FleetFuel running: whenever the system is not running (after sign-in, or when its
 # window was closed or the app stopped), it starts start_server.bat again within seconds.
-# With a database on this computer (XAMPP), it waits until MySQL is started first; with the
-# cloud database (MYSQL_HOST in .env is not this computer) it does not need XAMPP at all.
+# The database is Firebase Firestore (online), so nothing else has to be started first.
+# (The file keeps its old name so autostarts installed earlier keep working.)
 $ErrorActionPreference = "SilentlyContinue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -22,19 +22,9 @@ function Test-ServerWindow {
         Where-Object { $_.CommandLine -like '*start_server.bat*' })
 }
 
-# Is the database on this computer? Read again each round, so editing .env needs no restart.
-function Test-LocalDatabase {
-    $line = Get-Content "$root\.env" -ErrorAction SilentlyContinue |
-        Where-Object { $_ -match '^\s*MYSQL_HOST\s*=' } | Select-Object -First 1
-    if (-not $line) { return $true }
-    $dbHost = ($line -split '=', 2)[1].Trim().Trim('"').Trim("'")
-    return ($dbHost -eq '' -or $dbHost -eq '127.0.0.1' -or $dbHost -eq 'localhost')
-}
-
 $openedBrowser = $false
 while ($true) {
-    $databaseReady = (-not (Test-LocalDatabase)) -or (Test-Listening 3306)
-    if ($databaseReady -and -not (Test-Listening 5000) -and -not (Test-ServerWindow)) {
+    if (-not (Test-Listening 5000) -and -not (Test-ServerWindow)) {
         Start-Process -FilePath "$root\start_server.bat" -WorkingDirectory $root -WindowStyle Minimized
         for ($i = 0; $i -lt 60 -and -not (Test-Listening 5000); $i++) { Start-Sleep -Seconds 1 }
         # Open the system once per sign-in; later restarts happen quietly.

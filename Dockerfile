@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Manila \
     ONLINE=1
 
-# mariadb-client provides mysqldump for the automatic backups; tzdata for Philippine time.
+# tzdata for Philippine time.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends mariadb-client tzdata \
+    && apt-get install -y --no-install-recommends tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -8,55 +8,6 @@
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-user text-primary"></i> Profile Information</div>
 
-      <div class="avatar-edit mx-auto mb-3">
-        {% if user.profile_photo %}
-          <img class="avatar-preview" id="avatarPreview" src="{{ avatar }}" alt="Profile photo">
-        {% else %}
-          <div class="avatar-preview" id="avatarPreview">{{ (user.full_name or 'U')[0]|upper }}</div>
-        {% endif %}
-        <button type="button" class="avatar-badge" id="avatarBadge" data-bs-toggle="dropdown" aria-expanded="false" title="Change photo">
-          <i class="fa-solid fa-camera"></i>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end avatar-dropdown" id="avatarDropdownMenu" aria-labelledby="avatarBadge">
-          <li><button type="button" class="dropdown-item" id="takePhotoBtn"><i class="fa-solid fa-camera me-2"></i>Take Photo</button></li>
-          <li><button type="button" class="dropdown-item" id="uploadPhotoBtn"><i class="fa-solid fa-image me-2"></i>Upload Photo</button></li>
-          {% if user.profile_photo %}
-          <li id="viewPhotoItem"><button type="button" class="dropdown-item" id="viewPhotoBtn"><i class="fa-regular fa-eye me-2"></i>See Profile Picture</button></li>
-          <li id="removePhotoItem"><button type="button" class="dropdown-item text-danger" id="removePhotoBtn"><i class="fa-solid fa-trash me-2"></i>Remove Profile Picture</button></li>
-          {% endif %}
-        </ul>
-        <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/webp" class="d-none">
-      </div>
-      <input type="hidden" id="avatarCsrfToken" value="{{ csrf_token() }}">
-
-      <div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Take Photo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body text-center">
-              <video id="cameraVideo" autoplay playsinline class="camera-video"></video>
-              <canvas id="cameraCanvas" class="d-none"></canvas>
-              <p class="text-muted small mt-2 mb-0" id="cameraError"></p>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
-              <button type="button" class="btn btn-blue" id="capturePhotoBtn"><i class="fa-solid fa-camera me-1"></i> Capture</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal fade" id="viewPhotoModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Profile Picture</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body text-center">
-              <img id="viewPhotoImg" src="" alt="Profile photo" class="view-photo-img">
-            </div>
-          </div>
-        </div>
-      </div>
-
       <form method="POST" action="{{ url_for('update_profile') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
@@ -79,32 +30,37 @@
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-lock text-primary"></i> Change Password</div>
+      {% if user.username == admin_account %}
+      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> This is the fixed administrator account.
+        Its username and password cannot be changed in the system.</p>
+      {% else %}
       <form method="POST" action="{{ url_for('change_password') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
           <label class="form-label">Current Password</label>
-          <div class="input-group">
+          <div class="password-field-wrap">
             <input type="password" class="form-control" id="current_password" name="current_password" required>
-            <span class="input-group-text"><i class="fa-regular fa-eye password-toggle" data-target="current_password"></i></span>
+            <i class="fa-regular fa-eye password-toggle" data-target="current_password"></i>
           </div>
         </div>
         <div class="mb-3">
           <label class="form-label">New Password</label>
-          <div class="input-group">
+          <div class="password-field-wrap">
             <input type="password" class="form-control" id="new_password" name="new_password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" required>
-            <span class="input-group-text"><i class="fa-regular fa-eye password-toggle" data-target="new_password"></i></span>
+            <i class="fa-regular fa-eye password-toggle" data-target="new_password"></i>
           </div>
           <div class="form-text">8–128 characters, with at least one letter and one number. Must differ from your current password.</div>
         </div>
         <div class="mb-3">
           <label class="form-label">Confirm New Password</label>
-          <div class="input-group">
+          <div class="password-field-wrap">
             <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="8" maxlength="128" required>
-            <span class="input-group-text"><i class="fa-regular fa-eye password-toggle" data-target="confirm_password"></i></span>
+            <i class="fa-regular fa-eye password-toggle" data-target="confirm_password"></i>
           </div>
         </div>
         <button type="submit" class="btn btn-navy"><i class="fa-solid fa-key me-1"></i> Update Password</button>
       </form>
+      {% endif %}
     </div>
   </div>
 

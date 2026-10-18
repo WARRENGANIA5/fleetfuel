@@ -134,9 +134,6 @@ function initPage() {
     }, false);
   });
 
-  // Profile photo upload (Settings page)
-  initAvatarControls();
-
   // Generic table search filter (data-search-input + data-search-table)
   document.querySelectorAll('[data-search-input]').forEach(function (input) {
     const tableId = input.getAttribute('data-search-input');
@@ -517,26 +514,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // ---- Real-time account sync (every page) ----
-  // Keeps the top-bar name/role/photo — and the Settings form when it has
+  // Keeps the top-bar name/role — and the Settings form when it has
   // no unsaved edits — in step with changes made in other tabs or devices,
   // and signs the user out if the account is deactivated.
-  function setAvatar(imgId, initialId, baseClass, url, initial) {
-    const img = document.getElementById(imgId);
-    const div = document.getElementById(initialId);
-    const current = img || div;
-    if (!current) return;
-    if (url) {
-      if (img) { if (img.getAttribute('src') !== url) img.src = url; return; }
-      const el = document.createElement('img');
-      el.id = imgId; el.className = baseClass + ' user-avatar-img'; el.src = url; el.alt = 'Profile photo';
-      current.replaceWith(el);
-    } else {
-      if (div) { div.textContent = initial; return; }
-      const el = document.createElement('div');
-      el.id = initialId; el.className = baseClass; el.textContent = initial;
-      current.replaceWith(el);
-    }
-  }
   function syncField(id, value) {
     const el = document.getElementById(id);
     if (!el || document.activeElement === el) return;
@@ -557,18 +537,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!me) return;
         document.querySelectorAll('.user-name').forEach(function (el) { el.textContent = me.full_name; });
         document.querySelectorAll('.user-role').forEach(function (el) { el.textContent = me.role; });
-        setAvatar('topbarAvatarImg', 'topbarAvatarInitial', 'user-avatar', me.avatar_url, me.initial);
-        if (document.getElementById('avatarPreview')) {
-          const preview = document.getElementById('avatarPreview');
-          if (me.avatar_url) {
-            if (preview.tagName === 'IMG') { if (preview.getAttribute('src') !== me.avatar_url) preview.src = me.avatar_url; }
-            else { const im = document.createElement('img'); im.id = 'avatarPreview'; im.className = 'avatar-preview'; im.src = me.avatar_url; im.alt = 'Profile photo'; preview.replaceWith(im); }
-            showViewRemoveMenuItems();
-          } else {
-            if (preview.tagName === 'IMG') { const dv = document.createElement('div'); dv.id = 'avatarPreview'; dv.className = 'avatar-preview'; dv.textContent = me.initial; preview.replaceWith(dv); }
-            else preview.textContent = me.initial;
-            hideViewRemoveMenuItems();
-          }
+        const initial = document.getElementById('topbarAvatarInitial');
+        if (initial) initial.textContent = me.initial;
+        if (document.getElementById('settingsFullName')) {
           syncField('settingsFullName', me.full_name);
           syncField('settingsEmail', me.email);
           const un = document.getElementById('settingsUsername'); if (un) un.value = me.username;
@@ -583,200 +554,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   initPage();
 });
-
-// ---- Profile photo (Settings page) ----
-function initAvatarControls() {
-  const avatarInput = document.getElementById('avatarInput');
-  if (!avatarInput) return;
-  const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
-  if (uploadPhotoBtn) {
-    uploadPhotoBtn.addEventListener('click', function () { avatarInput.click(); });
-  }
-
-  avatarInput.addEventListener('change', function () {
-    const file = avatarInput.files[0];
-    if (file) uploadAvatarFile(file);
-    avatarInput.value = '';
-  });
-
-  // ---- Take Photo (webcam capture) ----
-  const cameraModalEl = document.getElementById('cameraModal');
-  const cameraVideo = document.getElementById('cameraVideo');
-  const cameraCanvas = document.getElementById('cameraCanvas');
-  const cameraError = document.getElementById('cameraError');
-  const takePhotoBtn = document.getElementById('takePhotoBtn');
-  const capturePhotoBtn = document.getElementById('capturePhotoBtn');
-  let cameraStream = null;
-
-  function stopCamera() {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(function (track) { track.stop(); });
-      cameraStream = null;
-    }
-  }
-
-  if (cameraModalEl && takePhotoBtn) {
-    const cameraModal = new bootstrap.Modal(cameraModalEl);
-
-    takePhotoBtn.addEventListener('click', function () {
-      cameraError.textContent = '';
-      cameraModal.show();
-      // Browsers only allow the camera on HTTPS or localhost; over the office
-      // network (http://<PC-IP>:5000) mediaDevices does not exist.
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        cameraError.textContent = 'The camera is only available when the system is opened on this computer ' +
-          '(http://127.0.0.1:5000) or over HTTPS. Please use "Upload Photo" instead.';
-        return;
-      }
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(function (stream) {
-          cameraStream = stream;
-          cameraVideo.srcObject = stream;
-        })
-        .catch(function () {
-          cameraError.textContent = 'Could not access the camera. Check your browser/device permissions.';
-        });
-    });
-
-    cameraModalEl.addEventListener('hidden.bs.modal', stopCamera);
-
-    capturePhotoBtn.addEventListener('click', function () {
-      if (!cameraStream) return;
-      cameraCanvas.width = cameraVideo.videoWidth;
-      cameraCanvas.height = cameraVideo.videoHeight;
-      cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0);
-      cameraCanvas.toBlob(function (blob) {
-        if (!blob) return;
-        cameraModal.hide();
-        uploadAvatarFile(new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' }));
-      }, 'image/jpeg', 0.92);
-    });
-  }
-
-  // ---- See Profile Picture / Remove Profile Picture (event-delegated: these
-  // menu items are only present in the DOM once a photo exists) ----
-  const avatarDropdownMenu = document.getElementById('avatarDropdownMenu');
-  const viewPhotoModalEl = document.getElementById('viewPhotoModal');
-  if (avatarDropdownMenu) {
-    avatarDropdownMenu.addEventListener('click', function (e) {
-      if (e.target.closest('#viewPhotoBtn')) {
-        const preview = document.getElementById('avatarPreview');
-        if (!preview || preview.tagName !== 'IMG') return;
-        document.getElementById('viewPhotoImg').src = preview.src;
-        bootstrap.Modal.getOrCreateInstance(viewPhotoModalEl).show();  // reuse: no stacked backdrops
-      } else if (e.target.closest('#removePhotoBtn')) {
-        if (!window.confirm('Remove your profile picture?')) return;
-        const csrfToken = document.getElementById('avatarCsrfToken').value;
-        showLoading('Removing photo...');
-        fetch('/settings/photo/remove', {
-          method: 'POST',
-          headers: { 'X-CSRFToken': csrfToken },
-        })
-          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-          .then(function (result) {
-            hideLoading();
-            if (!result.ok || !result.data.success) {
-              showToast((result.data && result.data.message) || 'Could not remove photo.', 'danger');
-              return;
-            }
-            setAvatarToInitial();
-            showToast('Profile photo removed.', 'success');
-          })
-          .catch(function () {
-            hideLoading();
-            showToast('Could not remove photo. Please try again.', 'danger');
-          });
-      }
-    });
-  }
-}
-
-function showViewRemoveMenuItems() {
-  const menu = document.getElementById('avatarDropdownMenu');
-  if (!menu || document.getElementById('viewPhotoItem')) return;
-  menu.insertAdjacentHTML('beforeend',
-    '<li id="viewPhotoItem"><button type="button" class="dropdown-item" id="viewPhotoBtn"><i class="fa-regular fa-eye me-2"></i>See Profile Picture</button></li>' +
-    '<li id="removePhotoItem"><button type="button" class="dropdown-item text-danger" id="removePhotoBtn"><i class="fa-solid fa-trash me-2"></i>Remove Profile Picture</button></li>'
-  );
-}
-
-function hideViewRemoveMenuItems() {
-  ['viewPhotoItem', 'removePhotoItem'].forEach(function (id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-  });
-}
-
-function setAvatarToInitial() {
-  const initialLetter = (document.querySelector('.user-name') ? document.querySelector('.user-name').textContent.trim().charAt(0) : 'U').toUpperCase();
-  [['avatarPreview', 'avatarPreview'], ['topbarAvatarImg', 'topbarAvatarInitial']].forEach(function (pair) {
-    const el = document.getElementById(pair[0]);
-    if (!el || el.tagName !== 'IMG') return;
-    const div = document.createElement('div');
-    div.id = pair[1];
-    div.className = el.className.replace('user-avatar-img', '').trim();
-    div.textContent = initialLetter;
-    el.replaceWith(div);
-  });
-  hideViewRemoveMenuItems();
-}
-
-function uploadAvatarFile(file) {
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-    showToast('Only PNG, JPG, or WEBP images are allowed.', 'danger');
-    return;
-  }
-  if (file.size > 3 * 1024 * 1024) {
-    showToast('Image must be smaller than 3 MB.', 'danger');
-    return;
-  }
-
-  const csrfToken = document.getElementById('avatarCsrfToken').value;
-  const formData = new FormData();
-  formData.append('photo', file);
-  formData.append('csrf_token', csrfToken);
-
-  showLoading('Uploading photo...');
-  fetch('/settings/photo', { method: 'POST', body: formData })
-    .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-    .then(function (result) {
-      hideLoading();
-      if (!result.ok || !result.data.success) {
-        showToast(result.data.message || 'Could not upload photo.', 'danger');
-        return;
-      }
-      const url = result.data.url;
-      ['avatarPreview', 'topbarAvatarImg'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (el.tagName === 'IMG') {
-          el.src = url;
-        } else {
-          const img = document.createElement('img');
-          img.id = el.id;
-          img.className = el.className + ' user-avatar-img';
-          img.src = url;
-          img.alt = 'Profile photo';
-          el.replaceWith(img);
-        }
-      });
-      const initial = document.getElementById('topbarAvatarInitial');
-      if (initial) {
-        const img = document.createElement('img');
-        img.id = 'topbarAvatarImg';
-        img.className = 'user-avatar user-avatar-img';
-        img.src = url;
-        img.alt = 'Profile photo';
-        initial.replaceWith(img);
-      }
-      showViewRemoveMenuItems();
-      showToast('Profile photo updated.', 'success');
-    })
-    .catch(function () {
-      hideLoading();
-      showToast('Could not upload photo. Please try again.', 'danger');
-    });
-}
 
 function escapeHtml(value) {
   const div = document.createElement('div');
@@ -835,18 +612,6 @@ const PH_TZ = 'Asia/Manila';
 function phToday() {   // YYYY-MM-DD
   return new Intl.DateTimeFormat('en-CA', { timeZone: PH_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
-
-// Live clock in the top bar, ticking every second.
-(function () {
-  const t = document.getElementById('liveClockTime');
-  const d = document.getElementById('liveClockDate');
-  if (!t || !d) return;
-  const timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: PH_TZ, hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-  const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: PH_TZ, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  function tick() { const now = new Date(); t.textContent = timeFmt.format(now); d.textContent = dateFmt.format(now); }
-  tick();
-  shellInterval(tick, 1000);
-})();
 
 // "Add" forms start with today's date already filled in (still editable);
 // edit forms keep the record's own values.

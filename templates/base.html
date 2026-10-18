@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=17) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=23) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -46,11 +46,6 @@
         <i class="fa-solid fa-clock-rotate-left"></i><span>{{ 'Prediction History' if is_admin else 'My Fuel Requests' }}</span>
         {% if is_admin %}<span class="nav-badge" id="pendingReqBadge" title="Fuel requests waiting for approval" {{ 'hidden' if not pending_requests }}>{{ pending_requests }}</span>{% endif %}
       </a>
-      {% if is_admin %}
-      <a href="{{ url_for('reports') }}" class="nav-link {{ 'active' if active=='reports' }}">
-        <i class="fa-solid fa-file-lines"></i><span>Reports</span>
-      </a>
-      {% endif %}
       {% if session.get('role') == 'admin' %}
       <a href="{{ url_for('users') }}" class="nav-link {{ 'active' if active=='users' }}">
         <i class="fa-solid fa-users-gear"></i><span>User Accounts</span>
@@ -81,10 +76,6 @@
         <h1>{% block page_title %}Dashboard{% endblock %}</h1>
       </div>
       <div class="topbar-actions">
-        <div class="live-clock" id="liveClock" title="Philippine time (updates every second)">
-          <span class="live-clock-time" id="liveClockTime"></span>
-          <span class="live-clock-date" id="liveClockDate"></span>
-        </div>
         <div class="dropdown notif-dropdown">
           <button class="icon-btn" id="notifBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Notifications">
             <i class="fa-regular fa-bell"></i>
@@ -104,11 +95,7 @@
           </div>
         </div>
         <a href="{{ url_for('settings') }}" class="user-chip" title="Account Settings">
-          {% if session.get('profile_photo') %}
-            <img class="user-avatar user-avatar-img" id="topbarAvatarImg" src="{{ session_avatar_url }}" alt="Profile photo">
-          {% else %}
-            <div class="user-avatar" id="topbarAvatarInitial">{{ (session.get('full_name') or 'U')[0]|upper }}</div>
-          {% endif %}
+          <div class="user-avatar" id="topbarAvatarInitial">{{ (session.get('full_name') or 'U')[0]|upper }}</div>
           <div class="user-meta">
             <span class="user-name">{{ session.get('full_name', 'User') }}</span>
             <span class="user-role">{{ session.get('role', 'staff')|capitalize }}</span>
@@ -156,7 +143,7 @@
 <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=18) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=19) }}"></script>
 <div id="pageScripts" hidden>{% block extra_scripts %}{% endblock %}</div>
 </body>
 </html>

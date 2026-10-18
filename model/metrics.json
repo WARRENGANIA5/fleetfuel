@@ -1,5 +1,5 @@
 {
-  "model_version": "v20261017220124",
+  "model_version": "v20261018083510",
   "r2_score": 0.9512,
   "mae": 0.7556,
   "rmse": 1.2753,
@@ -13,7 +13,7 @@
   "train_size": 4715,
   "test_size": 1179,
   "total_records": 5894,
-  "trained_at": "2026-10-17T22:01:24",
+  "trained_at": "2026-10-18T08:35:10",
   "status": "active",
   "equation_terms": [
     "distance_km",
@@ -199,7 +199,7 @@
       "records": 5801
     }
   },
-  "data_fingerprint": "1792242382-1792242548-93-213348207797",
+  "data_fingerprint": "1792246130-1792246130-93-213348207797",
   "system_records": 93,
   "supplementary_kind": "trips"
 }

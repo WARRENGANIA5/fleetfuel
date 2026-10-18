@@ -44,7 +44,7 @@ BLUE, NAVY, TEAL = "#1d6fd6", "#0b2545", "#1aa38c"
 
 def load_training_frame():
     """Same data the model trains on: the web app's loader (CSV + system trip
-    records from MySQL), or the CSV files alone if the database is offline."""
+    records from Firebase Firestore), or the CSV files alone if the database is offline."""
     try:
         from app import app, load_training_frame as app_loader
         with app.app_context():

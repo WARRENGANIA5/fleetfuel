@@ -2,18 +2,13 @@
 
 A thesis/capstone web system for **Guimaras State University's General Services Office (GSO)**,
 predicting government fleet fuel consumption using a **Linear Regression** model trained on
-the local trip records (Monthly Report of Official Travel) and a supplementary online dataset, served through a Flask + MySQL web application.
-
-This is an original system adapted from the general fuel-prediction concept (Auto MPG +
-Linear Regression) demonstrated in [Kanchu1147/Fuel_Consumption_Prediction_Of_Vehicles](https://github.com/Kanchu1147/Fuel_Consumption_Prediction_Of_Vehicles),
-redesigned end-to-end (data schema, features, UI, database, and workflow) for a government
-fleet / university motorpool context.
+the local trip records (Monthly Report of Official Travel) and a supplementary online dataset, served through a Flask web application with a Firebase Firestore database.
 
 ---
 
 ## 1. Tech Stack
 
-Python, Flask, HTML5, CSS3, JavaScript, Bootstrap 5, MySQL, Pandas, NumPy, Scikit-learn,
+Python, Flask, HTML5, CSS3, JavaScript, Bootstrap 5, Firebase Firestore, Pandas, NumPy, Scikit-learn,
 Joblib, Statsmodels (VIF and regression assumption tests), Matplotlib, Seaborn, Chart.js (live charts),
 Waitress (production WSGI server), Google Colab (notebook), Font Awesome.
 
@@ -23,8 +18,8 @@ Waitress (production WSGI server), Google Colab (notebook), Font Awesome.
 gov-fleets/
 ├── app.py                     Flask application (routes, auth, CRUD)
 ├── config.py                  Configuration (reads .env)
-├── db.py                      MySQL connection helper (PyMySQL)
-├── seed_data.py                Seeds admin account + demo fleet data
+├── db.py                      Firebase Firestore data layer (real-time sync)
+├── init_db.py                 Checks Firestore; creates the first administrator (online setup)
 ├── requirements.txt          Web app libraries (what Vercel installs)
 ├── requirements-train.txt    + training, diagnostics and Waitress (office server)
 ├── model/
@@ -37,18 +32,14 @@ gov-fleets/
 ├── data/
 │   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from the online dataset
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
-│   ├── supplementary_data.csv        Online trips: distance, engine power, fuel type, fuel consumed
-│   └── dataset_info.json       Fingerprints of the synthetic files ("Demo data" label)
-├── database/
-│   └── government_fleet_fuel.sql
+│   └── supplementary_data.csv        Online trips: distance, engine power, fuel type, fuel consumed
 ├── templates/                  Jinja2 templates (login, dashboard, ...)
 ├── static/
 │   ├── css/style.css
 │   ├── js/script.js
 │   └── images/ (favicon, generated charts/)
-├── notebooks/
-│   └── fuel_consumption_linear_regression.ipynb   Google Colab workflow
-├── start_server.bat            Starts MySQL, backs up the database, starts the web app
+├── colab/                      Google Colab notebooks + the three training CSV files
+├── start_server.bat            Backs up the database, starts the web app
 ├── backup_database.py          Database backup to backups/ (keeps the newest 30)
 ├── allow_network_access.bat    One-time firewall rule for LAN access
 └── reports/figures/            Evaluation figures (generated)
@@ -72,7 +63,7 @@ with fuel type encoded **1 = Gasoline, 0 = Diesel**.
 
 ### 4.1 Prerequisites
 - Python 3.10+
-- MySQL Server (e.g. XAMPP's MySQL/MariaDB, or standalone MySQL)
+- Internet connection and a Firebase project (free Spark plan is enough)
 
 ### 4.2 Create a virtual environment and install dependencies
 ```bash
@@ -81,16 +72,19 @@ venv\Scripts\activate
 pip install -r requirements-train.txt
 ```
 
-### 4.3 Create the database
-Start your MySQL server, then import the schema:
-```bash
-mysql -u root -p < database/government_fleet_fuel.sql
-```
-(If your MySQL root user has no password, omit `-p`.)
+### 4.3 Create the Firebase Firestore database
+1. Open https://console.firebase.google.com, **Add project** (e.g. `gsu-fleetfuel`).
+2. **Build > Firestore Database > Create database**, choose a location near the Philippines
+   (e.g. `asia-southeast1`), and start in **production mode** (only the server reads and writes it).
+3. **Project settings (gear) > Service accounts > Generate new private key**. Save the downloaded
+   file in this folder as **`firebase-key.json`**. Keep it secret: it is ignored by git.
+
+Firestore needs no tables. The collections `users`, `vehicles`, `trip_records`, `predictions` and
+`notification_dismissals` appear with their first record; `_counters` keeps the next record number of each.
 
 ### 4.4 Configure environment variables
-Copy `.env.example` to `.env` and adjust if your MySQL credentials differ from the defaults
-(`root` / no password / `localhost:3306`).
+Copy `.env.example` to `.env` and set a long random `SECRET_KEY`. The key file is found automatically
+as `firebase-key.json`; set `FIREBASE_CREDENTIALS` only if it is saved elsewhere.
 
 ### 4.5 Train the model
 ```bash
@@ -101,20 +95,18 @@ This creates `model/linear_regression_pipeline.joblib`, `model/metrics.json`, an
 `reports/figures/`. (The running app also trains the model by itself.) **Predictions will not work until this step is done** — the
 Prediction page will show "Model unavailable" until a trained model file exists.
 
-### 4.6 Seed the database
+### 4.6 Create the administrator account
 ```bash
-python seed_data.py
+set ADMIN_PASSWORD=...
+python init_db.py
 ```
-Creates the administrator account and demo vehicles and trip records so the
-dashboard and modules are populated on first run.
+Checks that Firestore can be reached and, on an empty database, creates the administrator account.
+Vehicles and trips are entered in the system (Vehicle Management, Trip Records); no sample data is added.
 
-**Default login:**
-- Username: `admin`
-- Password: `Admin@12345`
-
-(A second account `motorpool` / `Motorpool@2026` with the `staff` role is also created.)
-Change these passwords after first login via **Settings**. Anyone who logs in with one of these
-default passwords is sent straight to Settings with a reminder until it is changed.
+**Administrator:** there is exactly one administrator account, **`admin1114`** (`ADMIN_ACCOUNT` in
+`app.py`). Only that username with its own password opens the administrator pages: every other
+account is staff, no other account can be made an administrator, and the administrator's username,
+role and password cannot be changed from inside the system. Never write `ADMIN_PASSWORD` in a file in git.
 
 ### 4.7 Run the application
 ```bash
@@ -131,7 +123,7 @@ Visit **http://127.0.0.1:5000**.
 Retraining is automatic. While the app runs, a background watcher retrains the Linear Regression
 model within a few seconds whenever the training data changes:
 
-- a trip record is added, edited, imported (Trip Records > Import CSV) or deleted;
+- a trip record is added, edited or deleted;
 - a vehicle's plate number, fuel type or engine power is edited, or a vehicle is deleted;
 - `data/historical_fleet_data.csv` or `data/supplementary_data.csv` is replaced.
 
@@ -142,18 +134,24 @@ still work for training outside the app and for regenerating the figures in `rep
 
 ## 5a. Database Backups
 
-`start_server.bat` backs up the whole MySQL database to `backups/` every time the system starts,
-and the running app backs it up again every 24 hours. The newest 30 backups are kept. To make a
-backup at any time:
+`start_server.bat` backs up every Firestore collection to a `.json` file in `backups/` every time the
+system starts, and the running app backs it up again every 24 hours. The newest 30 backups are kept.
+To make a backup at any time:
 ```bash
 venv\Scripts\python.exe backup_database.py
 ```
-To restore a backup (this **replaces** the current data):
+To restore a backup (this **replaces** the records with the same IDs):
 ```bash
-C:\xampp\mysql\bin\mysql.exe -u root government_fleet_fuel_prediction < backups\<file>.sql
+venv\Scripts\python.exe backup_database.py --restore backups\<file>.json
 ```
-Copy the `backups/` folder to a USB drive or cloud storage now and then, so the collected
-records survive if the computer fails.
+Copy the `backups/` folder to a USB drive or cloud storage now and then.
+
+## 5b. Real-time data
+
+While the server runs, Firestore snapshot listeners keep an up-to-date copy of every collection in
+memory: a change saved from any computer reaches all pages within a moment (the pages refresh their
+data every few seconds), and those refreshes cost no Firestore reads, so the system stays within the
+free plan.
 
 ## 6. Machine Learning Pipeline Summary
 
@@ -174,20 +172,19 @@ records survive if the computer fails.
 
 - Passwords hashed with Werkzeug's `generate_password_hash` (scrypt) — never stored in plain
   text or hardcoded.
-- All SQL queries use parameterized statements (PyMySQL `%s` placeholders).
+- The database is only reached by the server with the Firebase service account key (`firebase-key.json`,
+  never in git); the browser never talks to Firestore directly, so Firestore security rules can deny all
+  client access.
 - CSRF protection via Flask-WTF on all state-changing forms.
 - All dashboard/module routes require an authenticated session (`login_required`).
-- Change the default `SECRET_KEY` and demo account passwords before any real deployment.
+- Change the default `SECRET_KEY` before any real deployment.
 
 ---
 
 ## Collecting the real data
 
-Until the synthetic CSV files in `data/` are replaced, every model page shows a **"Demo data"** label
-(detected automatically from `data/dataset_info.json`), so demo results are never reported as findings.
-
-* **Trip tickets:** Trip Records → **Import CSV** (download the template there). Every row is validated;
-  nothing is imported unless all rows are valid. The model retrains automatically.
+* **Trip tickets:** Trip Records → **Add Trip Record** (one trip of the Monthly Report of Official Travel
+  each). The model retrains automatically.
 * **Supplementary dataset (open online sources):** `data/supplementary_data.csv` with the columns
   `distance_km, engine_power_kw, fuel_type, actual_fuel_consumption`. The app detects a replaced file and retrains.
 
@@ -198,8 +195,8 @@ this removes the collinearity between the interaction and its components without
 the fitted equation is also shown in the original units. Training reports the **VIF** of every term (above 5 =
 high collinearity), uses **HC3 robust standard errors** for the coefficient p-values, and tests the LINE
 conditions on the residuals: Ramsey RESET (linearity), Durbin-Watson (independence), Jarque-Bera (normality),
-Breusch-Pagan (equal variance) and VIF (multicollinearity). Results appear on **Model Performance**, in the
-**Model Performance Report**, and in the Colab notebook. `python model/evaluate_model.py` saves print-ready
+Breusch-Pagan (equal variance) and VIF (multicollinearity). Results appear on **Model Performance** and in the
+Colab notebook. `python model/evaluate_model.py` saves print-ready
 figures to `reports/figures/`.
 
 ## User accounts
@@ -213,37 +210,26 @@ active administrator always remains.
 1. Connect the server PC to the GSO network and set that network to **Private** in Windows
    (Settings > Network > Properties). Run `allow_network_access.bat` once **as Administrator**; it opens
    port 5000 for Private/Domain networks only, never on public Wi-Fi.
-2. Double-click `start_server.bat` (starts XAMPP MySQL if needed, then the app with Waitress). If the
+2. Double-click `start_server.bat` (backs up the database, then starts the app with Waitress). If the
    app ever stops unexpectedly, the script starts it again after 10 seconds.
 3. Other computers on the same network open `http://<this-PC-IP>:5000` (the script prints the address).
 4. To start the system automatically whenever Windows signs in, run `install_autostart.bat` once
    (`uninstall_autostart.bat` turns it off). Also turn off Sleep on the server PC.
-5. Before turning the server PC off, run `stop_server.bat`: it shuts MySQL down cleanly. (Turning the PC
-   off while MySQL runs can corrupt its tables; `start_server.bat` checks and repairs them on every start.)
-
-### Database security (do this on every server PC)
-
-The database must only be reachable by the app on the same PC, never from the network:
-
-1. In `C:\xampp\mysql\bin\my.ini`, under `[mysqld]`, set `bind-address="127.0.0.1"` and restart MySQL.
-2. Give the app its own MySQL account instead of `root` (replace the password with a long random one):
-   ```sql
-   CREATE USER 'fleetfuel'@'127.0.0.1' IDENTIFIED BY '<long-random-password>';
-   GRANT ALL PRIVILEGES ON government_fleet_fuel_prediction.* TO 'fleetfuel'@'127.0.0.1';
-   GRANT SELECT ON mysql.proc TO 'fleetfuel'@'127.0.0.1';
-   ```
-3. In `.env` set `MYSQL_HOST=127.0.0.1`, `MYSQL_USER=fleetfuel` and `MYSQL_PASSWORD=<that password>`.
-   Use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and every page waits ~2 s.
+5. Before turning the server PC off, run `stop_server.bat`. The data itself lives in Firebase Firestore, so
+   it is safe even if the PC is turned off suddenly; the server PC only needs an internet connection.
 
 ## Roles and fuel requests
 
 * **Staff (GSO / motorpool):** predict fuel for a planned trip (each prediction is a *fuel request*), encode
-  trips from the Monthly Report of Official Travel (add, edit, CSV import), record the actual fuel after the trip, and view the
-  dashboard, vehicles, model performance and reports. The bell notifies them in real time when a request is
+  trips from the Monthly Report of Official Travel (add, edit), record the actual fuel after the trip, and view the
+  dashboard and vehicles. The bell notifies them in real time when a request is
   approved (with the liters released) or rejected.
 * **Administrators:** everything staff can do, plus approve/reject fuel requests and set the fuel to release
   (the predicted figure and range are the reference), manage vehicles, delete records and manage user
-  accounts (including approving sign-ups). The bell and sidebar show pending requests in real time.
+  accounts (including approving sign-ups). The bell and sidebar show pending requests and sign-ups in real time.
+* **Sign up:** a new account waits for approval. The sign-up page checks the username, email and password
+  while they are typed; after signing up (or logging in to a pending account) the waiting page checks every
+  3 seconds and signs the user in automatically as soon as an administrator approves the account.
 * After a trip, the actual fuel is flagged **outside the predicted range** when it differs from the prediction
   by more than the model's RMSE.
 

@@ -9,9 +9,10 @@ __pycache__/
 *.log
 *.bat
 backups/
-notebooks/
+colab/
 reports/
-static/images/avatars/*
 model/*.joblib
 model/*.tmp
 model/metrics.json
+firebase-key.json
+*-firebase-adminsdk-*.json

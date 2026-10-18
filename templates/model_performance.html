@@ -34,7 +34,7 @@
     <strong id="mpSystem">{{ metrics.system_records|default(0) }}</strong> trip records from the system<span id="mpCleanNote"></span>.
   </p>
   <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
-    <span class="text-muted">Train in Google Colab (<code>notebooks/fuel_consumption_linear_regression.ipynb</code>) with the same data:</span>
+    <span class="text-muted">Train in Google Colab (<code>colab/fuel_consumption_linear_regression.ipynb</code>) with the same data:</span>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
       <i class="fa-solid fa-download me-1"></i> trip_records.csv</a>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='vehicle_records') }}">

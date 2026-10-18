@@ -1,5 +1,3 @@
-import csv
-import io
 import json
 import os
 import re
@@ -10,14 +8,11 @@ from functools import wraps
 
 import joblib
 import numpy as np
-import pymysql
 import pandas as pd
 from flask import (Flask, Response, flash, g, redirect, render_template,
                     request, session, url_for)
 from flask_wtf import CSRFProtect
-from PIL import Image, UnidentifiedImageError
 from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename
 
 import db
 from config import Config
@@ -43,22 +38,7 @@ if app.config["SECRET_KEY"] in _PLACEHOLDER_SECRETS or len(app.config["SECRET_KE
 csrf = CSRFProtect(app)
 db.init_app(app)
 
-AVATAR_DIR = os.path.join(app.root_path, "static", "images", "avatars")
-AVATAR_MAX_BYTES = 3 * 1024 * 1024
-AVATAR_MAX_DIMENSION = 512
-try:
-    os.makedirs(AVATAR_DIR, exist_ok=True)
-except OSError:
-    pass  # read-only disk (serverless hosting): photos cannot be saved there
-
 FUEL_TYPES = ["Diesel", "Gasoline"]
-
-REPORT_TYPES = {
-    "vehicle": "Vehicle Report",
-    "trip": "Trip Report",
-    "prediction": "Prediction Report",
-    "model": "Model Performance Report",
-}
 
 _MODEL = None
 _MODEL_MTIME = None
@@ -122,47 +102,11 @@ def get_metrics():
     return metrics
 
 
-_DATASET_STATUS = {"key": None, "value": None}
-
-
-def dataset_status():
-    """Whether the training CSVs are still the synthetic demo files (their
-    SHA-256 matches data/dataset_info.json). Re-checked only when a file changes."""
-    paths = {"historical_fleet_data.csv": app.config["HISTORICAL_DATA_PATH"],
-             "supplementary_data.csv": app.config["SUPPLEMENTARY_DATA_PATH"]}
-    info_path = os.path.join(app.config["DATA_DIR"], "dataset_info.json")
-    try:
-        key = tuple(os.path.getmtime(p) for p in list(paths.values()) + [info_path])
-    except OSError:
-        return {"synthetic_files": [], "demo": False}
-    if _DATASET_STATUS["key"] != key:
-        import hashlib
-        with open(info_path, encoding="utf-8") as f:
-            known = json.load(f).get("synthetic_sha256", {})
-        synthetic = []
-        for name, path in paths.items():
-            with open(path, "rb") as f:
-                if known.get(name) == hashlib.sha256(f.read()).hexdigest():
-                    synthetic.append(name)
-        _DATASET_STATUS.update(key=key, value={"synthetic_files": synthetic, "demo": bool(synthetic)})
-    return _DATASET_STATUS["value"]
-
-
 def format_time(value):
     if isinstance(value, timedelta):
         total = int(value.total_seconds())
         return f"{total // 3600:02d}:{(total % 3600) // 60:02d}"
     return value
-
-
-def avatar_url(path):
-    """Static URL for a profile photo, versioned by file time so a new photo
-    shows immediately everywhere instead of a cached old one."""
-    if not path:
-        return None
-    full = os.path.join(app.root_path, "static", path)
-    version = int(os.path.getmtime(full)) if os.path.exists(full) else 0
-    return url_for("static", filename=path) + f"?v={version}"
 
 
 def password_signature(password_hash):
@@ -171,14 +115,14 @@ def password_signature(password_hash):
     return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
 
 
-def compact_ids(*tables):
-    """After a delete, point each table's next ID at MAX(id) + 1, so deleting the
-    newest record doesn't leave a gap and IDs keep counting up from 1."""
-    for table in tables:
+def compact_ids(*collections):
+    """After a delete, the next ID continues from the highest ID still in use,
+    so deleting the newest record doesn't leave a gap and IDs keep counting up from 1."""
+    for coll in collections:
         try:
-            db.execute(f"ALTER TABLE {table} AUTO_INCREMENT = 1")
+            db.reset_counter(coll)
         except Exception:
-            app.logger.exception("Could not reset the ID counter of %s", table)
+            app.logger.exception("Could not reset the ID counter of %s", coll)
 
 
 def session_ended(reason):
@@ -198,8 +142,7 @@ def login_required(view):
         # Re-check the account on every request: a deactivated or deleted
         # account is signed out right away, and name/role/photo changes made
         # elsewhere show up without logging in again.
-        user = db.query_one("SELECT id, username, full_name, role, status, profile_photo, password_hash FROM users WHERE id = %s",
-                            (session["user_id"],))
+        user = db.get("users", session["user_id"])
         if not user or user["status"] != "active":
             session.clear()
             flash("Your account is no longer active. Please contact the administrator.", "danger")
@@ -216,7 +159,7 @@ def login_required(view):
                 return session_ended("password_changed")
             return redirect(url_for("login"))
         session["username"], session["full_name"] = user["username"], user["full_name"]
-        session["role"], session["profile_photo"] = user["role"], user["profile_photo"]
+        session["role"] = effective_role(user)
         # Logged in with a default (published) password: only the password
         # change itself is allowed until a new one is set.
         if session.get("must_change_pw") and request.endpoint not in _ALLOWED_BEFORE_PW_CHANGE:
@@ -232,9 +175,20 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
                              "api_notifications_seen", "api_notifications_dismiss", "api_notifications_dismiss_all"}
 
 
+# The one administrator account (GSO). Only this username, with its own
+# password, opens the administrator pages; every other account is staff, and
+# this account cannot be demoted, deactivated or given a new password from the
+# system.
+ADMIN_ACCOUNT = "admin1114"
+
+
+def effective_role(user):
+    return "admin" if user["role"] == "admin" and user["username"] == ADMIN_ACCOUNT else "staff"
+
+
 def admin_required(view):
     """Pages and actions for the administrator (GSO) only: approving fuel
-    requests, user accounts, vehicles, reports and model monitoring (login is
+    requests, user accounts, vehicles and model monitoring (login is
     checked first)."""
     @wraps(view)
     @login_required
@@ -250,14 +204,12 @@ def admin_required(view):
 
 
 def _pending_counts():
-    """Sidebar badges (administrator only): both counts in one database round trip."""
+    """Sidebar badges (administrator only)."""
     if session.get("role") != "admin":
         return {"requests": 0, "accounts": 0}
     try:
-        return db.query_one("""
-            SELECT (SELECT COUNT(*) FROM predictions WHERE approval_status = 'pending') AS requests,
-                   (SELECT COUNT(*) FROM users WHERE status = 'pending') AS accounts
-        """)
+        return {"requests": len(db.find("predictions", approval_status="pending")),
+                "accounts": len(db.find("users", status="pending"))}
     except Exception:
         return {"requests": 0, "accounts": 0}
 
@@ -287,80 +239,66 @@ def inject_globals():
         "is_admin": session.get("role") == "admin",
         "current_year": today_local().year,
         "notif_count": g.get("notif_count", 0),
-        "session_avatar_url": avatar_url(session.get("profile_photo")),
-        "dataset": dataset_status() if session.get("user_id") else {"demo": False, "synthetic_files": []},
         "pending_accounts": pending["accounts"],
         "pending_requests": pending["requests"],
     }
 
-
-_NOTIF_TABLE_READY = {"ok": False}
 NOTIF_KEY_RE = re.compile(r"[a-z]+:\d+(:[a-z0-9]+)?")
-
-
-def _ensure_notif_table():
-    """Creates the per-user 'removed notifications' table on first use, so an
-    existing database needs no manual migration."""
-    if _NOTIF_TABLE_READY["ok"]:
-        return
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS notification_dismissals (
-            user_id INT NOT NULL,
-            notif_key VARCHAR(80) NOT NULL,
-            dismissed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, notif_key),
-            CONSTRAINT fk_notif_dismissals_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB
-    """)
-    _NOTIF_TABLE_READY["ok"] = True
 
 
 def build_notifications(limit=8):
     """Bell notifications for the current user, minus the ones they removed.
 
-    * administrators: fuel requests waiting for approval (actionable);
+    * administrators: sign-ups and fuel requests waiting for approval (actionable);
     * staff: approvals / rejections of their own fuel requests, counted as
       new until they open the bell.
     Each item has a `key`; a removed key stays hidden, but a new event gets a
     new key (e.g. an approved request that is later rejected shows up again)."""
-    _ensure_notif_table()
     uid, is_admin = session.get("user_id"), session.get("role") == "admin"
-    removed = {r["notif_key"] for r in db.query_all(
-        "SELECT notif_key FROM notification_dismissals WHERE user_id = %s", (uid,))}
+    removed = {r["notif_key"] for r in db.find("notification_dismissals", user_id=uid)}
     items, count = [], 0
+    newest = lambda rows, field: sorted(rows, key=lambda r: (r[field] or datetime.min, r["id"]), reverse=True)
     if is_admin:
-        pending = db.query_all("""
-            SELECT p.id, p.predicted_fuel, p.route, p.created_at, v.plate_number, u.full_name
-            FROM predictions p LEFT JOIN vehicles v ON p.vehicle_id = v.id LEFT JOIN users u ON p.user_id = u.id
-            WHERE p.approval_status = 'pending' ORDER BY p.created_at DESC, p.id DESC
-        """)
-        pending = [r for r in pending if f"request:{r['id']}" not in removed]
+        users_by_id = {u["id"]: u for u in db.records("users")}
+        vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+        signups = [r for r in newest(db.find("users", status="pending"), "created_at")
+                   if f"account:{r['id']}" not in removed]
+        count += len(signups)
+        for r in signups[:limit]:
+            items.append({"kind": "account", "id": r["id"], "key": f"account:{r['id']}", "icon": "fa-user-plus",
+                          "text": f"New sign-up: {r['full_name']}",
+                          "sub": f"{r['username']} · waiting for approval",
+                          "time": r["created_at"].strftime("%b %d, %I:%M %p"),
+                          "url": url_for("users"), "new": True})
+        pending = [r for r in newest(db.find("predictions", approval_status="pending"), "created_at")
+                   if f"request:{r['id']}" not in removed]
         count += len(pending)
         for r in pending[:limit]:
+            v, u = vehicles_by_id.get(r["vehicle_id"]), users_by_id.get(r["user_id"])
             items.append({"kind": "request", "id": r["id"], "key": f"request:{r['id']}", "icon": "fa-file-signature",
                           "text": f"Fuel request #{r['id']} needs approval",
-                          "sub": f"{r['plate_number'] or 'Manual Entry'} · {float(r['predicted_fuel']):.2f} L predicted · {r['full_name'] or 'Staff'}",
+                          "sub": f"{v['plate_number'] if v else 'Vehicle deleted'} · {float(r['predicted_fuel']):.2f} L predicted · {u['full_name'] if u else 'Staff'}",
                           "time": r["created_at"].strftime("%b %d, %I:%M %p"),
                           "url": url_for("prediction_result", prediction_id=r["id"]), "new": True})
     else:
-        seen = db.query_one("SELECT notif_seen_at FROM users WHERE id = %s", (uid,))["notif_seen_at"]
-        decided = db.query_all("""
-            SELECT p.id, p.approval_status, p.approved_fuel, p.predicted_fuel, p.reviewed_at, v.plate_number
-            FROM predictions p LEFT JOIN vehicles v ON p.vehicle_id = v.id
-            WHERE p.user_id = %s AND p.approval_status <> 'pending' AND p.reviewed_at IS NOT NULL
-              AND p.reviewed_at >= NOW() - INTERVAL 14 DAY
-            ORDER BY p.reviewed_at DESC
-        """, (uid,))
-        decided = [r for r in decided if f"decision:{r['id']}:{r['approval_status']}" not in removed][:limit]
+        seen = (db.get("users", uid) or {}).get("notif_seen_at")
+        since = now_local() - timedelta(days=14)
+        vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+        decided = [p for p in db.find("predictions", user_id=uid)
+                   if p["approval_status"] != "pending" and p["reviewed_at"] is not None and p["reviewed_at"] >= since]
+        decided = [r for r in newest(decided, "reviewed_at")
+                   if f"decision:{r['id']}:{r['approval_status']}" not in removed][:limit]
         for r in decided:
             is_new = seen is None or r["reviewed_at"] > seen
             count += 1 if is_new else 0
             approved = r["approval_status"] == "approved"
+            v = vehicles_by_id.get(r["vehicle_id"])
+            plate = v["plate_number"] if v else "Vehicle deleted"
             items.append({"kind": "decision", "id": r["id"], "key": f"decision:{r['id']}:{r['approval_status']}",
                           "icon": "fa-circle-check" if approved else "fa-circle-xmark",
                           "text": f"Fuel request #{r['id']} {'approved' if approved else 'rejected'}",
-                          "sub": (f"{r['plate_number'] or 'Manual Entry'} · {float(r['approved_fuel']):.2f} L released"
-                                  if approved and r["approved_fuel"] is not None else f"{r['plate_number'] or 'Manual Entry'}"),
+                          "sub": (f"{plate} · {float(r['approved_fuel']):.2f} L released"
+                                  if approved and r["approved_fuel"] is not None else plate),
                           "time": r["reviewed_at"].strftime("%b %d, %I:%M %p"),
                           "url": url_for("prediction_result", prediction_id=r["id"]), "new": is_new,
                           "status": r["approval_status"]})
@@ -384,13 +322,16 @@ def api_notifications():
 
 def _dismiss(keys):
     keys = [k for k in keys if isinstance(k, str) and len(k) <= 80 and NOTIF_KEY_RE.fullmatch(k)]
-    _ensure_notif_table()
+    uid = session["user_id"]
     for k in keys:
-        db.execute("INSERT IGNORE INTO notification_dismissals (user_id, notif_key) VALUES (%s, %s)",
-                   (session["user_id"], k))
-    # Keys of events long past are never shown again; keep the table small.
-    db.execute("DELETE FROM notification_dismissals WHERE user_id = %s AND dismissed_at < NOW() - INTERVAL 90 DAY",
-               (session["user_id"],))
+        doc_id = f"{uid}_{k.replace(':', '-')}"
+        if not db.get("notification_dismissals", doc_id):
+            db.put("notification_dismissals", doc_id, {"user_id": uid, "notif_key": k, "dismissed_at": now_local()})
+    # Keys of events long past are never shown again; keep the collection small.
+    cutoff = now_local() - timedelta(days=90)
+    for r in db.find("notification_dismissals", user_id=uid):
+        if r["dismissed_at"] and r["dismissed_at"] < cutoff:
+            db.delete("notification_dismissals", r["id"])
     return len(keys)
 
 
@@ -416,7 +357,7 @@ def api_notifications_dismiss_all():
 @login_required
 def api_notifications_seen():
     """Opening the bell marks the current decisions as read (staff)."""
-    db.execute("UPDATE users SET notif_seen_at = NOW() WHERE id = %s", (session["user_id"],))
+    db.update("users", session["user_id"], notif_seen_at=now_local())
     return {"ok": True}
 
 
@@ -428,7 +369,7 @@ def index():
     return redirect(url_for("dashboard") if session.get("user_id") else url_for("login"))
 
 
-# Passwords of the seeded demo accounts (seed_data.py / README); anyone who
+# Default passwords of earlier installations; anyone who
 # reads the guide knows them, so users logging in with one are sent to change it.
 DEFAULT_PASSWORDS = {"Admin@12345", "Motorpool@2026"}
 
@@ -460,6 +401,28 @@ def _record_login_failure(key):
         _LOGIN_FAILURES[key] = (count + 1, first)
 
 
+def start_session(user):
+    """Signs the account in on this browser (after a correct password, or
+    automatically once an administrator approves a sign-up made here)."""
+    session.clear()
+    session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (8 hours)
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+    session["full_name"] = user["full_name"]
+    session["role"] = effective_role(user)
+    session["pw_sig"] = password_signature(user["password_hash"])
+
+
+def wait_for_approval(user):
+    """Remember, on this browser only, the pending account whose password was
+    just given: the waiting page then signs it in by itself once approved."""
+    session.clear()
+    session.permanent = True
+    session["pending_user_id"] = user["id"]
+    session["pending_pw_sig"] = password_signature(user["password_hash"])
+    return redirect(url_for("signup_pending"))
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("user_id"):
@@ -475,26 +438,17 @@ def login():
             flash(f"Too many failed login attempts. Please try again in {wait // 60 + 1} minute(s).", "danger")
             return render_template("login.html")
 
-        user = db.query_one("SELECT * FROM users WHERE username = %s", (username,))
-        if user and check_password_hash(user["password_hash"], password) and user["status"] != "active":
-            _LOGIN_FAILURES.pop(key, None)
-            if user["status"] == "pending":
-                flash("Your account is waiting for administrator approval. Please try again once it is approved.", "warning")
-            else:
-                flash("Your account has been deactivated. Please contact the administrator.", "danger")
-            return render_template("login.html")
+        user = find_user(username)
         if user and check_password_hash(user["password_hash"], password):
             _LOGIN_FAILURES.pop(key, None)
-            session.clear()
-            session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (8 hours)
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            session["full_name"] = user["full_name"]
-            session["role"] = user["role"]
-            session["profile_photo"] = user["profile_photo"]
-            session["pw_sig"] = password_signature(user["password_hash"])
+            if user["status"] == "pending":
+                return wait_for_approval(user)
+            if user["status"] != "active":
+                flash("Your account has been deactivated. Please contact the administrator.", "danger")
+                return render_template("login.html")
+            start_session(user)
             flash(f"Welcome back, {user['full_name']}.", "success")
-            if password in DEFAULT_PASSWORDS:
+            if password in DEFAULT_PASSWORDS and user["username"] != ADMIN_ACCOUNT:
                 session["must_change_pw"] = True  # every other page stays locked until it is changed
                 flash("You are still using the default password that is printed in the setup guide. "
                       "Change it now under Change Password to continue using the system.", "warning")
@@ -511,11 +465,55 @@ _SIGNUPS = {}
 SIGNUP_LIMIT_PER_HOUR = 5
 
 
+def find_user(username):
+    """Account with this username (exact match, like the login form)."""
+    return next((u for u in db.records("users") if u["username"] == username), None)
+
+
+def username_taken(username, except_id=None):
+    name = (username or "").strip().lower()
+    return any(u["username"].lower() == name and u["id"] != except_id for u in db.records("users"))
+
+
+def email_taken(email, except_id=None):
+    email = (email or "").strip().lower()
+    return any((u["email"] or "").lower() == email and u["id"] != except_id for u in db.records("users"))
+
+
+def signup_field_problem(field, value):
+    """Live check of one sign-up field (the same rules run again on submit). None when valid."""
+    value = (value or "").strip()
+    if field == "username":
+        if not USERNAME_RE.fullmatch(value):
+            return "3-50 characters: letters, numbers, dot, dash or underscore."
+        if username_taken(value):
+            return f"Username {value} is already taken."
+    elif field == "email":
+        if not value:
+            return "Email is required."
+        if len(value) > 120 or not EMAIL_RE.fullmatch(value):
+            return "Please enter a valid email address."
+        if email_taken(value):
+            return "That email address is already used by another account."
+    return None
+
+
+@app.route("/api/signup/check")
+def api_signup_check():
+    """Checked while the user types on the sign-up page."""
+    field = request.args.get("field", "")
+    if field not in ("username", "email"):
+        return {"error": "invalid_field"}, 400
+    problem = signup_field_problem(field, request.args.get("value", ""))
+    return {"ok": problem is None, "message": problem or ("Username is available." if field == "username" else "")}
+
+
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     """Self-registration for GSO and motorpool staff. New accounts are
-    created as 'pending' staff accounts and can log in only after an
-    administrator approves them under User Accounts."""
+    created as 'pending' staff accounts; the browser that signed up waits on
+    the approval page and is signed in automatically once an administrator
+    approves the account under User Accounts."""
     if session.get("user_id"):
         return redirect(url_for("dashboard"))
     form = {}
@@ -527,29 +525,86 @@ def signup():
             recent = [t for t in _SIGNUPS.get(ip, []) if time.time() - t < 3600]
             _SIGNUPS[ip] = recent
         errors, full_name, email = validate_user_form(dict(f, role="staff", status="active"))
+        if not (f.get("email") or "").strip():
+            errors.insert(0, "Email is required.")
         problem = password_problem(f.get("password", ""), f.get("username", ""))
         if problem:
             errors.append(problem)
         elif f.get("password") != f.get("confirm_password"):
             errors.append("Password and confirmation do not match.")
-        if not (f.get("email") or "").strip():
-            errors.insert(0, "Email is required.")
-        if not f.get("agree_terms"):
-            errors.append("You must agree to the Terms & Conditions and Privacy Policy.")
         if len(recent) >= SIGNUP_LIMIT_PER_HOUR:
             errors = ["Too many sign-ups from this computer. Please try again later."]
         if errors:
             for e in errors:
                 flash(e, "danger")
             return render_template("signup.html", form=form)
-        db.execute("""INSERT INTO users (username, password_hash, full_name, email, role, status)
-                      VALUES (%s, %s, %s, %s, 'staff', 'pending')""",
-                   (f["username"].strip(), generate_password_hash(f["password"]), full_name, email or None))
+        user_id = db.insert("users", {"username": f["username"].strip(), "password_hash": generate_password_hash(f["password"]),
+                                      "full_name": full_name, "email": email or None, "role": "staff", "status": "pending"})
         with _LOGIN_LOCK:
             _SIGNUPS.setdefault(ip, []).append(time.time())
-        flash("Account created! An administrator must approve it before you can log in.", "success")
-        return redirect(url_for("login"))
+        return wait_for_approval(db.get("users", user_id))
     return render_template("signup.html", form=form)
+
+
+def _pending_account():
+    """The account this browser waits on and its state: 'pending', 'approved',
+    'inactive', or 'gone' (rejected, or its password was reset meanwhile)."""
+    uid = session.get("pending_user_id")
+    if not uid:
+        return None, None
+    user = db.get("users", uid)
+    if not user or password_signature(user["password_hash"]) != session.get("pending_pw_sig"):
+        return None, "gone"
+    return user, {"active": "approved"}.get(user["status"], user["status"])
+
+
+def _end_wait(state):
+    session.clear()
+    flash("Your sign-up request was not approved. Please contact the administrator." if state == "gone"
+          else "Your account has been deactivated. Please contact the administrator.", "danger")
+
+
+@app.route("/signup/pending")
+def signup_pending():
+    if session.get("user_id"):
+        return redirect(url_for("dashboard"))
+    user, state = _pending_account()
+    if state is None:
+        return redirect(url_for("login"))
+    if state == "approved":
+        start_session(user)
+        flash(f"Your account was approved. Welcome, {user['full_name']}!", "success")
+        return redirect(url_for("dashboard"))
+    if state != "pending":
+        _end_wait(state)
+        return redirect(url_for("login"))
+    return render_template("signup_pending.html", user=user)
+
+
+@app.route("/api/signup/status")
+def api_signup_status():
+    """Polled by the waiting page every few seconds. Once the administrator
+    approves the account, this browser is signed in right away."""
+    user, state = _pending_account()
+    if state is None:
+        return {"state": "none", "redirect": url_for("login")}
+    if state == "approved":
+        start_session(user)
+        flash(f"Your account was approved. Welcome, {user['full_name']}!", "success")
+        return {"state": "approved", "redirect": url_for("dashboard")}
+    if state != "pending":
+        _end_wait(state)
+        return {"state": state, "redirect": url_for("login")}
+    return {"state": "pending"}
+
+
+@app.route("/signup/cancel", methods=["POST"])
+def signup_cancel():
+    """Stop waiting on this browser (the request stays for the administrator)."""
+    session.pop("pending_user_id", None)
+    session.pop("pending_pw_sig", None)
+    flash("You can log in once the administrator approves your account.", "info")
+    return redirect(url_for("login"))
 
 
 @app.route("/logout", methods=["GET", "POST"])
@@ -572,48 +627,40 @@ def build_dashboard_context():
     waiting for approval and the model status. Staff (motorpool) get their own
     dashboard: only the fuel requests they made, with their status."""
     is_admin = session.get("role") == "admin"
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    users_by_id = {u["id"]: u for u in db.records("users")}
+    trips = db.records("trip_records")
+    fuel_trips = [t for t in trips if t["actual_fuel_consumption"] is not None]
+    all_predictions = db.records("predictions")
     # Scope of the fuel-request figures: everyone's for the admin, own for staff.
-    mine_sql, mine_params = ("", ()) if is_admin else (" AND p.user_id = %s", (session.get("user_id"),))
-    # The fleet-wide figures in one round trip (each query to the cloud database
-    # costs about a tenth of a second).
-    fleet = db.query_one("""
-        SELECT (SELECT COUNT(*) FROM vehicles) AS total_vehicles,
-               (SELECT COUNT(*) FROM trip_records) AS total_trips,
-               (SELECT AVG(actual_fuel_consumption) FROM trip_records
-                 WHERE actual_fuel_consumption IS NOT NULL) AS avg_actual,
-               (SELECT AVG(predicted_fuel) FROM predictions) AS avg_predicted,
-               (SELECT MAX(trip_date) FROM trip_records
-                 WHERE actual_fuel_consumption IS NOT NULL) AS latest_fuel_date,
-               (SELECT COUNT(*) FROM trip_records
-                 WHERE actual_fuel_consumption IS NOT NULL) AS fuel_trips""")
-    total_vehicles, total_trips = fleet["total_vehicles"], fleet["total_trips"]
-    req = db.query_one(f"""
-        SELECT COUNT(*) AS total, SUM(p.approval_status = 'pending') AS pending,
-               SUM(p.approval_status = 'approved') AS approved, SUM(p.approval_status = 'rejected') AS rejected
-        FROM predictions p WHERE 1=1{mine_sql}""", mine_params)
-    total_predictions = int(req["total"] or 0)
-    requests_summary = {k: int(req[k] or 0) for k in ("pending", "approved", "rejected")}
+    scoped = all_predictions if is_admin else [p for p in all_predictions if p["user_id"] == session.get("user_id")]
+    total_vehicles, total_trips = len(vehicles_by_id), len(trips)
+    total_predictions = len(scoped)
+    requests_summary = {k: sum(p["approval_status"] == k for p in scoped) for k in ("pending", "approved", "rejected")}
 
-    avg_fuel = fleet["avg_actual"] if fleet["avg_actual"] is not None else fleet["avg_predicted"]
+    if fuel_trips:
+        avg_fuel = sum(float(t["actual_fuel_consumption"]) for t in fuel_trips) / len(fuel_trips)
+    elif all_predictions:
+        avg_fuel = sum(float(p["predicted_fuel"]) for p in all_predictions) / len(all_predictions)
+    else:
+        avg_fuel = None
     avg_fuel = round(float(avg_fuel), 2) if avg_fuel is not None else 0.0
 
     # The 10 latest requests serve both the Recent list (first 5) and the chart.
-    latest_rows = db.query_all(f"""
-        SELECT p.*, v.plate_number, v.brand_model, u.full_name
-        FROM predictions p
-        LEFT JOIN vehicles v ON p.vehicle_id = v.id
-        LEFT JOIN users u ON p.user_id = u.id
-        WHERE 1=1{mine_sql}
-        ORDER BY p.created_at DESC, p.id DESC LIMIT 10
-    """, mine_params)
+    latest_rows = sorted(scoped, key=lambda p: (p["created_at"], p["id"]), reverse=True)[:10]
+    for r in latest_rows:
+        v, u = vehicles_by_id.get(r["vehicle_id"]), users_by_id.get(r["user_id"])
+        r.update(plate_number=v["plate_number"] if v else None, brand_model=v["brand_model"] if v else None,
+                 full_name=u["full_name"] if u else None)
     recent_predictions_rows = latest_rows[:5]
     recent_predictions = [{
         "id": r["id"], "status": r["approval_status"],
         "url": url_for("prediction_result", prediction_id=r["id"]),
         "created_at_display": r["created_at"].strftime("%b %d, %Y %I:%M %p"),
-        "plate_number": r["plate_number"] or "Manual Entry",
+        "plate_number": r["plate_number"] or "Vehicle deleted",
         "vehicle_model": r["brand_model"] or "",
         "distance_km": f"{float(r['distance_km']):.2f}",
+        "engine_power_kw": f"{float(r['engine_power_kw']):g} kW" if r["engine_power_kw"] is not None else "—",
         "fuel_type": r["fuel_type"],
         "predicted_fuel": f"{float(r['predicted_fuel']):.2f}",
         "full_name": r["full_name"] or "System",
@@ -622,21 +669,18 @@ def build_dashboard_context():
     # Fuel consumed per month from the trip records (Monthly Report of Official
     # Travel): the last 6 calendar months up to the latest month with records
     # (the reports are often encoded months later), empty months shown as 0.
-    latest = fleet["latest_fuel_date"] or today_local()
+    latest = max((t["trip_date"] for t in fuel_trips), default=None) or today_local()
     months = []
     y, m = latest.year, latest.month
     for _ in range(6):
         months.append((y, m))
         y, m = (y, m - 1) if m > 1 else (y - 1, 12)
     months.reverse()
-    first_month = date(months[0][0], months[0][1], 1)
-    trend_rows = db.query_all("""
-        SELECT DATE_FORMAT(trip_date, '%%Y-%%m') AS ym, SUM(actual_fuel_consumption) AS total
-        FROM trip_records WHERE trip_date >= %s AND actual_fuel_consumption IS NOT NULL
-        GROUP BY ym
-    """, (first_month,))
-    totals = {r["ym"]: float(r["total"]) for r in trend_rows}
-    has_fuel_records = fleet["fuel_trips"] > 0
+    totals = {}
+    for t in fuel_trips:
+        ym = t["trip_date"].strftime("%Y-%m")
+        totals[ym] = totals.get(ym, 0.0) + float(t["actual_fuel_consumption"])
+    has_fuel_records = bool(fuel_trips)
     fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months] if has_fuel_records else []
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
     fuel_trend_months = [f"{y:04d}-{m:02d}" for y, m in months] if has_fuel_records else []  # click -> that month's trips
@@ -651,17 +695,6 @@ def build_dashboard_context():
     avp_missing = sum(a is None for a in avp_actual)
     avp_urls = [url_for("prediction_result", prediction_id=r["id"]) for r in avp_rows]  # click a point -> that request
 
-    usage_rows = db.query_all("""
-        SELECT v.plate_number, COUNT(t.id) AS trip_count
-        FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
-        GROUP BY v.id ORDER BY trip_count DESC, v.plate_number
-    """)
-    if len(usage_rows) > 7:
-        others = sum(r["trip_count"] for r in usage_rows[6:])
-        usage_rows = usage_rows[:6] + [{"plate_number": f"Others ({len(usage_rows) - 6} vehicles)",
-                                        "trip_count": others}]
-    usage_colors = ["#2697ff", "#26e5ff", "#ffcf26", "#ee2727", "#6c5dd3", "#26e5c5", "#ff8a26"]
-
     model_summary = get_metrics() if is_admin else None   # model monitoring is the GSO's
 
     return {
@@ -672,9 +705,6 @@ def build_dashboard_context():
         "fuel_trend_months": fuel_trend_months,
         "avp_labels": avp_labels, "avp_actual": avp_actual, "avp_predicted": avp_predicted, "avp_missing": avp_missing,
         "avp_urls": avp_urls,
-        "vehicle_usage_labels": [r["plate_number"] for r in usage_rows],
-        "vehicle_usage_values": [r["trip_count"] for r in usage_rows],
-        "usage_colors": usage_colors,
         "model_summary": model_summary,
     }
 
@@ -684,11 +714,9 @@ def build_dashboard_context():
 def dashboard():
     ensure_model_current()
     ctx = build_dashboard_context()
-    usage_rows = [{"plate_number": p, "trip_count": v}
-                   for p, v in zip(ctx["vehicle_usage_labels"], ctx["vehicle_usage_values"])]
     hour = now_local().hour
     greeting = "Good morning" if hour < 12 else ("Good afternoon" if hour < 18 else "Good evening")
-    return render_template("dashboard.html", active="dashboard", vehicle_usage=usage_rows,
+    return render_template("dashboard.html", active="dashboard",
                            greeting=greeting, today_long=now_local().strftime("%A, %B %d, %Y"), **ctx)
 
 
@@ -709,10 +737,7 @@ def get_prediction_vehicles():
     """Every registered vehicle with what the model needs from its record:
     engine power (kW) and fuel type."""
     _ensure_vehicle_columns()
-    return db.query_all("""
-        SELECT id, plate_number, brand_model, fuel_type, engine_power_kw
-        FROM vehicles ORDER BY plate_number
-    """)
+    return sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
 
 
 def validate_prediction_form(form):
@@ -814,11 +839,10 @@ def prediction():
         return render_prediction_page(request.form, [f"Invalid input values: {e}"])
     predicted_fuel = max(round(raw_prediction, 2), 0.1)
 
-    pred_id = db.execute("""
-        INSERT INTO predictions (user_id, vehicle_id, distance_km, engine_power_kw, fuel_type, predicted_fuel)
-        VALUES (%s,%s,%s,%s,%s,%s)
-    """, (session["user_id"], vehicle["id"], values["distance_km"], values["engine_power_kw"],
-          values["fuel_type"], predicted_fuel))
+    pred_id = db.insert("predictions", {
+        "user_id": session["user_id"], "vehicle_id": vehicle["id"], "distance_km": values["distance_km"],
+        "engine_power_kw": values["engine_power_kw"], "fuel_type": values["fuel_type"],
+        "predicted_fuel": predicted_fuel})
     flash("Prediction saved and submitted as a fuel request for administrator approval.", "success")
     _link_actuals_quietly()  # the trip may already be encoded
     return redirect(url_for("prediction_result", prediction_id=pred_id))
@@ -843,17 +867,21 @@ def api_prediction_options():
 @app.route("/prediction/result/<int:prediction_id>")
 @login_required
 def prediction_result(prediction_id):
-    pred = db.query_one("""
-        SELECT p.*, v.plate_number, v.brand_model FROM predictions p
-        LEFT JOIN vehicles v ON p.vehicle_id = v.id
-        WHERE p.id = %s
-    """, (prediction_id,))
+    pred = db.get("predictions", prediction_id)
+    if pred:
+        v = db.get("vehicles", pred["vehicle_id"])
+        pred.update(plate_number=v["plate_number"] if v else None, brand_model=v["brand_model"] if v else None)
     if not pred or not can_see_prediction(pred):
         flash("Prediction record not found.", "danger")
         return redirect(url_for("prediction"))
     clamped = float(pred["predicted_fuel"]) <= 0.1  # model output was at/below the 0.1 L floor
     warnings = prediction_warnings(pred, get_metrics(), raw_prediction=0 if clamped else None)
-    reviewer = db.query_one("SELECT full_name FROM users WHERE id = %s", (pred["reviewed_by"],)) if pred["reviewed_by"] else None
+    if pred["vehicle_id"] is not None and not db.find("trip_records", vehicle_id=pred["vehicle_id"]):
+        # Scope and Limitations: only the vehicles with records in the Monthly
+        # Report of Official Travel are included, so other vehicles are not validated.
+        warnings.insert(0, f"{pred['plate_number']} has no trip records in the Monthly Report of Official Travel yet, "
+                           "so this prediction for it is not validated against its own trips.")
+    reviewer = db.get("users", pred["reviewed_by"])
     tolerance = float((get_metrics() or {}).get("rmse") or 2.0)
     predicted = float(pred["predicted_fuel"])
     return render_template("prediction_result.html", active="prediction", pred=pred, warnings=warnings,
@@ -866,8 +894,7 @@ def prediction_result(prediction_id):
 @login_required
 def api_prediction_status(prediction_id):
     """Polled by the result page so an approval / rejection shows up live."""
-    p = db.query_one("""SELECT user_id, approval_status, approved_fuel, reviewed_at, review_note, actual_fuel
-                        FROM predictions WHERE id = %s""", (prediction_id,))
+    p = db.get("predictions", prediction_id)
     if not p or not can_see_prediction(p):
         return {"exists": False}
     return {"exists": True, "signature": "|".join(str(p[k]) for k in
@@ -898,56 +925,48 @@ def prediction_history_data(args):
         page = 1
     per_page = 15
 
-    where, params = ["1=1"], []
-    if q:
-        like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where.append("(v.plate_number LIKE %s OR v.brand_model LIKE %s"
-                     " OR (p.vehicle_id IS NULL AND 'Manual Entry' LIKE %s))")
-        params += [like] * 3
-    if fuel_type in FUEL_TYPES:
-        where.append("p.fuel_type = %s")
-        params.append(fuel_type)
-    if status in ("pending", "approved", "rejected"):
-        where.append("p.approval_status = %s")
-        params.append(status)
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    users_by_id = {u["id"]: u for u in db.records("users")}
+    everything = sorted(db.records("predictions"), key=lambda p: (p["created_at"], p["id"]))
+    # First come, first served: requests are listed in the order they were made,
+    # and each keeps its request number (1 = the first request ever made) even
+    # when the list is filtered or paged, so "No." always names the same request.
+    for i, p in enumerate(everything, 1):
+        v, u, r = (vehicles_by_id.get(p["vehicle_id"]), users_by_id.get(p["user_id"]),
+                   users_by_id.get(p["reviewed_by"]))
+        p.update(request_no=i, plate_number=v["plate_number"] if v else None,
+                 brand_model=v["brand_model"] if v else None,
+                 full_name=u["full_name"] if u else None, reviewer_name=r["full_name"] if r else None)
     # Staff see only the fuel requests they made; the administrator sees all.
     mine = args.get("mine") == "1" or session.get("role") != "admin"
-    if mine:
-        where.append("p.user_id = %s")
-        params.append(session.get("user_id"))
-    where_clause = " AND ".join(where)
+    needle = q.lower()
+
+    def keep(p):
+        if needle:
+            label = [p["plate_number"] or "", p["brand_model"] or ""] if p["vehicle_id"] is not None and p["plate_number"] \
+                else ["Vehicle deleted"]
+            if not any(needle in part.lower() for part in label):
+                return False
+        if fuel_type in FUEL_TYPES and p["fuel_type"] != fuel_type:
+            return False
+        if status in ("pending", "approved", "rejected") and p["approval_status"] != status:
+            return False
+        return not mine or p["user_id"] == session.get("user_id")
+    matching = [p for p in everything if keep(p)]
     # "Predicted range" = predicted fuel ± the model's RMSE (its typical error in liters).
     tolerance = float((get_metrics() or {}).get("rmse") or 2.0)
 
-    stats = db.query_one(f"""
-        SELECT COUNT(*) AS total,
-               SUM(p.actual_fuel IS NOT NULL) AS with_actual,
-               AVG(ABS(p.predicted_fuel - p.actual_fuel)) AS mae,
-               AVG(ABS(p.predicted_fuel - p.actual_fuel) <= 2) AS within2,
-               SUM(p.approval_status = 'pending') AS pending,
-               SUM(ABS(p.predicted_fuel - p.actual_fuel) > %s) AS outside
-        FROM predictions p LEFT JOIN vehicles v ON p.vehicle_id = v.id
-        WHERE {where_clause}
-    """, [tolerance] + params)
+    errors_l = [abs(float(p["predicted_fuel"]) - float(p["actual_fuel"])) for p in matching if p["actual_fuel"] is not None]
+    stats = {"total": len(matching), "with_actual": len(errors_l),
+             "mae": sum(errors_l) / len(errors_l) if errors_l else None,
+             "within2": sum(e <= 2 for e in errors_l) / len(errors_l) if errors_l else None,
+             "pending": sum(p["approval_status"] == "pending" for p in matching),
+             "outside": sum(e > tolerance for e in errors_l)}
     total = int(stats["total"] or 0)
     total_pages = max((total + per_page - 1) // per_page, 1)
     page = min(page, total_pages)
     offset = (page - 1) * per_page
-
-    # First come, first served: requests are listed in the order they were made,
-    # and each keeps its request number (1 = the first request ever made) even
-    # when the list is filtered or paged, so "No." always names the same request.
-    rows = db.query_all(f"""
-        SELECT p.*, v.plate_number, v.brand_model, u.full_name, r.full_name AS reviewer_name,
-               (SELECT COUNT(*) FROM predictions p2
-                WHERE p2.created_at < p.created_at OR (p2.created_at = p.created_at AND p2.id <= p.id)) AS request_no
-        FROM predictions p
-        LEFT JOIN vehicles v ON p.vehicle_id = v.id
-        LEFT JOIN users u ON p.user_id = u.id
-        LEFT JOIN users r ON p.reviewed_by = r.id
-        WHERE {where_clause}
-        ORDER BY p.created_at, p.id LIMIT %s OFFSET %s
-    """, params + [per_page, offset])
+    rows = matching[offset:offset + per_page]
 
     records = []
     for p in rows:
@@ -958,8 +977,8 @@ def prediction_history_data(args):
             "id": p["id"], "num": int(p["request_no"]),
             "created_at": p["created_at"].strftime("%b %d, %Y %I:%M %p"),
             "created_at_long": p["created_at"].strftime("%B %d, %Y %I:%M %p"),
-            "vehicle": p["plate_number"] or "Manual Entry", "vehicle_model": p["brand_model"] or "",
-            "vehicle_label": f"{p['plate_number']} ({p['brand_model']})" if p["plate_number"] else "Manual Entry",
+            "vehicle": p["plate_number"] or "Vehicle deleted", "vehicle_model": p["brand_model"] or "",
+            "vehicle_label": f"{p['plate_number']} ({p['brand_model']})" if p["plate_number"] else "Vehicle deleted",
             "fuel_type": p["fuel_type"],
             "engine_power_kw": f"{float(p['engine_power_kw']):g}" if p.get("engine_power_kw") is not None else "",
             "distance_km": f"{float(p['distance_km']):.2f}",
@@ -1009,7 +1028,7 @@ def api_prediction_history():
 @app.route("/prediction-history/<int:prediction_id>/actual", methods=["POST"])
 @login_required
 def record_actual_fuel(prediction_id):
-    pred = db.query_one("SELECT id, user_id, approval_status FROM predictions WHERE id = %s", (prediction_id,))
+    pred = db.get("predictions", prediction_id)
     if not pred or not can_see_prediction(pred):
         flash("That prediction no longer exists.", "danger")
         return back_to_list("prediction_history")
@@ -1024,11 +1043,10 @@ def record_actual_fuel(prediction_id):
     except ValueError:
         flash("Actual fuel must be a number greater than 0 and at most 1,000 liters.", "danger")
     else:
-        _ensure_prediction_link_columns()
         # Typed in by hand: never changed by the automatic matching from trips.
-        db.execute("""UPDATE predictions SET actual_fuel = %s, actual_source = %s,
-                      trip_record_id = CASE WHEN %s IS NULL THEN NULL ELSE trip_record_id END
-                      WHERE id = %s""", (value, "manual" if value is not None else None, value, prediction_id))
+        db.update("predictions", prediction_id, actual_fuel=value,
+                  actual_source="manual" if value is not None else None,
+                  trip_record_id=pred["trip_record_id"] if value is not None else None)
         if value is None:
             _link_actuals_quietly()  # cleared: let it be matched to its trip again
         flash("Actual fuel consumption recorded." if value is not None else "Actual fuel consumption cleared.", "success")
@@ -1041,7 +1059,7 @@ def review_fuel_request(prediction_id):
     """Administrator approves or rejects a fuel request, using the predicted
     fuel figure as the computed reference (Chapter I: administrators approve
     fuel requests; the prediction replaces manual judgment)."""
-    pred = db.query_one("SELECT id, approval_status, predicted_fuel FROM predictions WHERE id = %s", (prediction_id,))
+    pred = db.get("predictions", prediction_id)
     if not pred:
         flash("That fuel request no longer exists.", "danger")
         return back_to_list("prediction_history")
@@ -1060,8 +1078,8 @@ def review_fuel_request(prediction_id):
         except ValueError:
             flash("Enter the fuel to release: a number greater than 0 and at most 1,000 liters.", "danger")
             return back_to_list("prediction_history")
-    db.execute("""UPDATE predictions SET approval_status=%s, approved_fuel=%s, reviewed_by=%s, reviewed_at=NOW(), review_note=%s
-                  WHERE id=%s""", (decision, approved_fuel, session["user_id"], note, prediction_id))
+    db.update("predictions", prediction_id, approval_status=decision, approved_fuel=approved_fuel,
+              reviewed_by=session["user_id"], reviewed_at=now_local(), review_note=note)
     flash(f"Fuel request #{prediction_id} {decision}" + (f": {approved_fuel:.2f} L to release." if approved_fuel else "."), "success")
     _link_actuals_quietly()  # a rejection frees its trip for another request
     return back_to_list("prediction_history")
@@ -1070,31 +1088,15 @@ def review_fuel_request(prediction_id):
 @app.route("/prediction-history/<int:prediction_id>/delete", methods=["POST"])
 @admin_required
 def delete_prediction(prediction_id):
-    if not db.query_one("SELECT id FROM predictions WHERE id = %s", (prediction_id,)):
+    if not db.get("predictions", prediction_id):
         flash("That prediction no longer exists.", "danger")
         return back_to_list("prediction_history")
-    db.execute("DELETE FROM predictions WHERE id = %s", (prediction_id,))
+    db.delete("predictions", prediction_id)
     compact_ids("predictions")
     flash("Prediction record deleted.", "success")
     return back_to_list("prediction_history")
 
 
-VEHICLE_EXTRA_COLUMNS = (
-    ("engine_power_kw", "DECIMAL(6,2) NULL"),
-)
-# Columns from the earlier design that the study no longer collects (the
-# vehicle records are plate number, model, fuel type and engine power; the
-# Monthly Report of Official Travel records date, distance and fuel consumed).
-# In a database from that design (e.g. an older XAMPP copy) they are made
-# optional, so the current forms can save without them.
-OPTIONAL_LEGACY_COLUMNS = {
-    "vehicles": ("vehicle_type", "engine_displacement", "year_model"),
-    "trip_records": ("trip_type", "departure_time", "route", "road_type", "terrain_classification",
-                     "odometer_reading", "duration_minutes", "avg_speed_kmh"),
-    "predictions": ("odometer_reading", "duration_minutes", "avg_speed_kmh", "trip_type", "departure_time",
-                    "route", "road_type", "terrain_classification", "vehicle_type", "engine_displacement",
-                    "year_model"),
-}
 # Engine power (kW) from published manufacturer specifications matched to each
 # fleet vehicle's model and fuel type (Scope and Limitations). Filled in only
 # where a vehicle has none yet; corrected values are edited in Vehicle Management.
@@ -1113,44 +1115,28 @@ _VEHICLE_COLUMNS_READY = {"ok": False}
 
 
 def _ensure_vehicle_columns():
-    """One-time schema update on first use, so an existing database needs no
-    manual migration: adds the vehicle columns (incl. engine power), adds engine
-    power to the fuel requests, makes the columns the study no longer collects
-    optional, and fills in the published engine power of the fleet vehicles."""
+    """Once per server start: fill in the published engine power of the fleet
+    vehicles that have none yet (corrected values are kept)."""
     if _VEHICLE_COLUMNS_READY["ok"]:
         return
-    columns = db.query_all("""
-        SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLUMN_TYPE AS ty, IS_NULLABLE AS n
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('vehicles', 'trip_records', 'predictions')
-    """)
-    have = {(r["t"], r["c"]): r for r in columns}
-    for name, ddl in VEHICLE_EXTRA_COLUMNS:
-        if ("vehicles", name) not in have:
-            db.execute(f"ALTER TABLE vehicles ADD COLUMN {name} {ddl}")
-    if ("predictions", "engine_power_kw") not in have:
-        db.execute("ALTER TABLE predictions ADD COLUMN engine_power_kw DECIMAL(6,2) NULL")
-    for table, names in OPTIONAL_LEGACY_COLUMNS.items():
-        for name in names:
-            col = have.get((table, name))
-            if col and col["n"] == "NO":
-                db.execute(f"ALTER TABLE {table} MODIFY {name} {col['ty']} NULL")
-    for plate, kw in PUBLISHED_ENGINE_POWER_KW.items():
-        db.execute("UPDATE vehicles SET engine_power_kw = %s WHERE plate_number = %s AND engine_power_kw IS NULL",
-                   (kw, plate))
+    for v in db.records("vehicles"):
+        kw = PUBLISHED_ENGINE_POWER_KW.get(v["plate_number"])
+        if kw is not None and v["engine_power_kw"] is None:
+            db.update("vehicles", v["id"], engine_power_kw=float(kw))
     _VEHICLE_COLUMNS_READY["ok"] = True
+
 
 
 def query_vehicles():
     """Vehicles with how many trip records depend on each one and its last trip."""
     _ensure_vehicle_columns()
-    return db.query_all("""
-        SELECT v.*,
-               (SELECT COUNT(*) FROM trip_records t WHERE t.vehicle_id = v.id) AS trip_count,
-               (SELECT MAX(t.trip_date) FROM trip_records t WHERE t.vehicle_id = v.id) AS last_trip_date
-        FROM vehicles v
-        ORDER BY v.plate_number
-    """)
+    trips = db.records("trip_records")
+    rows = sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
+    for v in rows:
+        mine = [t["trip_date"] for t in trips if t["vehicle_id"] == v["id"]]
+        v.update(trip_count=len(mine), last_trip_date=max(mine) if mine else None)
+    return rows
+
 
 
 def vehicle_record(v, num):
@@ -1172,7 +1158,7 @@ def validate_vehicle_form(f, vehicle_id=None):
         errors.append("Plate number is required.")
     elif len(plate) > 20 or not re.fullmatch(r"[A-Z0-9][A-Z0-9 \-]*", plate):
         errors.append("Plate number may only contain letters, numbers, spaces and dashes (max 20 characters).")
-    elif db.query_one("SELECT id FROM vehicles WHERE plate_number = %s AND id <> %s", (plate, vehicle_id or 0)):
+    elif any(v["plate_number"] == plate and v["id"] != vehicle_id for v in db.records("vehicles")):
         errors.append(f"Plate number {plate} is already registered to another vehicle.")
     model = (f.get("brand_model") or "").strip()
     if not model or len(model) > 100:
@@ -1190,8 +1176,9 @@ def validate_vehicle_form(f, vehicle_id=None):
 
 
 def _vehicle_values(f):
-    return (f["plate_number"].strip().upper(), f["brand_model"].strip(), f["fuel_type"],
-            round(float(f["engine_power_kw"]), 2))
+    return {"plate_number": f["plate_number"].strip().upper(), "brand_model": f["brand_model"].strip(),
+            "fuel_type": f["fuel_type"], "engine_power_kw": round(float(f["engine_power_kw"]), 2)}
+
 
 
 def render_vehicles_page(reopen=None):
@@ -1222,10 +1209,7 @@ def add_vehicle():
         return render_vehicles_page({"modal": "addVehicleModal", "values": request.form.to_dict()})
     try:
         _ensure_vehicle_columns()
-        db.execute("""
-            INSERT INTO vehicles (plate_number, brand_model, fuel_type, engine_power_kw)
-            VALUES (%s,%s,%s,%s)
-        """, _vehicle_values(request.form))
+        db.insert("vehicles", _vehicle_values(request.form))
         flash("Vehicle added successfully.", "success")
     except Exception:
         app.logger.exception("Adding vehicle failed")
@@ -1236,7 +1220,7 @@ def add_vehicle():
 @app.route("/vehicles/<int:vehicle_id>/edit", methods=["POST"])
 @admin_required
 def edit_vehicle(vehicle_id):
-    if not db.query_one("SELECT id FROM vehicles WHERE id = %s", (vehicle_id,)):
+    if not db.get("vehicles", vehicle_id):
         flash("That vehicle no longer exists.", "danger")
         return redirect(url_for("vehicles"))
     errors = validate_vehicle_form(request.form, vehicle_id)
@@ -1246,10 +1230,7 @@ def edit_vehicle(vehicle_id):
                                      "values": request.form.to_dict()})
     try:
         _ensure_vehicle_columns()
-        db.execute("""
-            UPDATE vehicles SET plate_number=%s, brand_model=%s, fuel_type=%s, engine_power_kw=%s
-            WHERE id = %s
-        """, _vehicle_values(request.form) + (vehicle_id,))
+        db.update("vehicles", vehicle_id, **_vehicle_values(request.form))
         flash("Vehicle updated successfully.", "success")
     except Exception:
         app.logger.exception("Updating vehicle failed")
@@ -1260,13 +1241,28 @@ def edit_vehicle(vehicle_id):
 @app.route("/vehicles/<int:vehicle_id>/delete", methods=["POST"])
 @admin_required
 def delete_vehicle(vehicle_id):
-    v = db.query_one("SELECT plate_number FROM vehicles WHERE id = %s", (vehicle_id,))
+    v = db.get("vehicles", vehicle_id)
     if not v:
         flash("That vehicle no longer exists.", "danger")
         return redirect(url_for("vehicles"))
     try:
-        # The vehicle's trip records cascade in the database schema.
-        db.execute("DELETE FROM vehicles WHERE id = %s", (vehicle_id,))
+        # The vehicle's trip records are deleted with it; its fuel requests stay
+        # in the prediction history (as "Vehicle deleted"), and a request whose
+        # actual fuel came from one of those trips loses it.
+        trip_ids = {t["id"] for t in db.find("trip_records", vehicle_id=vehicle_id)}
+        for p in db.records("predictions"):
+            fields = {}
+            if p["vehicle_id"] == vehicle_id:
+                fields["vehicle_id"] = None
+            if p["trip_record_id"] in trip_ids:
+                fields["trip_record_id"] = None
+                if p["actual_source"] == "trip":
+                    fields.update(actual_fuel=None, actual_source=None)
+            if fields:
+                db.update("predictions", p["id"], **fields)
+        for tid in trip_ids:
+            db.delete("trip_records", tid)
+        db.delete("vehicles", vehicle_id)
         compact_ids("vehicles", "trip_records", "predictions")
         flash(f"Vehicle {v['plate_number']} and its trip records were deleted.", "success")
     except Exception:
@@ -1295,19 +1291,18 @@ def trip_record(t, num):
         "trip_date": str(t["trip_date"]), "plate_number": t["plate_number"], "brand_model": t["brand_model"],
         "distance_km": str(t["distance_km"]),
         "actual_fuel_consumption": str(t["actual_fuel_consumption"]) if t["actual_fuel_consumption"] is not None else "",
-        "remarks": t["remarks"] or "",
     }
 
 
 def query_trips():
     _ensure_vehicle_columns()
-    rows = db.query_all("""
-        SELECT t.id, t.vehicle_id, t.trip_date, t.distance_km, t.actual_fuel_consumption, t.remarks,
-               v.plate_number, v.brand_model
-        FROM trip_records t
-        JOIN vehicles v ON t.vehicle_id = v.id
-        ORDER BY t.trip_date, t.id
-    """)
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    rows = []
+    for t in sorted(db.records("trip_records"), key=lambda t: (t["trip_date"], t["id"])):
+        v = vehicles_by_id.get(t["vehicle_id"])
+        if v:
+            t.update(plate_number=v["plate_number"], brand_model=v["brand_model"])
+            rows.append(t)
     # Oldest first (January to December, like the Monthly Report of Official
     # Travel); a newly added or edited trip lands in its date's place automatically.
     return [trip_record(r, i) for i, r in enumerate(rows, 1)]
@@ -1319,7 +1314,7 @@ def validate_trip_form(f, trip_id=None):
     block saving; warnings are shown but the trip is still saved."""
     errors, warnings = [], []
     vid = (f.get("vehicle_id") or "").strip()
-    if not (vid.isdigit() and db.query_one("SELECT id FROM vehicles WHERE id = %s", (vid,))):
+    if not (vid.isdigit() and db.get("vehicles", int(vid))):
         errors.append("Please choose a valid vehicle.")
     try:
         trip_date = date.fromisoformat((f.get("trip_date") or "").strip())
@@ -1327,8 +1322,6 @@ def validate_trip_form(f, trip_id=None):
             errors.append(f"Date of travel must be between 2000-01-01 and today ({today_local().isoformat()}).")
     except ValueError:
         errors.append("Date of travel must be a valid date.")
-    if len((f.get("remarks") or "").strip()) > 255:
-        errors.append("Remarks must be at most 255 characters.")
     values = {}
     for field, label, lo, hi in TRIP_NUMERIC_LIMITS:
         raw = (f.get(field) or "").strip().replace(",", "")
@@ -1349,25 +1342,8 @@ def validate_trip_form(f, trip_id=None):
     return errors, warnings
 
 
-_PREDICTION_LINK_READY = {"ok": False}
 ACTUAL_MATCH_DISTANCE_TOLERANCE = 0.20   # trip distance within ±20% of the requested distance
 ACTUAL_MATCH_DAYS_BEFORE, ACTUAL_MATCH_DAYS_AFTER = 1, 7
-
-
-def _ensure_prediction_link_columns():
-    """predictions.trip_record_id / actual_source: which trip the actual fuel
-    came from and whether it was recorded automatically ('trip') or by hand
-    ('manual'). Added on first use, so an existing database needs no migration."""
-    if _PREDICTION_LINK_READY["ok"]:
-        return
-    have = {r["c"] for r in db.query_all("""
-        SELECT COLUMN_NAME AS c FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'predictions'""")}
-    if "trip_record_id" not in have:
-        db.execute("ALTER TABLE predictions ADD COLUMN trip_record_id INT NULL")
-    if "actual_source" not in have:
-        db.execute("ALTER TABLE predictions ADD COLUMN actual_source VARCHAR(10) NULL")
-    _PREDICTION_LINK_READY["ok"] = True
 
 
 def link_predictions_to_trips():
@@ -1380,42 +1356,45 @@ def link_predictions_to_trips():
        distance is within ±20% of the requested distance (closest first), and
        that is not already matched to another request.
     Manually recorded actual fuel is never changed. Returns the request ids filled."""
-    _ensure_prediction_link_columns()
-    db.execute("""
-        UPDATE predictions p JOIN trip_records t ON p.trip_record_id = t.id
-        SET p.actual_fuel = t.actual_fuel_consumption
-        WHERE p.actual_source = 'trip' AND NOT (p.actual_fuel <=> t.actual_fuel_consumption)""")
-    db.execute("""
-        UPDATE predictions SET trip_record_id = NULL, actual_source = NULL
-        WHERE actual_source = 'trip' AND actual_fuel IS NULL""")
-    # A rejected request released no fuel: it never takes a trip's actual fuel,
-    # and frees any trip it was matched to before it was rejected.
-    db.execute("""
-        UPDATE predictions SET actual_fuel = NULL, trip_record_id = NULL, actual_source = NULL
-        WHERE actual_source = 'trip' AND approval_status = 'rejected'""")
+    trips = {t["id"]: t for t in db.records("trip_records")}
+    preds = sorted(db.records("predictions"), key=lambda p: (p["created_at"], p["id"]))
+
+    def change(p, **fields):
+        if any(p[k] != v for k, v in fields.items()):
+            db.update("predictions", p["id"], **fields)
+            p.update(fields)
+
+    for p in preds:
+        if p["actual_source"] != "trip":
+            continue
+        t = trips.get(p["trip_record_id"])
+        if t is not None and p["actual_fuel"] != t["actual_fuel_consumption"]:
+            change(p, actual_fuel=t["actual_fuel_consumption"])
+        if p["actual_fuel"] is None:
+            change(p, trip_record_id=None, actual_source=None)
+        # A rejected request released no fuel: it never takes a trip's actual fuel,
+        # and frees any trip it was matched to before it was rejected.
+        if p["approval_status"] == "rejected":
+            change(p, actual_fuel=None, trip_record_id=None, actual_source=None)
+    used = {p["trip_record_id"] for p in preds if p["trip_record_id"] is not None}
     filled = []
-    pending = db.query_all("""
-        SELECT id, vehicle_id, distance_km, created_at FROM predictions
-        WHERE actual_fuel IS NULL AND vehicle_id IS NOT NULL AND trip_record_id IS NULL
-          AND approval_status <> 'rejected'
-        ORDER BY created_at, id""")
-    for p in pending:
-        d = float(p["distance_km"])
-        trip = db.query_one("""
-            SELECT t.id, t.actual_fuel_consumption FROM trip_records t
-            WHERE t.vehicle_id = %s AND t.actual_fuel_consumption IS NOT NULL
-              AND t.trip_date BETWEEN DATE(%s) - INTERVAL %s DAY AND DATE(%s) + INTERVAL %s DAY
-              AND ABS(t.distance_km - %s) <= %s
-              AND NOT EXISTS (SELECT 1 FROM predictions q WHERE q.trip_record_id = t.id)
-            ORDER BY ABS(t.distance_km - %s), ABS(DATEDIFF(t.trip_date, %s)), t.id
-            LIMIT 1""", (p["vehicle_id"], p["created_at"], ACTUAL_MATCH_DAYS_BEFORE, p["created_at"],
-                         ACTUAL_MATCH_DAYS_AFTER, d, d * ACTUAL_MATCH_DISTANCE_TOLERANCE, d, p["created_at"]))
-        if trip:
-            db.execute("""UPDATE predictions SET actual_fuel = %s, trip_record_id = %s, actual_source = 'trip'
-                          WHERE id = %s AND actual_fuel IS NULL""",
-                       (trip["actual_fuel_consumption"], trip["id"], p["id"]))
+    for p in preds:
+        if (p["actual_fuel"] is not None or p["vehicle_id"] is None or p["trip_record_id"] is not None
+                or p["approval_status"] == "rejected"):
+            continue
+        d, day = float(p["distance_km"]), p["created_at"].date()
+        lo, hi = day - timedelta(days=ACTUAL_MATCH_DAYS_BEFORE), day + timedelta(days=ACTUAL_MATCH_DAYS_AFTER)
+        candidates = [t for t in trips.values()
+                      if t["vehicle_id"] == p["vehicle_id"] and t["actual_fuel_consumption"] is not None
+                      and lo <= t["trip_date"] <= hi and t["id"] not in used
+                      and abs(float(t["distance_km"]) - d) <= d * ACTUAL_MATCH_DISTANCE_TOLERANCE]
+        if candidates:
+            trip = min(candidates, key=lambda t: (abs(float(t["distance_km"]) - d), abs((t["trip_date"] - day).days), t["id"]))
+            change(p, actual_fuel=trip["actual_fuel_consumption"], trip_record_id=trip["id"], actual_source="trip")
+            used.add(trip["id"])
             filled.append(p["id"])
     return filled
+
 
 
 def _link_actuals_quietly():
@@ -1430,16 +1409,16 @@ def _link_actuals_quietly():
 
 
 def _trip_payload(f):
-    return (
-        f["vehicle_id"], f["trip_date"].strip(),
-        round(float(f["distance_km"].strip().replace(",", "")), 2),
-        round(float(f["actual_fuel_consumption"].strip().replace(",", "")), 2),
-        (f.get("remarks") or "").strip() or None,
-    )
+    return {
+        "vehicle_id": int(f["vehicle_id"]), "trip_date": date.fromisoformat(f["trip_date"].strip()),
+        "distance_km": round(float(f["distance_km"].strip().replace(",", "")), 2),
+        "actual_fuel_consumption": round(float(f["actual_fuel_consumption"].strip().replace(",", "")), 2),
+    }
+
 
 
 def render_trips_page(reopen=None, status=200):
-    vehicles_list = db.query_all("SELECT id, plate_number, brand_model FROM vehicles ORDER BY plate_number")
+    vehicles_list = sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
     return render_template(
         "trips.html", active="trips", trips=query_trips(), vehicles=vehicles_list,
         today=today_local().isoformat(), reopen=reopen,
@@ -1467,10 +1446,7 @@ def add_trip():
         flash("Could not add trip record: " + " ".join(errors), "danger")
         return render_trips_page({"modal": "addTripModal", "values": request.form.to_dict()})
     try:
-        db.execute("""
-            INSERT INTO trip_records (vehicle_id, trip_date, distance_km, actual_fuel_consumption, remarks)
-            VALUES (%s,%s,%s,%s,%s)
-        """, _trip_payload(request.form))
+        db.insert("trip_records", _trip_payload(request.form))
         flash("Trip record added successfully.", "success")
         for w in warnings:
             flash(w, "warning")
@@ -1484,7 +1460,7 @@ def add_trip():
 @app.route("/trips/<int:trip_id>/edit", methods=["POST"])
 @login_required
 def edit_trip(trip_id):
-    if not db.query_one("SELECT id FROM trip_records WHERE id = %s", (trip_id,)):
+    if not db.get("trip_records", trip_id):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
     _ensure_vehicle_columns()
@@ -1494,10 +1470,7 @@ def edit_trip(trip_id):
         return render_trips_page({"modal": "editTripModal", "trip_id": trip_id,
                                   "values": request.form.to_dict()})
     try:
-        db.execute("""
-            UPDATE trip_records SET vehicle_id=%s, trip_date=%s, distance_km=%s, actual_fuel_consumption=%s, remarks=%s
-            WHERE id=%s
-        """, _trip_payload(request.form) + (trip_id,))
+        db.update("trip_records", trip_id, **_trip_payload(request.form))
         flash("Trip record updated successfully.", "success")
         for w in warnings:
             flash(w, "warning")
@@ -1508,182 +1481,21 @@ def edit_trip(trip_id):
     return redirect(url_for("trips"))
 
 
-# CSV import of the Monthly Report of Official Travel (one row per trip).
-IMPORT_COLUMNS = ["plate_number", "trip_date", "distance_km", "actual_fuel_consumption", "remarks"]
-IMPORT_OPTIONAL = {"remarks"}
-IMPORT_MAX_ROWS = 5000
-IMPORT_EXAMPLE_REMARK = "example row - delete before importing"
-IMPORT_NUMERIC = {"distance_km", "actual_fuel_consumption"}
-# Other header spellings people type in Excel, after _header_key() normalisation.
-IMPORT_HEADER_ALIASES = {
-    "plate": "plate_number", "plate_no": "plate_number", "vehicle": "plate_number", "vehicle_plate": "plate_number",
-    "date": "trip_date", "date_of_travel": "trip_date", "travel_date": "trip_date",
-    "distance": "distance_km", "distance_traveled": "distance_km", "distance_travelled": "distance_km",
-    "actual_fuel": "actual_fuel_consumption", "fuel": "actual_fuel_consumption", "fuel_consumed": "actual_fuel_consumption",
-    "fuel_consumption": "actual_fuel_consumption", "liters": "actual_fuel_consumption",
-    "gasoline_diesoline_consumed": "actual_fuel_consumption", "consumed": "actual_fuel_consumption",
-    "remark": "remarks",
-}
-IMPORT_DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d", "%m-%d-%Y", "%d-%b-%Y", "%d-%b-%y",
-                       "%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y")
-
-
-def _header_key(header):
-    """'Distance (km)' -> 'distance', 'Plate Number' -> 'plate_number'."""
-    key = re.sub(r"\(.*?\)", "", (header or "").replace("﻿", "")).strip().lower()
-    key = re.sub(r"[^a-z0-9]+", "_", key).strip("_")
-    return key if key in IMPORT_COLUMNS else IMPORT_HEADER_ALIASES.get(key, key)
-
-
-def _normalize_import_row(row):
-    """Accept common spreadsheet formats: many date styles and numbers with
-    thousands separators."""
-    out = {k: (row.get(k) or "").strip() for k in IMPORT_COLUMNS}
-    d = out["trip_date"].split(" ")[0] if re.match(r"\d{4}-\d{2}-\d{2} ", out["trip_date"]) else out["trip_date"]
-    for fmt in IMPORT_DATE_FORMATS:
-        try:
-            out["trip_date"] = datetime.strptime(d, fmt).date().isoformat()
-            break
-        except ValueError:
-            continue
-    for field in IMPORT_NUMERIC:
-        out[field] = out[field].replace(",", "").replace(" ", "")
-    return out
-
-
-def _decode_csv(raw):
-    """CSV UTF-8 from Excel, or plain 'CSV (Comma delimited)', which Excel
-    saves in the Windows (ANSI) encoding."""
-    try:
-        return raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        return raw.decode("cp1252", errors="replace")
-
-
-def _trip_key(vehicle_id, trip_date, distance, fuel):
-    """Identity of a trip on the report, used to skip rows that were already imported."""
-    return (int(vehicle_id), str(trip_date), round(float(distance), 2), round(float(fuel), 2))
-
-
-@app.route("/trips/import-template.csv")
-@admin_required
-def trip_import_template():
-    output = io.StringIO()
-    output.write("﻿")
-    writer = csv.writer(output)
-    writer.writerow(IMPORT_COLUMNS)
-    writer.writerow(["SFA 4714", "2026-07-01", "120", "12.0", IMPORT_EXAMPLE_REMARK])
-    return Response(output.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": "attachment; filename=trip_records_template.csv"})
-
-
-@app.route("/trips/import", methods=["POST"])
-@admin_required
-def import_trips():
-    """Bulk-import the Monthly Report of Official Travel from a CSV (e.g. saved
-    from Excel). All rows are validated first; nothing is saved unless every
-    row is valid."""
-    _ensure_vehicle_columns()
-    file = request.files.get("file")
-    if not file or not file.filename.lower().endswith(".csv"):
-        flash("Please choose a .csv file (in Excel: File > Save As > CSV UTF-8).", "danger")
-        return redirect(url_for("trips"))
-    text = _decode_csv(file.read())
-    first_line = text.split("\n", 1)[0]
-    delimiter = max((",", ";", "\t"), key=first_line.count)  # Excel uses ';' in some regional settings
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-    headers = [_header_key(h) for h in (reader.fieldnames or [])]
-    reader.fieldnames = headers
-    missing = [c for c in IMPORT_COLUMNS if c not in IMPORT_OPTIONAL and c not in headers]
-    if missing:
-        flash("The CSV is missing these columns: " + ", ".join(missing) + ". Download the template for the exact headers.", "danger")
-        return redirect(url_for("trips"))
-
-    vehicles_by_plate = {v["plate_number"].upper(): v["id"] for v in db.query_all("SELECT id, plate_number FROM vehicles")}
-    existing = {_trip_key(t["vehicle_id"], t["trip_date"], t["distance_km"], t["actual_fuel_consumption"])
-                for t in db.query_all("""SELECT vehicle_id, trip_date, distance_km, actual_fuel_consumption
-                                         FROM trip_records WHERE actual_fuel_consumption IS NOT NULL""")}
-    payloads, errors, warnings_count, duplicates, examples = [], [], 0, 0, 0
-    rows = list(reader)
-    if len(rows) > IMPORT_MAX_ROWS:
-        flash(f"Import at most {IMPORT_MAX_ROWS} rows at a time.", "danger")
-        return redirect(url_for("trips"))
-    for line_no, raw in enumerate(rows, start=2):  # row 1 is the header
-        if not any(str(v or "").strip() for k, v in raw.items() if k is not None):
-            continue
-        row = _normalize_import_row(raw)
-        if row["remarks"].lower() == IMPORT_EXAMPLE_REMARK:
-            examples += 1  # the template's sample row, left in by mistake
-            continue
-        vid = vehicles_by_plate.get(row["plate_number"].upper())
-        if not vid:
-            errors.append(f"Row {line_no}: unknown plate number '{row['plate_number']}' (add the vehicle first).")
-            continue
-        form = dict(row, vehicle_id=str(vid))
-        row_errors, row_warnings = validate_trip_form(form)
-        errors.extend(f"Row {line_no}: {e}" for e in row_errors)
-        if row_errors:
-            continue
-        key = _trip_key(vid, row["trip_date"], row["distance_km"], row["actual_fuel_consumption"])
-        if key in existing:
-            duplicates += 1  # already in the system (e.g. the same file imported twice)
-            continue
-        existing.add(key)
-        warnings_count += len(row_warnings)
-        payloads.append(_trip_payload(form))
-    if errors:
-        shown = errors[:8]
-        more = f" ...and {len(errors) - 8} more." if len(errors) > 8 else ""
-        flash("Nothing was imported. Fix these rows and try again: " + " ".join(shown) + more, "danger")
-        return redirect(url_for("trips"))
-    skipped = []
-    if duplicates:
-        skipped.append(f"{duplicates} row(s) skipped because the trip is already recorded")
-    if examples:
-        skipped.append("the template's example row was skipped")
-    if not payloads:
-        flash(("No new trip records to import: " + "; ".join(skipped) + ".") if skipped else "The CSV has no data rows.",
-              "warning" if skipped else "danger")
-        return redirect(url_for("trips"))
-
-    conn = db.get_db()
-    try:
-        conn.begin()
-        with conn.cursor() as cur:
-            cur.executemany("""
-                INSERT INTO trip_records (vehicle_id, trip_date, distance_km, actual_fuel_consumption, remarks)
-                VALUES (%s,%s,%s,%s,%s)
-            """, payloads)
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        app.logger.exception("Trip import failed")
-        flash("Nothing was imported because of a database error. Please try again.", "danger")
-        return redirect(url_for("trips"))
-    msg = f"Imported {len(payloads)} trip record(s). The model retrains automatically."
-    if skipped:
-        msg += " " + "; ".join(skipped).capitalize() + "."
-    if warnings_count:
-        msg += f" {warnings_count} row(s) have an unusual fuel use per 100 km; please review them."
-    flash(msg, "success")
-    _link_actuals_quietly()
-    return redirect(url_for("trips"))
-
-
 @app.route("/trips/<int:trip_id>/delete", methods=["POST"])
 @admin_required
 def delete_trip(trip_id):
-    if not db.query_one("SELECT id FROM trip_records WHERE id = %s", (trip_id,)):
+    if not db.get("trip_records", trip_id):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
     try:
         # A fuel request whose actual fuel came from this trip loses it (and may
         # be matched again to another trip below); manual entries are kept.
-        _ensure_prediction_link_columns()
-        db.execute("""UPDATE predictions SET actual_fuel = NULL, trip_record_id = NULL, actual_source = NULL
-                      WHERE trip_record_id = %s AND actual_source = 'trip'""", (trip_id,))
-        db.execute("UPDATE predictions SET trip_record_id = NULL WHERE trip_record_id = %s", (trip_id,))
-        db.execute("DELETE FROM trip_records WHERE id = %s", (trip_id,))
+        for p in db.find("predictions", trip_record_id=trip_id):
+            if p["actual_source"] == "trip":
+                db.update("predictions", p["id"], actual_fuel=None, trip_record_id=None, actual_source=None)
+            else:
+                db.update("predictions", p["id"], trip_record_id=None)
+        db.delete("trip_records", trip_id)
         compact_ids("trip_records")
         flash("Trip record deleted successfully.", "success")
         _link_actuals_quietly()
@@ -1700,15 +1512,15 @@ _MODEL_CHARTS_CACHE = {"key": None, "data": None}
 _RETRAIN_LOCK = threading.Lock()
 _LAST_DATA_CHECK = {"at": 0.0}
 
-# Every value the model trains on from a trip and its vehicle, so adding,
-# editing or deleting a trip record (or editing a vehicle) changes the fingerprint.
-_SYSTEM_DATA_FINGERPRINT_SQL = """
-    SELECT COUNT(*) AS n,
-           COALESCE(SUM(CRC32(CONCAT_WS('|', t.id, t.trip_date, t.distance_km, t.actual_fuel_consumption,
-               v.plate_number, v.fuel_type, v.engine_power_kw))), 0) AS crc
-    FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
-    WHERE t.actual_fuel_consumption IS NOT NULL
-"""
+def _system_trips():
+    """Trips with fuel consumed, joined to their vehicle, oldest first."""
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    rows = []
+    for t in sorted(db.records("trip_records"), key=lambda t: (t["trip_date"], t["id"])):
+        v = vehicles_by_id.get(t["vehicle_id"])
+        if v and t["actual_fuel_consumption"] is not None:
+            rows.append((t, v))
+    return rows
 
 
 def load_system_trip_records():
@@ -1717,20 +1529,19 @@ def load_system_trip_records():
     (engine power and fuel type) using the plate number."""
     from model.preprocess import merge_trips_and_vehicles
     _ensure_vehicle_columns()
-    trips = pd.DataFrame(db.query_all("""
-        SELECT t.trip_date, v.plate_number, t.distance_km, t.actual_fuel_consumption
-        FROM trip_records t JOIN vehicles v ON t.vehicle_id = v.id
-        WHERE t.actual_fuel_consumption IS NOT NULL
-        ORDER BY t.trip_date, t.id
-    """))
+    trips = pd.DataFrame([{"trip_date": t["trip_date"], "plate_number": v["plate_number"],
+                           "distance_km": t["distance_km"], "actual_fuel_consumption": t["actual_fuel_consumption"]}
+                          for t, v in _system_trips()])
     if trips.empty:
         return trips
-    vehicles = pd.DataFrame(db.query_all("SELECT plate_number, brand_model, fuel_type, engine_power_kw FROM vehicles"))
+    vehicles = pd.DataFrame([{k: v[k] for k in ("plate_number", "brand_model", "fuel_type", "engine_power_kw")}
+                             for v in db.records("vehicles")])
     df = merge_trips_and_vehicles(trips, vehicles)
     df["trip_date"] = df["trip_date"].astype(str)
     for col in ("distance_km", "actual_fuel_consumption", "engine_power_kw"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
+
 
 
 def load_training_frame():
@@ -1745,10 +1556,17 @@ def load_training_frame():
 def current_data_fingerprint():
     """Changes whenever the CSV datasets or any trip/vehicle data the model
     trains on changes."""
+    import zlib
     _ensure_vehicle_columns()
-    fp = db.query_one(_SYSTEM_DATA_FINGERPRINT_SQL)
+    # Every value the model trains on from a trip and its vehicle, so adding,
+    # editing or deleting a trip record (or editing a vehicle) changes the fingerprint.
+    rows = _system_trips()
+    crc = sum(zlib.crc32("|".join(str(x) for x in (
+        t["id"], t["trip_date"], f"{float(t['distance_km']):.2f}", f"{float(t['actual_fuel_consumption']):.2f}",
+        v["plate_number"], v["fuel_type"], "" if v["engine_power_kw"] is None else f"{float(v['engine_power_kw']):.2f}"))
+        .encode()) for t, v in rows)
     mtimes = [os.path.getmtime(app.config[k]) for k in ("HISTORICAL_DATA_PATH", "SUPPLEMENTARY_DATA_PATH")]
-    return f"{mtimes[0]:.0f}-{mtimes[1]:.0f}-{int(fp['n'])}-{int(fp['crc'])}"
+    return f"{mtimes[0]:.0f}-{mtimes[1]:.0f}-{len(rows)}-{crc}"
 
 
 def retrain_model(log=None):
@@ -1773,7 +1591,7 @@ RETRAIN_RETRY_SECONDS = 60  # wait this long before retrying a retrain that fail
 # Form submissions that change the model's training data; after any of these
 # the watcher is woken immediately instead of waiting for its next tick.
 _DATA_CHANGING_ENDPOINTS = {
-    "add_trip", "edit_trip", "delete_trip", "import_trips",
+    "add_trip", "edit_trip", "delete_trip",
     "add_vehicle", "edit_vehicle", "delete_vehicle",
 }
 
@@ -1854,10 +1672,10 @@ BACKUP_INTERVAL_HOURS = 24
 
 
 def _latest_backup_age_hours():
-    from backup_database import BACKUP_DIR
+    from backup_database import BACKUP_DIR, PREFIX
     try:
         files = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
-                 if f.startswith(app.config["MYSQL_DB"] + "_") and f.endswith(".sql")]
+                 if f.startswith(PREFIX) and f.endswith(".json")]
     except FileNotFoundError:
         return None
     if not files:
@@ -1964,7 +1782,7 @@ def model_performance():
 @admin_required
 def export_training_dataset(name):
     """The model's training data for the Google Colab notebook
-    (notebooks/fuel_consumption_linear_regression.ipynb), as the three CSV files
+    (colab/fuel_consumption_linear_regression.ipynb), as the three CSV files
     of Chapter III (How the Project Will Work):
 
     * trip_records - the Monthly Report of Official Travel: date of travel,
@@ -1984,8 +1802,8 @@ def export_training_dataset(name):
         body = data.to_csv(index=False).encode("utf-8")
     elif name == "vehicle_records":
         _ensure_vehicle_columns()
-        data = pd.DataFrame(db.query_all("SELECT plate_number, brand_model, fuel_type, engine_power_kw FROM vehicles "
-                                         "ORDER BY plate_number"), columns=VEHICLE_COLUMNS)
+        data = pd.DataFrame([{k: v[k] for k in VEHICLE_COLUMNS} for v in
+                             sorted(db.records("vehicles"), key=lambda v: v["plate_number"])], columns=VEHICLE_COLUMNS)
         body = data.to_csv(index=False).encode("utf-8")
     else:
         flash("Unknown dataset.", "danger")
@@ -2011,266 +1829,7 @@ def api_model_status():
 @admin_required
 def api_model_performance_data():
     ensure_model_current()
-    return {"metrics": get_metrics(), "charts": build_model_charts(), "dataset": dataset_status()}
-
-
-# ------------------------------------------------------------------
-# REPORTS
-# ------------------------------------------------------------------
-# Which filters each report actually uses (the page disables the others).
-REPORT_FILTERS = {
-    "vehicle": ["vehicle_id", "fuel_type"],
-    "trip": ["date_from", "date_to", "vehicle_id"],
-    "prediction": ["date_from", "date_to", "vehicle_id", "fuel_type"],
-    "model": [],
-}
-
-
-def parse_report_args(args):
-    """Validate the report filters. Returns (filters, errors); filters only
-    contains the ones that apply to the chosen report type."""
-    errors = []
-    report_type = args.get("type", "")
-    if report_type not in REPORT_TYPES:
-        return {"type": None}, ["Please choose a valid report type."]
-    f = {"type": report_type}
-    allowed = REPORT_FILTERS[report_type]
-    for key in ("date_from", "date_to"):
-        raw = (args.get(key) or "").strip()
-        if key in allowed and raw:
-            try:
-                f[key] = date.fromisoformat(raw)
-            except ValueError:
-                errors.append(f"{'Date From' if key == 'date_from' else 'Date To'} is not a valid date.")
-    if f.get("date_from") and f.get("date_to") and f["date_from"] > f["date_to"]:
-        errors.append("Date From must be on or before Date To.")
-    vid = (args.get("vehicle_id") or "").strip()
-    if "vehicle_id" in allowed and vid:
-        v = db.query_one("SELECT id, plate_number FROM vehicles WHERE id = %s", (vid,)) if vid.isdigit() else None
-        if v:
-            f["vehicle_id"], f["vehicle_label"] = v["id"], v["plate_number"]
-        else:
-            errors.append("The selected vehicle does not exist.")
-    ft = args.get("fuel_type") or ""
-    if "fuel_type" in allowed and ft:
-        if ft in FUEL_TYPES:
-            f["fuel_type"] = ft
-        else:
-            errors.append("Please choose a valid fuel type.")
-    return f, errors
-
-
-def _num(v, places=2):
-    return f"{float(v):,.{places}f}"
-
-
-def build_report(f):
-    """Returns (columns, rows, totals) for validated filters `f`. All cell
-    values are strings so the same data serves HTML, JSON and CSV."""
-    from model.preprocess import TERM_LABELS
-    report_type = f["type"]
-    date_from, date_to = f.get("date_from"), f.get("date_to")
-    vehicle_id, fuel_type = f.get("vehicle_id"), f.get("fuel_type")
-    dash = "—"
-
-    if report_type == "vehicle":
-        # The vehicle records: plate number, vehicle model, fuel type and engine power.
-        columns = ["No.", "Plate Number", "Vehicle Model", "Fuel Type", "Engine Power (kW)", "Trips"]
-        where, params = ["1=1"], []
-        if vehicle_id:
-            where.append("v.id = %s"); params.append(vehicle_id)
-        if fuel_type:
-            where.append("v.fuel_type = %s"); params.append(fuel_type)
-        _ensure_vehicle_columns()
-        rows_db = db.query_all(f"""
-            SELECT v.*, (SELECT COUNT(*) FROM trip_records t WHERE t.vehicle_id = v.id) AS trip_count
-            FROM vehicles v WHERE {' AND '.join(where)} ORDER BY v.plate_number""", params)
-        rows = [{"No.": str(i), "Plate Number": r["plate_number"], "Vehicle Model": r["brand_model"],
-                 "Fuel Type": r["fuel_type"],
-                 "Engine Power (kW)": f"{float(r['engine_power_kw']):g}" if r["engine_power_kw"] is not None else dash,
-                 "Trips": str(r["trip_count"])} for i, r in enumerate(rows_db, 1)]
-        totals = {"Vehicles": str(len(rows))}
-
-    elif report_type == "trip":
-        # The Monthly Report of Official Travel: date, vehicle, distance and fuel consumed.
-        columns = ["No.", "Date of Travel", "Vehicle", "Distance (km)", "Fuel Consumed (L)", "L/100 km"]
-        where, params = ["1=1"], []
-        if date_from: where.append("t.trip_date >= %s"); params.append(date_from)
-        if date_to: where.append("t.trip_date <= %s"); params.append(date_to)
-        if vehicle_id: where.append("t.vehicle_id = %s"); params.append(vehicle_id)
-        rows_db = db.query_all(f"""
-            SELECT t.*, v.plate_number FROM trip_records t JOIN vehicles v ON t.vehicle_id=v.id
-            WHERE {' AND '.join(where)} ORDER BY t.trip_date, t.id
-        """, params)
-        rows = []
-        for i, r in enumerate(rows_db, 1):
-            fuel = r["actual_fuel_consumption"]
-            per_100 = float(fuel) / float(r["distance_km"]) * 100 if fuel is not None and float(r["distance_km"]) else None
-            rows.append({"No.": str(i), "Date of Travel": str(r["trip_date"]), "Vehicle": r["plate_number"],
-                         "Distance (km)": str(r["distance_km"]),
-                         "Fuel Consumed (L)": str(fuel) if fuel is not None else dash,
-                         "L/100 km": f"{per_100:.2f}" if per_100 is not None else dash})
-        fuel_vals = [float(r["actual_fuel_consumption"]) for r in rows_db if r["actual_fuel_consumption"] is not None]
-        totals = {"Trips": str(len(rows)),
-                  "Total Distance": _num(sum(float(r["distance_km"]) for r in rows_db)) + " km",
-                  "Total Fuel Consumed": _num(sum(fuel_vals)) + " L",
-                  "Avg Fuel / Trip": (_num(sum(fuel_vals) / len(fuel_vals)) + " L") if fuel_vals else dash}
-
-    elif report_type == "prediction":
-        columns = ["No.", "Date", "Vehicle", "Distance (km)", "Engine Power (kW)", "Fuel Type", "Predicted Fuel (L)",
-                   "Actual Fuel (L)", "Difference (L)"]
-        where, params = ["1=1"], []
-        if date_from: where.append("DATE(p.created_at) >= %s"); params.append(date_from)
-        if date_to: where.append("DATE(p.created_at) <= %s"); params.append(date_to)
-        if vehicle_id: where.append("p.vehicle_id = %s"); params.append(vehicle_id)
-        if fuel_type: where.append("p.fuel_type = %s"); params.append(fuel_type)
-        _ensure_vehicle_columns()
-        rows_db = db.query_all(f"""
-            SELECT p.*, v.plate_number FROM predictions p LEFT JOIN vehicles v ON p.vehicle_id=v.id
-            WHERE {' AND '.join(where)} ORDER BY p.created_at, p.id
-        """, params)  # in request order, like Prediction History
-        rows, errs = [], []
-        for i, r in enumerate(rows_db, 1):
-            diff = None
-            if r["actual_fuel"] is not None:
-                diff = float(r["predicted_fuel"]) - float(r["actual_fuel"])
-                errs.append(abs(diff))
-            rows.append({"No.": str(i), "Date": r["created_at"].strftime("%Y-%m-%d"),
-                         "Vehicle": r["plate_number"] or "Manual Entry",
-                         "Distance (km)": str(r["distance_km"]),
-                         "Engine Power (kW)": f"{float(r['engine_power_kw']):g}" if r.get("engine_power_kw") is not None else dash,
-                         "Fuel Type": r["fuel_type"],
-                         "Predicted Fuel (L)": str(r["predicted_fuel"]),
-                         "Actual Fuel (L)": str(r["actual_fuel"]) if r["actual_fuel"] is not None else dash,
-                         "Difference (L)": f"{diff:.2f}" if diff is not None else dash})
-        totals = {"Predictions": str(len(rows)),
-                  "Total Predicted": _num(sum(float(r["predicted_fuel"]) for r in rows_db)) + " L",
-                  "With Actual": str(len(errs)),
-                  "Average Error": (_num(sum(errs) / len(errs)) + " L") if errs else dash}
-
-    else:  # model
-        columns = ["Metric", "Value"]
-        m = get_metrics()
-        rows = []
-        if m:
-            for label, value in (
-                ("Model Version", m.get("model_version")),
-                ("Train-Test Split", "80% training / 20% testing"),
-                ("R² Score", m.get("r2_score")), ("MAE (L)", m.get("mae")), ("RMSE (L)", m.get("rmse")),
-                ("Cross-Validation Folds", m.get("cv_folds")), ("CV Mean R²", m.get("cv_mean_r2")),
-                ("CV Std. Deviation", m.get("cv_std_r2")),
-                ("CV Mean MAE (L)", m.get("cv_mean_mae")), ("CV Mean RMSE (L)", m.get("cv_mean_rmse")),
-                ("Training Set Size", m.get("train_size")),
-                ("Testing Set Size", m.get("test_size")), ("Total Dataset Records", m.get("total_records")),
-                ("Local Trip Records Used", (m.get("data_sources") or {}).get("system")),
-                ("Supplementary Records Used", (m.get("data_sources") or {}).get("supplementary")),
-                ("Trained At", m.get("trained_at_display")), ("Model Status", (m.get("status") or "").capitalize()),
-            ):
-                if value is not None:
-                    rows.append({"Metric": label, "Value": str(value)})
-            if m.get("coefficients"):
-                centering = m.get("centering") or {}
-                for name, value in (("mean distance", centering.get("distance_km")), ("mean engine power", centering.get("engine_power_kw"))):
-                    if value is not None:
-                        rows.append({"Metric": f"Centering: {name}", "Value": str(value)})
-                rows.append({"Metric": "Intercept (β₀), centered", "Value": str(m.get("intercept"))})
-                for i, term in enumerate(m.get("equation_terms") or [], 1):
-                    rows.append({"Metric": f"β{i} {TERM_LABELS.get(term, term)}, centered", "Value": str(m["coefficients"].get(term))})
-                if m.get("raw_coefficients"):
-                    rows.append({"Metric": "Intercept (β₀), original units", "Value": str(m.get("raw_intercept"))})
-                    for i, term in enumerate(m.get("equation_terms") or [], 1):
-                        rows.append({"Metric": f"β{i} {TERM_LABELS.get(term, term)}, original units",
-                                     "Value": str(m["raw_coefficients"].get(term))})
-            for term, value in (m.get("vif") or {}).items():
-                rows.append({"Metric": f"VIF {TERM_LABELS.get(term, term)}", "Value": "—" if value is None else str(value)})
-            for t in (m.get("diagnostics") or {}).get("tests", []):
-                p = "" if t["p_value"] is None else f", p = {t['p_value']}"
-                rows.append({"Metric": f"{t['assumption']} ({t['test']})",
-                             "Value": f"{'Met' if t['passed'] else 'Not met'} (statistic {t['statistic']}{p})"})
-        totals = {}
-
-    return columns, rows, totals
-
-
-def report_payload(args):
-    f, errors = parse_report_args(args)
-    if errors:
-        return {"errors": errors, "columns": [], "rows": [], "totals": [], "title": ""}
-    columns, rows, totals = build_report(f)
-    applied = []
-    if f.get("date_from") or f.get("date_to"):
-        applied.append(f"Date: {f.get('date_from') or 'start'} to {f.get('date_to') or 'today'}")
-    if f.get("vehicle_label"):
-        applied.append(f"Vehicle: {f['vehicle_label']}")
-    if f.get("fuel_type"):
-        applied.append(f"Fuel: {f['fuel_type']}")
-    return {"errors": [], "type": f["type"], "title": REPORT_TYPES[f["type"]], "columns": columns, "rows": rows,
-            # A list keeps the display order (JSON objects get their keys sorted).
-            "totals": list(totals.items()), "applied": applied or ["All records"],
-            "generated_at": now_local().strftime("%B %d, %Y %I:%M:%S %p")}
-
-
-@app.route("/reports")
-@admin_required
-def reports():
-    vehicles_list = db.query_all("SELECT * FROM vehicles ORDER BY plate_number")
-    generated = "type" in request.args
-    report = report_payload(request.args) if generated else None
-    return render_template(
-        "reports.html", active="reports", report_types=REPORT_TYPES, report_filters=REPORT_FILTERS,
-        vehicles=vehicles_list, generated=generated, report=report,
-    )
-
-
-@app.route("/api/reports")
-@admin_required
-def api_reports():
-    payload = report_payload(request.args)
-    # Keeps the page's Vehicle filter in sync with vehicles added/removed elsewhere.
-    payload["vehicles"] = [{"id": v["id"], "plate_number": v["plate_number"]}
-                           for v in db.query_all("SELECT id, plate_number FROM vehicles ORDER BY plate_number")]
-    return payload
-
-
-def _csv_safe(value):
-    """Stop spreadsheet apps from running cell text as a formula (CSV injection)."""
-    text = "" if value is None else str(value)
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") and not _looks_numeric(text) else text
-
-
-def _looks_numeric(text):
-    try:
-        float(text.replace(",", ""))
-        return True
-    except ValueError:
-        return False
-
-
-@app.route("/reports/export-csv")
-@admin_required
-def export_report_csv():
-    report = report_payload(request.args)
-    if report["errors"]:
-        flash("Could not export report: " + " ".join(report["errors"]), "danger")
-        return redirect(url_for("reports", **request.args))
-    output = io.StringIO()
-    output.write("\ufeff")  # BOM so Excel shows R², ₱ and — correctly
-    writer = csv.writer(output)
-    writer.writerow([report["title"]])
-    writer.writerow(["Generated", report["generated_at"]])
-    writer.writerow(["Filters", "; ".join(report["applied"])])
-    writer.writerow([])
-    writer.writerow(report["columns"])
-    for row in report["rows"]:
-        writer.writerow([_csv_safe(row[c]) for c in report["columns"]])
-    if report["totals"]:
-        writer.writerow([])
-        for label, value in report["totals"]:
-            writer.writerow([label, _csv_safe(value)])
-    return Response(
-        output.getvalue(), mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={report['type']}_report_{today_local().isoformat()}.csv"},
-    )
+    return {"metrics": get_metrics(), "charts": build_model_charts()}
 
 
 # ------------------------------------------------------------------
@@ -2280,9 +1839,9 @@ EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
 def render_settings(form=None, status=200):
-    user = db.query_one("SELECT * FROM users WHERE id = %s", (session["user_id"],))
+    user = db.get("users", session["user_id"])
     return render_template("settings.html", active="settings", user=user, form=form or {},
-                           avatar=avatar_url(user["profile_photo"])), status
+                           admin_account=ADMIN_ACCOUNT), status
 
 
 @app.route("/settings")
@@ -2294,14 +1853,12 @@ def settings():
 @app.route("/api/me")
 @login_required
 def api_me():
-    """Current account details, polled by every page so the name and photo
-    in the top bar (and the settings form) stay in sync across tabs."""
-    user = db.query_one("SELECT username, full_name, email, role, profile_photo FROM users WHERE id = %s",
-                        (session["user_id"],))
+    """Current account details, polled by every page so the name in the
+    top bar (and the settings form) stay in sync across tabs."""
+    user = db.get("users", session["user_id"])
     return {
         "username": user["username"], "full_name": user["full_name"], "email": user["email"] or "",
         "role": user["role"].capitalize(), "initial": (user["full_name"] or "U")[0].upper(),
-        "avatar_url": avatar_url(user["profile_photo"]),
     }
 
 
@@ -2316,86 +1873,24 @@ def update_profile():
     if email:
         if len(email) > 120 or not EMAIL_RE.fullmatch(email):
             errors.append("Please enter a valid email address.")
-        elif db.query_one("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) AND id <> %s", (email, session["user_id"])):
+        elif email_taken(email, session["user_id"]):
             errors.append("That email address is already used by another account.")
     if errors:
         flash("Could not save profile: " + " ".join(errors), "danger")
         return render_settings({"full_name": request.form.get("full_name", ""), "email": email})
-    db.execute("UPDATE users SET full_name=%s, email=%s WHERE id=%s", (full_name, email or None, session["user_id"]))
+    db.update("users", session["user_id"], full_name=full_name, email=email or None)
     session["full_name"] = full_name
     flash("Profile updated successfully.", "success")
     return redirect(url_for("settings"))
 
 
-@app.route("/settings/photo", methods=["POST"])
-@login_required
-def update_profile_photo():
-    file = request.files.get("photo")
-    if not file or not file.filename:
-        return {"success": False, "message": "No file selected."}
-
-    ext = os.path.splitext(secure_filename(file.filename))[1].lower().lstrip(".")
-    if ext not in {"png", "jpg", "jpeg", "webp"}:
-        return {"success": False, "message": "Only PNG, JPG, or WEBP images are allowed."}
-
-    file.seek(0, os.SEEK_END)
-    size = file.tell()
-    file.seek(0)
-    if size > AVATAR_MAX_BYTES:
-        return {"success": False, "message": "Image must be smaller than 3 MB."}
-
-    try:
-        image = Image.open(file)
-        image.verify()
-        file.seek(0)
-        image = Image.open(file).convert("RGB")
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
-        return {"success": False, "message": "That file is not a valid image (or its dimensions are too large)."}
-
-    image.thumbnail((AVATAR_MAX_DIMENSION, AVATAR_MAX_DIMENSION))
-
-    user_id = session["user_id"]
-    for existing in (os.listdir(AVATAR_DIR) if os.path.isdir(AVATAR_DIR) else []):
-        if existing.startswith(f"user_{user_id}."):
-            try:
-                os.remove(os.path.join(AVATAR_DIR, existing))
-            except OSError:
-                pass
-
-    filename = f"user_{user_id}.jpg"
-    try:
-        image.save(os.path.join(AVATAR_DIR, filename), "JPEG", quality=88)
-    except OSError:
-        return {"success": False, "message": "Profile photos cannot be saved on this online server."}
-
-    relative_path = f"images/avatars/{filename}"
-    db.execute("UPDATE users SET profile_photo=%s WHERE id=%s", (relative_path, user_id))
-    session["profile_photo"] = relative_path
-
-    return {"success": True, "url": avatar_url(relative_path)}
-
-
-@app.route("/settings/photo/remove", methods=["POST"])
-@login_required
-def remove_profile_photo():
-    user_id = session["user_id"]
-    for existing in (os.listdir(AVATAR_DIR) if os.path.isdir(AVATAR_DIR) else []):
-        if existing.startswith(f"user_{user_id}."):
-            try:
-                os.remove(os.path.join(AVATAR_DIR, existing))
-            except OSError:
-                pass
-
-    db.execute("UPDATE users SET profile_photo=NULL WHERE id=%s", (user_id,))
-    session["profile_photo"] = None
-
-    return {"success": True}
-
-
 @app.route("/settings/password", methods=["POST"])
 @login_required
 def change_password():
-    user = db.query_one("SELECT * FROM users WHERE id = %s", (session["user_id"],))
+    user = db.get("users", session["user_id"])
+    if user["username"] == ADMIN_ACCOUNT:
+        flash("The administrator account's password is fixed and cannot be changed.", "danger")
+        return redirect(url_for("settings"))
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")
     confirm_password = request.form.get("confirm_password", "")
@@ -2411,7 +1906,7 @@ def change_password():
         flash("New password and confirmation do not match.", "danger")
     else:
         new_hash = generate_password_hash(new_password)
-        db.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, session["user_id"]))
+        db.update("users", session["user_id"], password_hash=new_hash)
         session["pw_sig"] = password_signature(new_hash)  # stay logged in here; other sessions are signed out
         session.pop("must_change_pw", None)
         flash("Password updated successfully. You were signed out on your other devices.", "success")
@@ -2421,7 +1916,7 @@ def change_password():
 # ------------------------------------------------------------------
 # USER ACCOUNTS (admin only)
 # ------------------------------------------------------------------
-USER_ROLES = ["admin", "staff"]
+USER_ROLES = ["staff"]  # the only administrator is ADMIN_ACCOUNT
 USER_STATUSES = ["active", "inactive"]
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.-]{3,50}")
 
@@ -2441,14 +1936,16 @@ def password_problem(password, username=""):
 
 def user_record(u, num):
     return {"id": u["id"], "num": num, "username": u["username"], "full_name": u["full_name"],
-            "email": u["email"] or "", "role": u["role"], "status": u["status"],
+            "email": u["email"] or "", "role": effective_role(u), "status": u["status"],
+            "locked": u["username"] == ADMIN_ACCOUNT,
             "created_at": u["created_at"].strftime("%b %d, %Y") if u["created_at"] else "",
             "is_self": u["id"] == session.get("user_id")}
 
 
 def query_users():
-    rows = db.query_all("SELECT * FROM users ORDER BY status = 'pending' DESC, role = 'admin' DESC, full_name")
+    rows = sorted(db.records("users"), key=lambda u: (u["status"] != "pending", u["role"] != "admin", u["full_name"] or ""))
     return [user_record(u, i) for i, u in enumerate(rows, 1)]
+
 
 
 def validate_user_form(f, user_id=None):
@@ -2459,14 +1956,14 @@ def validate_user_form(f, user_id=None):
         username = (f.get("username") or "").strip()
         if not USERNAME_RE.fullmatch(username):
             errors.append("Username must be 3-50 characters: letters, numbers, dot, dash or underscore.")
-        elif db.query_one("SELECT id FROM users WHERE LOWER(username) = LOWER(%s)", (username,)):
+        elif username_taken(username):
             errors.append(f"Username {username} is already taken.")
     if not 2 <= len(full_name) <= 100:
         errors.append("Full name must be 2 to 100 characters.")
     if email:
         if len(email) > 120 or not EMAIL_RE.fullmatch(email):
             errors.append("Please enter a valid email address.")
-        elif db.query_one("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) AND id <> %s", (email, user_id or 0)):
+        elif email_taken(email, user_id):
             errors.append("That email address is already used by another account.")
     if f.get("role") not in USER_ROLES:
         errors.append("Please choose a valid role.")
@@ -2479,8 +1976,7 @@ def _would_remove_last_admin(user_id, new_role, new_status):
     """True if this change leaves no active administrator."""
     if new_role == "admin" and new_status == "active":
         return False
-    others = db.query_one("SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND status = 'active' AND id <> %s",
-                          (user_id,))["c"]
+    others = sum(u["role"] == "admin" and u["status"] == "active" and u["id"] != user_id for u in db.records("users"))
     return others == 0
 
 
@@ -2510,10 +2006,8 @@ def add_user():
     if errors:
         flash("Could not create account: " + " ".join(errors), "danger")
         return redirect(url_for("users"))
-    db.execute("""INSERT INTO users (username, password_hash, full_name, email, role, status)
-                  VALUES (%s, %s, %s, %s, %s, %s)""",
-               (f["username"].strip(), generate_password_hash(f["password"]), full_name, email or None,
-                f["role"], f["status"]))
+    db.insert("users", {"username": f["username"].strip(), "password_hash": generate_password_hash(f["password"]),
+                        "full_name": full_name, "email": email or None, "role": f["role"], "status": f["status"]})
     flash(f"Account {f['username'].strip()} created. Share the username and password with the user.", "success")
     return redirect(url_for("users"))
 
@@ -2521,9 +2015,12 @@ def add_user():
 @app.route("/users/<int:user_id>/edit", methods=["POST"])
 @admin_required
 def edit_user(user_id):
-    target = db.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+    target = db.get("users", user_id)
     if not target:
         flash("That account no longer exists.", "danger")
+        return redirect(url_for("users"))
+    if target["username"] == ADMIN_ACCOUNT:
+        flash("The administrator account is fixed and cannot be changed here.", "danger")
         return redirect(url_for("users"))
     f = request.form
     errors, full_name, email = validate_user_form(f, user_id)
@@ -2534,8 +2031,7 @@ def edit_user(user_id):
     if errors:
         flash("Could not update account: " + " ".join(errors), "danger")
         return redirect(url_for("users"))
-    db.execute("UPDATE users SET full_name=%s, email=%s, role=%s, status=%s WHERE id=%s",
-               (full_name, email or None, f["role"], f["status"], user_id))
+    db.update("users", user_id, full_name=full_name, email=email or None, role=f["role"], status=f["status"])
     flash(f"Account {target['username']} updated.", "success")
     return redirect(url_for("users"))
 
@@ -2543,11 +2039,11 @@ def edit_user(user_id):
 @app.route("/users/<int:user_id>/approve", methods=["POST"])
 @admin_required
 def approve_user(user_id):
-    target = db.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+    target = db.get("users", user_id)
     if not target or target["status"] != "pending":
         flash("That sign-up request no longer exists or was already handled.", "danger")
         return redirect(url_for("users"))
-    db.execute("UPDATE users SET status = 'active' WHERE id = %s", (user_id,))
+    db.update("users", user_id, status="active")
     flash(f"Account {target['username']} approved. The user can now log in.", "success")
     return redirect(url_for("users"))
 
@@ -2555,11 +2051,13 @@ def approve_user(user_id):
 @app.route("/users/<int:user_id>/reject", methods=["POST"])
 @admin_required
 def reject_user(user_id):
-    target = db.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+    target = db.get("users", user_id)
     if not target or target["status"] != "pending":
         flash("That sign-up request no longer exists or was already handled.", "danger")
         return redirect(url_for("users"))
-    db.execute("DELETE FROM users WHERE id = %s AND status = 'pending'", (user_id,))
+    db.delete("users", user_id)
+    for d in db.find("notification_dismissals", user_id=user_id):
+        db.delete("notification_dismissals", d["id"])
     compact_ids("users")
     flash(f"Sign-up request from {target['username']} was rejected and removed.", "success")
     return redirect(url_for("users"))
@@ -2568,9 +2066,12 @@ def reject_user(user_id):
 @app.route("/users/<int:user_id>/reset-password", methods=["POST"])
 @admin_required
 def reset_user_password(user_id):
-    target = db.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+    target = db.get("users", user_id)
     if not target:
         flash("That account no longer exists.", "danger")
+        return redirect(url_for("users"))
+    if target["username"] == ADMIN_ACCOUNT:
+        flash("The administrator account's password is fixed and cannot be reset.", "danger")
         return redirect(url_for("users"))
     password = request.form.get("password", "")
     problem = password_problem(password, target["username"])
@@ -2580,7 +2081,7 @@ def reset_user_password(user_id):
         flash("Could not reset password: " + problem, "danger")
         return redirect(url_for("users"))
     new_hash = generate_password_hash(password)
-    db.execute("UPDATE users SET password_hash=%s WHERE id=%s", (new_hash, user_id))
+    db.update("users", user_id, password_hash=new_hash)
     if user_id == session["user_id"]:
         session["pw_sig"] = password_signature(new_hash)
     flash(f"Password for {target['username']} was reset and the user was signed out of any open sessions. "
@@ -2592,13 +2093,10 @@ def reset_user_password(user_id):
 # ERROR HANDLING
 # ------------------------------------------------------------------
 from flask_wtf.csrf import CSRFError
-import warnings
-warnings.simplefilter("error", Image.DecompressionBombWarning)  # treat oversized images as invalid
 
 
 def _wants_json():
-    return request.path.startswith("/api/") or request.path == "/settings/photo" or \
-        request.accept_mimetypes.best == "application/json"
+    return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
 
 
 @app.errorhandler(CSRFError)
@@ -2629,15 +2127,16 @@ def handle_not_found(e):
 @app.errorhandler(500)
 def handle_server_error(e):
     app.logger.exception("Unhandled server error")
-    # MySQL stopped (e.g. stopped or closed in the XAMPP Control Panel): say so plainly.
+    # Firebase Firestore cannot be reached (no internet, missing key): say so plainly.
     original = getattr(e, "original_exception", None)
-    if isinstance(original, pymysql.err.OperationalError) and original.args and original.args[0] in (2003, 2006, 2013):
+    if isinstance(original, db.DatabaseUnavailable):
         if _wants_json():
             return {"error": "database_unavailable"}, 503
-        message = ("The online database cannot be reached right now. Please try again in a few minutes; "
-                   "if it keeps happening, contact the system administrator.") if app.config["ONLINE"] else \
-                  "MySQL is not running. Open the XAMPP Control Panel, press Start on MySQL, then reload this page."
-        return render_template("error.html", code=503, title="Database is not running", message=message), 503
+        message = ("The Firebase Firestore database cannot be reached right now. Check the internet connection "
+                   "and try again in a few minutes; if it keeps happening, contact the system administrator.")
+        if not app.config["ONLINE"] and "key not found" in str(original):
+            message = str(original)
+        return render_template("error.html", code=503, title="Database cannot be reached", message=message), 503
     if _wants_json():
         return {"error": "server_error"}, 500
     return render_template("error.html", code=500, title="Something went wrong",
@@ -2652,10 +2151,21 @@ if __name__ == "__main__":
     # Set USE_DEV_SERVER=1 to use Flask's auto-reloading debug server instead.
     if os.environ.get("USE_DEV_SERVER") == "1":
         if os.environ.get("WERKZEUG_RUN_MAIN") == "true":  # reloader child only
+            with app.app_context():
+                try:
+                    db.warm_up()
+                except db.DatabaseUnavailable as e:
+                    print(f" * WARNING: Firebase Firestore is not reachable yet: {e}")
             start_model_watcher()
         app.run(debug=True, host="0.0.0.0", port=5000, threaded=True)
     else:
         from waitress import serve
+        with app.app_context():
+            try:
+                db.warm_up()
+                print(" * Connected to Firebase Firestore (real-time sync on).")
+            except db.DatabaseUnavailable as e:
+                print(f" * WARNING: Firebase Firestore is not reachable yet: {e}")
         start_model_watcher()
         start_backup_scheduler()
         port = int(os.environ.get("PORT", 5000))  # hosting providers choose the port

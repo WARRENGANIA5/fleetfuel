@@ -3,11 +3,10 @@ venv/
 .venv/
 backups/
 colab/
-notebooks/
 reports/
 .vercel_build/
 *.bat
 *.ps1
-seed_data.py
 data/*.synthetic_*
-static/images/avatars/*
+firebase-key.json
+*-firebase-adminsdk-*.json

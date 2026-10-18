@@ -1,87 +1,84 @@
-"""Back up the MySQL database to backups/ (one .sql file per run).
+"""Back up the Firebase Firestore database to backups/ (one .json file per run).
 
-Runs automatically from start_server.bat every time the system is started,
-and can be run by hand:  venv\\Scripts\\python.exe backup_database.py
+Runs automatically from start_server.bat every time the system is started
+(and every 24 hours while the server runs), and can be run by hand:
+    venv\\Scripts\\python.exe backup_database.py
 Keeps the newest KEEP backups and deletes older ones.
 
-To restore a backup (this REPLACES the current data):
-    C:\\xampp\\mysql\\bin\\mysql.exe -u root government_fleet_fuel_prediction < backups\\<file>.sql
+To restore a backup (this REPLACES the records with the same IDs):
+    venv\\Scripts\\python.exe backup_database.py --restore backups\\<file>.json
 """
+import json
 import os
-import shutil
-import subprocess
 import sys
+from datetime import date, datetime
 
-from config import Config
 from timeutil import now_local
 
 KEEP = 30
-TIMEOUT_SECONDS = 10 * 60
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
+PREFIX = "firestore_"
 
 
-def _dump_completed(path):
-    """mysqldump writes '-- Dump completed' as its last line only on success."""
-    size = os.path.getsize(path)
-    if size == 0:
-        return False
-    with open(path, "rb") as f:
-        f.seek(max(0, size - 200))
-        return b"-- Dump completed" in f.read()
+def _plain(value):
+    if isinstance(value, datetime):
+        return {"$datetime": value.isoformat()}
+    if isinstance(value, date):
+        return {"$date": value.isoformat()}
+    return value
 
 
-def find_mysqldump():
-    for path in (r"C:\xampp\mysql\bin\mysqldump.exe", shutil.which("mysqldump")):
-        if path and os.path.exists(path):
-            return path
-    return None
+def _restore_value(value):
+    if isinstance(value, dict) and "$datetime" in value:
+        return datetime.fromisoformat(value["$datetime"])
+    if isinstance(value, dict) and "$date" in value:
+        return date.fromisoformat(value["$date"])
+    return value
 
 
 def main():
-    dump = find_mysqldump()
-    if not dump:
-        print(" * Backup skipped: mysqldump was not found (install XAMPP or add MySQL to PATH).")
-        return 1
+    from app import app
+    import db
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    target = os.path.join(BACKUP_DIR, f"{Config.MYSQL_DB}_{now_local():%Y-%m-%d_%H%M%S}.sql")
-    cmd = [dump, f"--host={Config.MYSQL_HOST}", f"--port={Config.MYSQL_PORT}", f"--user={Config.MYSQL_USER}",
-           "--default-character-set=utf8mb4"]
-    if Config.MYSQL_SSL:
-        # Cloud database (TiDB): encrypted connection; it has no stored routines and
-        # no savepoints, which mysqldump's --single-transaction relies on.
-        cmd += ["--ssl", "--skip-lock-tables", "--no-tablespaces"]
-    else:
-        cmd += ["--single-transaction", "--routines"]
-    cmd.append(Config.MYSQL_DB)
-    env = dict(os.environ)
-    if Config.MYSQL_PASSWORD:
-        env["MYSQL_PWD"] = Config.MYSQL_PASSWORD  # keeps the password off the command line
-    # Dump to a .partial file and rename it only once the dump is complete, so a
-    # hung or killed dump never leaves an empty .sql that counts as a backup.
+    with app.app_context():
+        try:
+            data = {coll: [{k: _plain(v) for k, v in r.items()} for r in db.records(coll)]
+                    for coll in db.COLLECTIONS}
+        except db.DatabaseUnavailable as e:
+            print(" * Backup FAILED: " + str(e))
+            return 1
+    target = os.path.join(BACKUP_DIR, f"{PREFIX}{now_local():%Y-%m-%d_%H%M%S}.json")
     partial = target + ".partial"
-    try:
-        with open(partial, "wb") as out:
-            result = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, env=env, timeout=TIMEOUT_SECONDS)
-        error = result.stderr.decode(errors="replace").strip()
-        if result.returncode == 0 and not _dump_completed(partial):
-            error = "the dump file is empty or incomplete."
-        elif result.returncode == 0:
-            error = None
-    except subprocess.TimeoutExpired:
-        error = f"mysqldump did not finish within {TIMEOUT_SECONDS // 60} minutes (is MySQL responding?)."
-    if error is not None:
-        os.remove(partial)
-        print(" * Backup FAILED: " + error)
-        return 1
+    with open(partial, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
     os.replace(partial, target)
-    backups = sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith(Config.MYSQL_DB + "_") and f.endswith(".sql"))
+    backups = sorted(f for f in os.listdir(BACKUP_DIR) if f.startswith(PREFIX) and f.endswith(".json"))
     for old in backups[:-KEEP]:
         os.remove(os.path.join(BACKUP_DIR, old))
+    total = sum(len(v) for v in data.values())
     print(f" * Database backed up to backups\\{os.path.basename(target)} "
-          f"({os.path.getsize(target) // 1024} KB; keeping the newest {KEEP}).")
+          f"({total} records; keeping the newest {KEEP}).")
+    return 0
+
+
+def restore(path):
+    from app import app
+    import db
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    with app.app_context():
+        for coll, rows in data.items():
+            for r in rows:
+                doc_id = r.pop("id")
+                db.put(coll, doc_id, {k: _restore_value(v) for k, v in r.items()})
+            if coll != "notification_dismissals":
+                db.reset_counter(coll)
+    print(f" * Restored {sum(len(v) for v in data.values())} records from {path}.")
     return 0
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--restore":
+        sys.exit(restore(sys.argv[2]))
     sys.exit(main())

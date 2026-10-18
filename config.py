@@ -12,16 +12,15 @@ class Config:
     # could forge a logged-in session).
     SECRET_KEY = os.environ.get("SECRET_KEY", "")
 
-    # The MYSQL* names (no underscore) are the ones a Railway MySQL service
-    # provides, so an online deployment needs no extra mapping.
-    MYSQL_HOST = os.environ.get("MYSQL_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1"
-    MYSQL_PORT = int(os.environ.get("MYSQL_PORT") or os.environ.get("MYSQLPORT") or 3306)
-    MYSQL_USER = os.environ.get("MYSQL_USER") or os.environ.get("MYSQLUSER") or "root"
-    MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD") or os.environ.get("MYSQLPASSWORD") or ""
-    MYSQL_DB = os.environ.get("MYSQL_DB") or os.environ.get("MYSQLDATABASE") or "government_fleet_fuel_prediction"
-    # Cloud MySQL services (TiDB Cloud, Aiven, ...) only accept encrypted connections.
-    MYSQL_SSL = (os.environ.get("MYSQL_SSL") or "").lower() in ("1", "true", "yes")
-    # Dates and NOW() follow Philippine time even on a server that runs in UTC.
+    # Database: Firebase Firestore. The service account key of the Firebase
+    # project (Project settings > Service accounts > Generate new private key)
+    # is read from FIREBASE_CREDENTIALS (a file path, default firebase-key.json
+    # next to this file) or, on hosting without files, from the key's JSON text
+    # in FIREBASE_CREDENTIALS_JSON. Keep the key secret: it is not in git.
+    FIREBASE_CREDENTIALS = os.environ.get("FIREBASE_CREDENTIALS") or os.path.join(BASE_DIR, "firebase-key.json")
+    FIREBASE_CREDENTIALS_JSON = os.environ.get("FIREBASE_CREDENTIALS_JSON", "")
+    DB_BACKEND = os.environ.get("DB_BACKEND", "firestore")  # "memory" only for automated tests
+    # Dates and times follow Philippine time even on a server that runs in UTC.
     DB_TIME_ZONE = os.environ.get("DB_TIME_ZONE", "+08:00")
 
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 8  # sessions expire after 8 hours

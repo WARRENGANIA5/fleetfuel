@@ -4,12 +4,12 @@ Pagkatapos sini, may HTTPS link ang system (halimbawa `https://gsu-fleetfuel.up.
 nga mabuksan sa bisan ano nga phone, tablet, ukon computer nga may internet.
 
 > **Ngaa indi Vercel?** Indi magkasya sa Vercel ang Python libraries sang model (mga 350 MB). Wala man
-> sini sang MySQL, background tasks (auto-retrain kag backup), kag storage para sa photos. Ang Railway
-> may tanan sina.
+> sini sang background tasks (auto-retrain kag backup) kag storage para sa backups. Ang Railway
+> may tanan sina. Ang database amo gihapon ang **Firebase Firestore** (pareho sa office computer).
 
 > **Antes mag-upload sang data sang gobyerno online,** pamangkot anay sa Data Protection Officer ukon
-> ICT office sang agency (RA 10173, Data Privacy Act). Ang Railway nagabutang sang data sa servers sa gwa
-> sang Pilipinas.
+> ICT office sang agency (RA 10173, Data Privacy Act). Ang Railway kag ang Firebase nagabutang sang data
+> sa servers sa gwa sang Pilipinas.
 
 ## Mga steps
 
@@ -26,34 +26,31 @@ railway init
 ```
 Sa `railway init`, pili-a ang **Create new project** kag hatagi sang pangalan (halimbawa `gsu-fleetfuel`).
 
-### 3. Dugangi sang MySQL database
-Sa Railway dashboard sang project: **+ New → Database → MySQL**.
+### 3. Ihanda ang Firebase key
+Gamita ang Firebase project kag ang `firebase-key.json` sa README (4.3). Indi ginaupload ang file mismo;
+ang sulod sini ang ibutang sa Variables (step 5). Para makuha ini sa isa ka linya:
+`venv\Scripts\python.exe -c "import json; print(json.dumps(json.load(open('firebase-key.json'))))"`
 
 ### 4. I-upload ang system
 ```
 railway up
 ```
-Ginaupload sini ang folder kag ginabuild ang `Dockerfile`. Ang `venv`, `.env`, `backups`, kag photos
+Ginaupload sini ang folder kag ginabuild ang `Dockerfile`. Ang `venv`, `.env`, kag `backups`
 indi upod (`.railwayignore`). Ang una nga build mga 5–10 minutos.
 
 ### 5. I-set ang Variables sang app service
 Sa dashboard, i-click ang app service → **Variables** → **Raw Editor**, kag i-paste ini.
 Ilisan ang mga value nga may `<...>`:
 ```
-MYSQLHOST=${{MySQL.MYSQLHOST}}
-MYSQLPORT=${{MySQL.MYSQLPORT}}
-MYSQLUSER=${{MySQL.MYSQLUSER}}
-MYSQLPASSWORD=${{MySQL.MYSQLPASSWORD}}
-MYSQLDATABASE=${{MySQL.MYSQLDATABASE}}
+FIREBASE_CREDENTIALS_JSON=<ang isa ka linya halin sa step 3>
 SECRET_KEY=<64 ka random characters>
-ADMIN_USERNAME=<username sang admin>
 ADMIN_PASSWORD=<password: 8+ characters, may letra kag numero>
 ADMIN_FULL_NAME=<pangalan sang admin>
 ```
 Para makahimo sang `SECRET_KEY`, padalagana ini sa project folder:
 `venv\Scripts\python.exe -c "import secrets; print(secrets.token_hex(32))"`
 
-### 6. Dugangi sang Volume (para sa photos kag backups)
+### 6. Dugangi sang Volume (para sa backups)
 I-right-click ang app service → **Attach Volume** → Mount path: `/data`.
 
 ### 7. Himo sang public link
@@ -61,9 +58,9 @@ App service → **Settings → Networking → Generate Domain**. Amo ini ang lin
 Buksan ini sa phone.
 
 ### 8. Pagkatapos sang una nga login
-1. Mag-login gamit ang `ADMIN_USERNAME` kag `ADMIN_PASSWORD`.
+1. Mag-login gamit ang `admin1114` kag ang `ADMIN_PASSWORD`.
 2. **Panason ang `ADMIN_PASSWORD`** sa Variables (indi na ini kinahanglan).
-3. Dugangi ang mga vehicle, dayon i-import ang trip records (Trip Records → Import CSV). Ang model
+3. Dugangi ang mga vehicle, dayon ang trip records (Trip Records → Add Trip Record). Ang model
    magatrain sa iya lang gamit ang data sang GSU fleet.
 4. Ang staff mag-sign up sa link, kag ang admin ang mag-approve sa **User Accounts**.
 
@@ -74,13 +71,6 @@ Buksan ini sa phone.
 - **Backup kada 24 oras**: nakatago sa volume (`/data/backups`).
 - **Philippine time**: sa dates kag sa oras sang records.
 
-## Opsyonal: ilipat ang data halin sa office computer
-Kon gusto mo dalhon online ang data nga ara na sa XAMPP:
-1. Sa Railway, buksan ang MySQL service → **Variables**, kag kopyaha ang `MYSQL_PUBLIC_URL`
-   (host, port, password).
-2. Sa office computer:
-   ```
-   C:\xampp\mysql\bin\mysqldump.exe -u root government_fleet_fuel_prediction > export.sql
-   C:\xampp\mysql\bin\mysql.exe -h <public host> -P <public port> -u root -p railway < export.sql
-   ```
-   Himua ini **antes** mag-login sa online system, kay ang `export.sql` nagatanda sa mga tables.
+## Data halin sa office computer
+Indi na kinahanglan ilipat: ang office computer kag ang online system nagagamit sang pareho nga
+Firebase Firestore database, gani pareho ang ila nga data kag dayon makita ang pagbag-o sa duha.

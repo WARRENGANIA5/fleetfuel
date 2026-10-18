@@ -1,9 +1,0 @@
-{% if dataset and dataset.demo %}
-<div class="demo-banner" role="note">
-  <i class="fa-solid fa-flask"></i>
-  <div><strong>Demo data.</strong> The model is trained on synthetic records
-  ({{ dataset.synthetic_files|join(', ') }}), not the collected {{ org.org_short }} fleet records, so these results must not be
-  reported as study findings. This label disappears automatically when the files in <code>data/</code> are
-  replaced with the collected data.</div>
-</div>
-{% endif %}
