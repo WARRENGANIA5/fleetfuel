@@ -1976,7 +1976,7 @@ def _would_remove_last_admin(user_id, new_role, new_status):
 @app.route("/users")
 @admin_required
 def users():
-    return render_template("users.html", active="users", users=query_users(), roles=USER_ROLES, statuses=USER_STATUSES)
+    return render_template("users.html", active="users", users=query_users(), statuses=USER_STATUSES)
 
 
 @app.route("/api/users")

@@ -20,7 +20,6 @@
       <i class="fa-solid fa-user-plus me-1"></i> Create Account
     </button>
   </div>
-  <p class="diag-note">Sign-up requests appear as <strong>Pending approval</strong>. Deactivate an account instead of deleting it to keep its history.</p>
 
   <div class="table-wrap">
     <table class="table-fleet" id="usersTable">
@@ -70,12 +69,9 @@
           <div class="mb-2"><label class="form-label">Username</label><input class="form-control" name="username" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
             <div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore.</div></div>
           <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
-          <div class="row g-2 mb-2">
-            <div class="col-6"><label class="form-label">Role</label>
-              <select class="form-select" name="role" required>{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == 'staff' }}>{{ r|capitalize }}</option>{% endfor %}</select></div>
-            <div class="col-6"><label class="form-label">Status</label>
-              <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
-          </div>
+          <input type="hidden" name="role" value="staff">
+          <div class="mb-2"><label class="form-label">Status</label>
+            <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
           <div class="mb-2"><label class="form-label">Password</label><input type="password" class="form-control" name="password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" autocomplete="new-password" required>
             <div class="form-text">8–128 characters with at least one letter and one number.</div></div>
           <div class="mb-2"><label class="form-label">Confirm Password</label><input type="password" class="form-control" name="confirm_password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
@@ -98,12 +94,9 @@
         <div class="modal-body">
           <div class="mb-2"><label class="form-label">Full Name</label><input class="form-control" name="full_name" minlength="2" maxlength="100" required></div>
           <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
-          <div class="row g-2">
-            <div class="col-6"><label class="form-label">Role</label>
-              <select class="form-select" name="role" required>{% for r in roles %}<option value="{{ r }}">{{ r|capitalize }}</option>{% endfor %}</select></div>
-            <div class="col-6"><label class="form-label">Status</label>
-              <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
-          </div>
+          <input type="hidden" name="role" value="staff">
+          <div><label class="form-label">Status</label>
+            <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
           <div class="form-text mt-2">Inactive accounts are signed out immediately and cannot log in.</div>
         </div>
         <div class="modal-footer">

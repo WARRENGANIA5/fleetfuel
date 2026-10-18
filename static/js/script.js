@@ -145,6 +145,7 @@ function initPage() {
         row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none';
       });
     };
+    input.addEventListener('input', apply);  // typing, pasting and autofill
     input.addEventListener('keyup', apply);
     input.addEventListener('search', apply);
     if (input.value) apply();  // opened with a search already filled in (e.g. a month from the dashboard)
