@@ -777,6 +777,7 @@ a { text-decoration: none; color: inherit; }
   .table-fleet tbody td[colspan] { justify-content: center; text-align: center; }
   .table-fleet td:has(> .action-btn) { justify-content: flex-end; gap: 6px; }
   .table-fleet td:has(> .action-btn)::before { margin-right: auto; }
+  .table-fleet tbody td.cell-empty { display: none; }
 }
 
 .spinner-overlay {
@@ -983,3 +984,13 @@ a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-off
 
 /* Error message under a password box that has the show/hide eye */
 .was-validated .password-field-wrap:has(.form-control:invalid) ~ .invalid-feedback { display: block; }
+
+/* Phone browser in "Desktop site" mode: one-line hint at the top */
+.desktop-site-hint {
+  position: sticky; top: 0; z-index: 3000;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 22px; font-size: 26px; line-height: 1.35;
+  background: #ffb547; color: #1b1d2a;
+}
+.desktop-site-hint i { margin-right: 8px; }
+.desktop-site-hint button { border: 0; background: none; font-size: 40px; line-height: 1; color: inherit; padding: 0 6px; }

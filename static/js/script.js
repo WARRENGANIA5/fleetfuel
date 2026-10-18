@@ -45,6 +45,8 @@ function initPage() {
       table.querySelectorAll('tbody tr').forEach(function (tr) {
         Array.from(tr.children).forEach(function (td, i) {
           if (!td.hasAttribute('colspan') && labels[i] && td.dataset.label !== labels[i]) td.dataset.label = labels[i];
+          // A cell with nothing in it (e.g. no actions for this user) is left out of the phone card.
+          td.classList.toggle('cell-empty', !td.hasAttribute('colspan') && !td.children.length && !td.textContent.trim());
         });
       });
     };
@@ -163,6 +165,27 @@ function initPage() {
     }, 60000);
   }
 }
+
+// ---- Phone showing the desktop layout ("Desktop site" is on in the browser) ----
+// The pages switch to the phone layout by themselves; a phone browser in
+// desktop mode pretends to be a wide screen, so say how to turn it off.
+document.addEventListener('DOMContentLoaded', function () {
+  const touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const phone = Math.min(window.screen.width, window.screen.height) <= 600;
+  let dismissed = false;
+  try { dismissed = sessionStorage.getItem('desktopHintClosed') === '1'; } catch (e) { /* storage blocked */ }
+  if (!touch || !phone || window.innerWidth < 900 || dismissed) return;
+  const bar = document.createElement('div');
+  bar.className = 'desktop-site-hint';
+  bar.setAttribute('role', 'note');
+  bar.innerHTML = '<span><i class="fa-solid fa-mobile-screen-button"></i> Showing the desktop version. For the phone layout, ' +
+    'turn off <strong>"Desktop site"</strong> in your browser menu.</span><button type="button" aria-label="Close">&times;</button>';
+  bar.querySelector('button').addEventListener('click', function () {
+    bar.remove();
+    try { sessionStorage.setItem('desktopHintClosed', '1'); } catch (e) { /* storage blocked */ }
+  });
+  document.body.prepend(bar);
+});
 
 document.addEventListener('DOMContentLoaded', function () {
   // ---- Loading bar for page changes ----
