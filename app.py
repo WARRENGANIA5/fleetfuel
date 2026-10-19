@@ -167,8 +167,8 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
 
 # The one administrator account (GSO) is the account with the role "admin": it
 # opens the administrator pages; every other account is staff and none can be
-# made an administrator. Only the administrator itself changes its username,
-# profile and password (Account Settings); User Accounts cannot change it.
+# made an administrator. Every account changes its own username, profile and
+# password in Account Settings; User Accounts cannot change the administrator.
 # ADMIN_ACCOUNT is the username it gets when it is first created (init_db.py).
 ADMIN_ACCOUNT = "admin1114"
 
@@ -436,11 +436,6 @@ def login():
                 return wait_for_approval(user)
             if user["status"] != "active":
                 flash("Your account has been deactivated. Please contact the administrator.", "danger")
-                return render_template("login.html")
-            if password in DEFAULT_PASSWORDS and user["role"] != "admin":
-                # Staff cannot change their own password: the administrator resets it.
-                flash("Your account still uses a default password. Ask the administrator to reset your "
-                      "password under User Accounts, then log in with the new one.", "danger")
                 return render_template("login.html")
             start_session(user)
             flash(f"Welcome back, {user['full_name']}.", "success")
@@ -1836,12 +1831,6 @@ def api_model_performance_data():
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
-# Account Settings: only the administrator changes its own profile and
-# password here; staff accounts are changed by the administrator under User Accounts.
-STAFF_SETTINGS_NOTE = ("Only the administrator can change account details. Ask the administrator to update "
-                       "your name, email or password under User Accounts.")
-
-
 def render_settings(form=None, status=200):
     user = db.get("users", session["user_id"])
     return render_template("settings.html", active="settings", user=user, form=form or {}), status
@@ -1868,9 +1857,6 @@ def api_me():
 @app.route("/settings/profile", methods=["POST"])
 @login_required
 def update_profile():
-    if session.get("role") != "admin":
-        flash(STAFF_SETTINGS_NOTE, "danger")
-        return redirect(url_for("settings"))
     full_name = " ".join((request.form.get("full_name") or "").split())
     email = (request.form.get("email") or "").strip()
     username = (request.form.get("username") or "").strip()
@@ -1898,9 +1884,6 @@ def update_profile():
 @app.route("/settings/password", methods=["POST"])
 @login_required
 def change_password():
-    if session.get("role") != "admin":
-        flash(STAFF_SETTINGS_NOTE, "danger")
-        return redirect(url_for("settings"))
     user = db.get("users", session["user_id"])
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")

@@ -3,34 +3,27 @@
 {% block page_title %}Account Settings{% endblock %}
 
 {% block content %}
-{# Read from the session so the page works even before the server reloads its code. #}
-{% set can_edit = session.get('role') == 'admin' %}
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-user text-primary"></i> Profile Information</div>
-      {% if not can_edit %}
-      <p class="text-muted small"><i class="fa-solid fa-lock me-1"></i> Only the administrator can change account details. Ask the administrator to update your name, email or password under User Accounts.</p>
-      {% endif %}
 
       <form method="POST" action="{{ url_for('update_profile') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
           <label class="form-label">Full Name</label>
-          <input type="text" class="form-control" name="full_name" id="settingsFullName" minlength="2" maxlength="100" value="{{ form.full_name if form else user.full_name }}" data-original="{{ user.full_name }}" required{{ ' disabled' if not can_edit }}>
+          <input type="text" class="form-control" name="full_name" id="settingsFullName" minlength="2" maxlength="100" value="{{ form.full_name if form else user.full_name }}" data-original="{{ user.full_name }}" required>
         </div>
         <div class="mb-3">
           <label class="form-label">Email</label>
-          <input type="email" class="form-control" name="email" id="settingsEmail" maxlength="120" value="{{ form.email if form else (user.email or '') }}" data-original="{{ user.email or '' }}"{{ ' disabled' if not can_edit }}>
+          <input type="email" class="form-control" name="email" id="settingsEmail" maxlength="120" value="{{ form.email if form else (user.email or '') }}" data-original="{{ user.email or '' }}">
         </div>
         <div class="mb-3">
           <label class="form-label">Username</label>
-          <input type="text" class="form-control" name="username" id="settingsUsername" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" value="{{ form.username if form and form.username else user.username }}" data-original="{{ user.username }}" required{{ ' disabled' if not can_edit }}>
-          {% if can_edit %}<div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore. Use the new username the next time you log in.</div>{% endif %}
+          <input type="text" class="form-control" name="username" id="settingsUsername" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" value="{{ form.username if form and form.username else user.username }}" data-original="{{ user.username }}" required>
+          <div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore. Use the new username the next time you log in.</div>
         </div>
-        {% if can_edit %}
         <button type="submit" class="btn btn-blue"><i class="fa-solid fa-floppy-disk me-1"></i> Save Profile</button>
-        {% endif %}
       </form>
     </div>
   </div>
@@ -38,9 +31,6 @@
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-lock text-primary"></i> Change Password</div>
-      {% if not can_edit %}
-      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> Your password is reset by the administrator under User Accounts.</p>
-      {% else %}
       <form method="POST" action="{{ url_for('change_password') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
@@ -69,7 +59,6 @@
         </div>
         <button type="submit" class="btn btn-navy"><i class="fa-solid fa-key me-1"></i> Update Password</button>
       </form>
-      {% endif %}
     </div>
   </div>
 
