@@ -29,11 +29,13 @@
       </div>
       <span class="live-badge" id="tripLive"><span class="live-dot"></span><span id="tripLiveText">Live</span></span>
     </div>
+    {% if is_admin %}
     <div class="d-flex gap-2 flex-wrap">
       <button class="btn btn-blue" data-bs-toggle="modal" data-bs-target="#addTripModal">
         <i class="fa-solid fa-plus me-1"></i> Add Trip Record
       </button>
     </div>
+    {% endif %}
   </div>
   <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model.</p>
 
@@ -41,7 +43,7 @@
     <table class="table-fleet" id="tripsTable">
       <thead>
         <tr>
-          <th>No.</th><th>Date of Travel</th><th>Vehicle</th><th>Distance Traveled (km)</th><th>Fuel Consumed (L)</th><th>Actions</th>
+          <th>No.</th><th>Date of Travel</th><th>Vehicle</th><th>Distance Traveled (km)</th><th>Fuel Consumed (L)</th>{% if is_admin %}<th>Actions</th>{% endif %}
         </tr>
       </thead>
       <tbody id="tripsBody">
@@ -52,26 +54,28 @@
           <td>{{ t.plate_number }}</td>
           <td>{{ t.distance_km }}</td>
           <td>{{ t.actual_fuel_consumption or '—' }}</td>
+          {% if is_admin %}
           <td>
-            {% if t.can_edit %}<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>{% endif %}
-            {% if is_admin %}
+            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
             <form method="POST" action="{{ url_for('delete_trip', trip_id=t.id) }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </form>
-            {% endif %}
           </td>
+          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No trip records yet.</td></tr>
+        <tr><td colspan="{{ 6 if is_admin else 5 }}" class="text-center text-muted py-4">No trip records yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-{# One shared Edit modal, filled from the clicked row's data-record (see
-   script.js) instead of one full modal per trip. #}
+{# Trip records are the collected training data: only the administrator adds,
+   edits or deletes them (each change retrains the model). One shared Edit
+   modal, filled from the clicked row's data-record (see script.js). #}
+{% if is_admin %}
 <div class="modal fade" id="editTripModal" tabindex="-1" data-record-modal>
   <div class="modal-dialog">
     <div class="modal-content">
@@ -103,6 +107,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
@@ -114,7 +119,7 @@ const TRIP_CSRF = {{ csrf_token()|tojson }};
 const REOPEN = {{ reopen|tojson if reopen else 'null' }};
 
 // After a rejected save, reopen the same form with what the user typed.
-if (REOPEN) {
+if (REOPEN && IS_ADMIN) {
   const modalEl = document.getElementById(REOPEN.modal);
   const form = modalEl.querySelector('form');
   if (REOPEN.trip_id) {
@@ -127,7 +132,7 @@ if (REOPEN) {
     if (field && field.type !== 'hidden') field.value = REOPEN.values[k];
   });
   bootstrap.Modal.getOrCreateInstance(modalEl).show();
-} else if (new URLSearchParams(window.location.search).get('add') === '1') {
+} else if (IS_ADMIN && new URLSearchParams(window.location.search).get('add') === '1') {
   // Dashboard "Add Trip Record" opens the form straight away.
   history.replaceState(null, '', window.location.pathname);
   bootstrap.Modal.getOrCreateInstance(document.getElementById('addTripModal')).show();
@@ -139,13 +144,13 @@ function tripRow(t) {
   tr.dataset.record = JSON.stringify(t);
   const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km, t.actual_fuel_consumption || '—'];
   tr.innerHTML = cells.map(function (c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') +
-    '<td>' +
-      (t.can_edit ? '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' : '') +
-      (IS_ADMIN ? '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
+    (IS_ADMIN ? '<td>' +
+      '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
+      '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
         '<input type="hidden" name="csrf_token" value="' + escapeHtml(TRIP_CSRF) + '">' +
         '<button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>' +
-      '</form>' : '') +
-    '</td>';
+      '</form>' +
+    '</td>' : '');
   return tr;
 }
 let lastTripsJson = JSON.stringify([...document.querySelectorAll('#tripsBody tr[data-record]')].map(function (tr) { return JSON.parse(tr.dataset.record); }));
@@ -163,7 +168,7 @@ function refreshTrips() {
       const body = document.getElementById('tripsBody');
       body.innerHTML = '';
       if (!d.trips.length) {
-        body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No trip records yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 6 : 5) + '" class="text-center text-muted py-4">No trip records yet.</td></tr>';
       } else {
         const frag = document.createDocumentFragment();
         d.trips.forEach(function (t) { frag.appendChild(tripRow(t)); });

@@ -1275,8 +1275,6 @@ def trip_record(t, num):
         "trip_date": str(t["trip_date"]), "plate_number": t["plate_number"], "brand_model": t["brand_model"],
         "distance_km": str(t["distance_km"]),
         "actual_fuel_consumption": str(t["actual_fuel_consumption"]) if t["actual_fuel_consumption"] is not None else "",
-        # Staff edit only the trips they encoded; the collected records stay with the administrator.
-        "can_edit": session.get("role") == "admin" or t.get("created_by") == session.get("user_id"),
     }
 
 
@@ -1423,8 +1421,10 @@ def api_trips():
     return {"trips": query_trips()}
 
 
+# Trip records are the collected training data (Monthly Report of Official
+# Travel): staff only view them; the administrator adds, edits and deletes them.
 @app.route("/trips/add", methods=["POST"])
-@login_required
+@admin_required
 def add_trip():
     _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form)
@@ -1444,14 +1444,11 @@ def add_trip():
 
 
 @app.route("/trips/<int:trip_id>/edit", methods=["POST"])
-@login_required
+@admin_required
 def edit_trip(trip_id):
     trip = db.get("trip_records", trip_id)
     if not trip:
         flash("That trip record no longer exists.", "danger")
-        return redirect(url_for("trips"))
-    if session.get("role") != "admin" and trip.get("created_by") != session.get("user_id"):
-        flash("You can only edit the trip records you encoded.", "danger")
         return redirect(url_for("trips"))
     _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form, trip_id)
