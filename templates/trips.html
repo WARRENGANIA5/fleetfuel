@@ -37,7 +37,7 @@
     </div>
     {% endif %}
   </div>
-  <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model.
+  <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model in Google Colab (Model Performance &gt; Upload Trained Model).
     {% if is_admin %}Encode each trip after the vehicle returns: a fuel request that was not rejected, for the same vehicle (trip dated 1 day before to 7 days after the request, distance within ±20%) gets this trip's fuel consumed as its actual fuel automatically.{% endif %}</p>
 
   <div class="table-wrap">
@@ -74,7 +74,7 @@
 </div>
 
 {# Trip records are the collected training data: only the administrator adds,
-   edits or deletes them (each change retrains the model). One shared Edit
+   edits or deletes them (they are exported for training in Google Colab). One shared Edit
    modal, filled from the clicked row's data-record (see script.js). #}
 {% if is_admin %}
 <div class="modal fade" id="editTripModal" tabindex="-1" data-record-modal>

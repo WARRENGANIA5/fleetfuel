@@ -15,9 +15,12 @@ EASIEST WAY (AUTO version):
   4. Wait 1-2 minutes until every cell has a green check mark.
   5. Section 6 shows R2, MAE, RMSE and the 5-fold CV - the same as the
      Model Performance page of the web app.
-  6. Optional: folder icon on the left > right-click linear_regression_pipeline.joblib > Download.
+  6. The last cell downloads linear_regression_pipeline.joblib and metrics_colab.json (allow the
+     browser to download multiple files). In the web app, open Model Performance >
+     Upload Trained Model from Google Colab, choose the two files and click Upload.
+     The system then predicts with this model; it never retrains by itself.
 
 The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 7,260 online records).
 For newer records, download the three CSV files again from the web app
-(Model Performance > Training Details) and use fuel_consumption_linear_regression.ipynb:
+(Model Performance > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

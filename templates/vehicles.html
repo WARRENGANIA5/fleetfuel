@@ -164,7 +164,7 @@ document.getElementById('vehiclesBody').addEventListener('submit', function (e) 
   let msg = 'Delete vehicle ' + rec.plate_number + '?';
   if (rec.trip_count) {
     msg += '\n\nThis will ALSO permanently delete its ' + rec.trip_count +
-      ' trip record(s), and the fuel prediction model will retrain without them.';
+      ' trip record(s).';
   }
   msg += '\n\nThis cannot be undone.';
   if (!window.confirm(msg)) e.preventDefault();

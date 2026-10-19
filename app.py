@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import re
@@ -46,9 +47,8 @@ _MODEL_MTIME = None
 
 def get_model():
     """Loads (and hot-reloads if the file changes) the trained Linear
-    Regression pipeline. Returns None if no model has been trained yet."""
+    Regression pipeline saved with Joblib. Returns None if there is no model yet."""
     global _MODEL, _MODEL_MTIME
-    ensure_model_current()
     path = app.config["MODEL_PATH"]
     if not os.path.exists(path):
         return None
@@ -703,7 +703,6 @@ def build_dashboard_context():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    ensure_model_current()
     ctx = build_dashboard_context()
     hour = now_local().hour
     greeting = "Good morning" if hour < 12 else ("Good afternoon" if hour < 18 else "Good evening")
@@ -714,7 +713,6 @@ def dashboard():
 @app.route("/api/dashboard-data")
 @login_required
 def api_dashboard_data():
-    ensure_model_current()
     return build_dashboard_context()
 
 
@@ -853,7 +851,7 @@ def api_prediction_options():
             "power": "" if v["engine_power_kw"] is None else f"{float(v['engine_power_kw']):g}",
         } for v in get_prediction_vehicles()],
         "model": {"available": get_model() is not None, "version": metrics.get("model_version"),
-                  "r2": metrics.get("r2_score"), "mae": metrics.get("mae"), "retraining": _WATCHER["retraining"]},
+                  "r2": metrics.get("r2_score"), "mae": metrics.get("mae")},
     }
 
 
@@ -1495,8 +1493,7 @@ def delete_trip(trip_id):
 # MODEL PERFORMANCE
 # ------------------------------------------------------------------
 _MODEL_CHARTS_CACHE = {"key": None, "data": None}
-_RETRAIN_LOCK = threading.Lock()
-_LAST_DATA_CHECK = {"at": 0.0}
+
 
 def _system_trips():
     """Trips with fuel consumed, joined to their vehicle, oldest first."""
@@ -1539,121 +1536,42 @@ def load_training_frame():
                                    extra_df=load_system_trip_records())
 
 
-def current_data_fingerprint():
-    """Changes whenever the CSV datasets or any trip/vehicle data the model
-    trains on changes."""
-    import zlib
-    _ensure_vehicle_columns()
-    # Every value the model trains on from a trip and its vehicle, so adding,
-    # editing or deleting a trip record (or editing a vehicle) changes the fingerprint.
-    rows = _system_trips()
-    crc = sum(zlib.crc32("|".join(str(x) for x in (
-        t["id"], t["trip_date"], f"{float(t['distance_km']):.2f}", f"{float(t['actual_fuel_consumption']):.2f}",
-        v["plate_number"], v["fuel_type"], "" if v["engine_power_kw"] is None else f"{float(v['engine_power_kw']):.2f}"))
-        .encode()) for t, v in rows)
-    mtimes = [os.path.getmtime(app.config[k]) for k in ("HISTORICAL_DATA_PATH", "SUPPLEMENTARY_DATA_PATH")]
-    return f"{mtimes[0]:.0f}-{mtimes[1]:.0f}-{len(rows)}-{crc}"
-
-
 def retrain_model(log=None):
-    """Retrain on the local trips + supplementary dataset and save model + metrics."""
+    """Train on the local trips + supplementary dataset and save model + metrics,
+    with the same steps as the Google Colab notebook. Used only by
+    `python model/train_model.py`: the web application never retrains on its
+    own (Chapter III: Flask loads the saved Joblib model without retraining);
+    a model trained in Google Colab is uploaded under Model Performance."""
     from model.train_model import train_and_save
     from model.preprocess import load_and_merge_datasets, supplementary_info
-    fingerprint = current_data_fingerprint()
     system_records = load_system_trip_records()
     info = supplementary_info(app.config["SUPPLEMENTARY_DATA_PATH"])
-    extra = {"data_fingerprint": fingerprint, "system_records": int(len(system_records)),
-             "supplementary_kind": info["kind"]}
+    extra = {"system_records": int(len(system_records)), "supplementary_kind": info["kind"]}
     df = load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
                                  app.config["SUPPLEMENTARY_DATA_PATH"], extra_df=system_records)
     return train_and_save(df, extra_metrics=extra, log=log or (lambda *a, **k: None))
 
 
-_WATCHER = {"running": False, "retraining": False, "last_check": None}
-_WATCHER_WAKE = threading.Event()
-WATCHER_INTERVAL_SECONDS = 3
-RETRAIN_RETRY_SECONDS = 60  # wait this long before retrying a retrain that failed
-
-# Form submissions that change the model's training data; after any of these
-# the watcher is woken immediately instead of waiting for its next tick.
-_DATA_CHANGING_ENDPOINTS = {
-    "add_trip", "edit_trip", "delete_trip",
-    "add_vehicle", "edit_vehicle", "delete_vehicle",
-}
+_RECONNECT = {"running": False}
 
 
-def _check_and_retrain():
-    """Retrain now if the CSV datasets or any trip/vehicle data the model
-    trains on changed since the model was last trained."""
-    if not all(os.path.exists(app.config[k]) for k in ("HISTORICAL_DATA_PATH", "SUPPLEMENTARY_DATA_PATH")):
-        return
-    with _RETRAIN_LOCK:
-        fingerprint = current_data_fingerprint()
-        saved, outdated = None, False
-        if os.path.exists(app.config["METRICS_PATH"]) and os.path.exists(app.config["MODEL_PATH"]):
-            with open(app.config["METRICS_PATH"]) as f:
-                saved_metrics = json.load(f)
-            saved = saved_metrics.get("data_fingerprint")
-            # Trained by an earlier version of the training code (before the
-            # Distance x Engine Power equation and cross-validated MAE/RMSE): train again once.
-            outdated = saved_metrics.get("centering") is None or saved_metrics.get("cv_mean_rmse") is None
-        _WATCHER["last_check"] = now_local().isoformat(timespec="seconds")
-        if saved != fingerprint or outdated:
-            # After a failed retrain, try the same data again only after a pause,
-            # instead of every few seconds (which would keep the server PC busy).
-            failed = _WATCHER.get("failed")
-            if failed and failed["fingerprint"] == fingerprint and time.time() - failed["at"] < RETRAIN_RETRY_SECONDS:
-                return
-            app.logger.info("Training data changed; retraining model automatically...")
-            _WATCHER["retraining"] = True
-            try:
-                retrain_model()
-                _WATCHER["failed"] = None
-            except Exception:
-                _WATCHER["failed"] = {"fingerprint": fingerprint, "at": time.time()}
-                raise
-            finally:
-                _WATCHER["retraining"] = False
-
-
-def ensure_model_current():
-    """Request-time fallback for when the background watcher is not running
-    (e.g. the app is imported by a script). With the watcher running this is
-    a no-op, so pages never wait on a retrain. Serverless hosting keeps the
-    model trained on the office computer (its disk is read-only)."""
-    if _WATCHER["running"] or app.config["SERVERLESS"]:
-        return
-    if time.time() - _LAST_DATA_CHECK["at"] < 3:
-        return
-    _LAST_DATA_CHECK["at"] = time.time()
-    try:
-        _check_and_retrain()
-    except Exception:
-        app.logger.exception("Automatic model retraining failed")
-
-
-def _model_watcher_loop():
+def _reconnect_loop():
     while True:
-        _WATCHER_WAKE.wait(WATCHER_INTERVAL_SECONDS)
-        _WATCHER_WAKE.clear()
+        time.sleep(5)
         try:
             if db.reconnect():  # was running from a backup while Firestore reads were blocked
                 print(" * Firebase Firestore can be read again (real-time sync on).")
-            with app.app_context():
-                _check_and_retrain()
         except Exception:
-            app.logger.exception("Automatic model retraining failed")
+            app.logger.exception("Reconnecting to Firebase Firestore failed")
 
 
-def start_model_watcher():
-    """Background thread that keeps the model in sync with the data, whether
-    or not anyone has a page open. Also catches edits made directly in the
-    database or to the CSV files."""
-    if _WATCHER["running"]:
+def start_reconnect_watcher():
+    """Background thread that switches back to live Firestore data after the
+    server had to run from its newest backup (daily read quota reached)."""
+    if _RECONNECT["running"]:
         return
-    _WATCHER["running"] = True
-    threading.Thread(target=_model_watcher_loop, name="model-watcher", daemon=True).start()
-    _WATCHER_WAKE.set()  # check once right away on startup
+    _RECONNECT["running"] = True
+    threading.Thread(target=_reconnect_loop, name="firestore-reconnect", daemon=True).start()
 
 
 BACKUP_INTERVAL_HOURS = 24
@@ -1689,17 +1607,13 @@ def start_backup_scheduler():
     threading.Thread(target=_backup_loop, name="db-backup", daemon=True).start()
 
 
-@app.after_request
-def wake_model_watcher(response):
-    if request.method == "POST" and request.endpoint in _DATA_CHANGING_ENDPOINTS:
-        _WATCHER_WAKE.set()
-    return response
+
 
 
 def build_model_charts():
     """Chart data for the Model Performance page, computed from the same
     data and 80/20 split (random_state=42) the current model was trained
-    on. Cached per model version, so it refreshes after every retrain."""
+    on. Cached per model version, so it refreshes after a new model is uploaded."""
     from sklearn.model_selection import train_test_split
     from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, clean_data
 
@@ -1762,7 +1676,6 @@ def build_model_charts():
 @app.route("/model-performance")
 @admin_required
 def model_performance():
-    ensure_model_current()
     return render_template("model_performance.html", active="model_performance", metrics=get_metrics())
 
 
@@ -1808,8 +1721,6 @@ def api_model_status():
     metrics = get_metrics() or {}
     return {
         "model_version": metrics.get("model_version"),
-        "retraining": _WATCHER["retraining"],
-        "last_check": _WATCHER["last_check"],
         # "backup" while Firestore reads are blocked and the server runs from its newest backup
         "database": "backup" if db.offline_backup() else "live",
     }
@@ -1818,8 +1729,129 @@ def api_model_status():
 @app.route("/api/model-performance-data")
 @admin_required
 def api_model_performance_data():
-    ensure_model_current()
     return {"metrics": get_metrics(), "charts": build_model_charts()}
+
+
+# The results the Colab notebook saves with the model (metrics_colab.json) and
+# the Model Performance page shows.
+UPLOAD_METRICS_KEYS = ("r2_score", "mae", "rmse", "cv_folds", "cv_mean_r2", "cv_std_r2", "cv_mean_mae",
+                       "cv_std_mae", "cv_mean_rmse", "cv_std_rmse", "train_size", "test_size", "total_records",
+                       "equation_terms", "intercept", "coefficients", "centering", "raw_intercept",
+                       "raw_coefficients", "vif", "diagnostics")
+
+
+def check_uploaded_model(pipeline, metrics):
+    """Problems with an uploaded model + results pair (empty when usable): it
+    must be the Linear Regression pipeline of the notebook, and its predictions
+    must follow the equation in the uploaded results (so the two files belong
+    together)."""
+    from sklearn.linear_model import LinearRegression
+    from sklearn.pipeline import Pipeline
+    from model.preprocess import MODEL_TERMS, TermEncoder, build_prediction_frame
+    steps = pipeline.named_steps if isinstance(pipeline, Pipeline) else {}
+    if not (isinstance(steps.get("encoder"), TermEncoder) and isinstance(steps.get("regressor"), LinearRegression)):
+        return ["The model file is not the Linear Regression model saved by the Google Colab notebook "
+                "(linear_regression_pipeline.joblib)."]
+    if not isinstance(metrics, dict):
+        return ["The results file is not the metrics file saved by the Google Colab notebook (metrics_colab.json)."]
+    missing = [k for k in UPLOAD_METRICS_KEYS if k not in metrics]
+    if missing:
+        return ["The results file is missing " + ", ".join(missing) + ". Upload the metrics_colab.json saved by "
+                "the same notebook run."]
+    if list(metrics["equation_terms"]) != MODEL_TERMS:
+        return ["The results file is for a different equation than Distance, Engine Power, Fuel Type and "
+                "Distance × Engine Power."]
+    b0, b = float(metrics["raw_intercept"]), metrics["raw_coefficients"]
+    worst = 0.0
+    for distance in (10, 100, 500):
+        for power in (60, 95, 180):
+            for fuel, code in (("Diesel", 0), ("Gasoline", 1)):
+                frame = build_prediction_frame({"distance_km": distance, "engine_power_kw": power, "fuel_type": fuel})
+                model_value = float(pipeline.predict(frame)[0])
+                equation = (b0 + b["distance_km"] * distance + b["engine_power_kw"] * power
+                            + b["fuel_type_code"] * code + b["distance_x_power"] * distance * power)
+                worst = max(worst, abs(model_value - equation))
+    if not worst < 0.05:
+        return ["The model file and the results file are from different training runs. Upload the two files "
+                "saved by the same run of the notebook."]
+    return []
+
+
+def complete_uploaded_metrics(metrics):
+    """The notebook saves the scores; add what the system also shows with a
+    model (input ranges for the extrapolation warnings, record counts by
+    source), taken from the same cleaned training data in the system."""
+    from model.diagnostics import VIF_THRESHOLD
+    from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, clean_data
+    df = clean_data(load_training_frame())
+    X = df[FEATURE_COLUMNS]
+    stamp = now_local()
+    extra = {
+        "model_version": stamp.strftime("v%Y%m%d%H%M%S"),
+        "trained_at": stamp.isoformat(timespec="seconds"),
+        "status": "active",
+        "source": "Google Colab",
+        "vif_threshold": VIF_THRESHOLD,
+        "selected_numeric_features": list(MODEL_TERMS),
+        "selected_categorical_features": [],
+        "data_sources": {k: int(v) for k, v in df["data_source"].value_counts().items()},
+        "feature_ranges": {col: [round(float(X[col].min()), 2), round(float(X[col].max()), 2)]
+                           for col in ("distance_km", "engine_power_kw")},
+        "category_values": {"fuel_type": sorted(X["fuel_type"].astype(str).unique().tolist())},
+        "ranges_by_fuel": {fuel: {col: [round(float(g[col].min()), 2), round(float(g[col].max()), 2)]
+                                  for col in ("distance_km", "engine_power_kw")} | {"records": int(len(g))}
+                           for fuel, g in X.groupby(X["fuel_type"].astype(str))},
+    }
+    return {**metrics, **extra}
+
+
+@app.route("/model-performance/upload", methods=["POST"])
+@admin_required
+def upload_model():
+    """Model Performance > Upload Trained Model: the Linear Regression model
+    trained in Google Colab (Joblib file) and its results replace the model the
+    system predicts with (Chapter III: the trained model is saved and
+    integrated into the web application). Administrator only: a Joblib file
+    is loaded with pickle, so only files from the notebook belong here."""
+    from model.train_model import _replace_with_retry
+    model_file, metrics_file = request.files.get("model_file"), request.files.get("metrics_file")
+    if not (model_file and model_file.filename and metrics_file and metrics_file.filename):
+        flash("Choose both files from Google Colab: linear_regression_pipeline.joblib and metrics_colab.json.", "danger")
+        return redirect(url_for("model_performance"))
+    try:
+        pipeline = joblib.load(io.BytesIO(model_file.read()))
+    except Exception:
+        app.logger.exception("Uploaded model could not be read")
+        flash("The model file could not be read. Upload the linear_regression_pipeline.joblib saved by the "
+              "Google Colab notebook.", "danger")
+        return redirect(url_for("model_performance"))
+    try:
+        metrics = json.loads(metrics_file.read().decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        flash("The results file could not be read. Upload the metrics_colab.json saved by the Google Colab notebook.",
+              "danger")
+        return redirect(url_for("model_performance"))
+    try:
+        problems = check_uploaded_model(pipeline, metrics)
+    except Exception:
+        app.logger.exception("Checking the uploaded model failed")
+        problems = ["The model file could not make a prediction. Upload the linear_regression_pipeline.joblib "
+                    "saved by the Google Colab notebook."]
+    if problems:
+        flash("Model not uploaded: " + " ".join(problems), "danger")
+        return redirect(url_for("model_performance"))
+    metrics = complete_uploaded_metrics(metrics)
+    # Saved again with this server's libraries and swapped in, so a page
+    # reading at the same moment never sees half a file.
+    joblib.dump(pipeline, app.config["MODEL_PATH"] + ".tmp")
+    _replace_with_retry(app.config["MODEL_PATH"] + ".tmp", app.config["MODEL_PATH"])
+    with open(app.config["METRICS_PATH"] + ".tmp", "w") as f:
+        json.dump(metrics, f, indent=2)
+    _replace_with_retry(app.config["METRICS_PATH"] + ".tmp", app.config["METRICS_PATH"])
+    _MODEL_CHARTS_CACHE.update(key=None, data=None)
+    flash(f"Trained model uploaded: R² {metrics['r2_score']}, MAE {metrics['mae']} L, RMSE {metrics['rmse']} L. "
+          "Predictions now use this model.", "success")
+    return redirect(url_for("model_performance"))
 
 
 # ------------------------------------------------------------------
@@ -2131,7 +2163,7 @@ if __name__ == "__main__":
                     db.warm_up()
                 except db.DatabaseUnavailable as e:
                     print(f" * WARNING: Firebase Firestore is not reachable yet: {e}")
-            start_model_watcher()
+            start_reconnect_watcher()
         app.run(debug=True, host="0.0.0.0", port=5000, threaded=True)
     else:
         from waitress import serve
@@ -2141,7 +2173,7 @@ if __name__ == "__main__":
                 print(" * Connected to Firebase Firestore (real-time sync on).")
             except db.DatabaseUnavailable as e:
                 print(f" * WARNING: Firebase Firestore is not reachable yet: {e}")
-        start_model_watcher()
+        start_reconnect_watcher()
         start_backup_scheduler()
         port = int(os.environ.get("PORT", 5000))  # hosting providers choose the port
         print(f" * Serving on http://127.0.0.1:{port} (Waitress)")

@@ -132,7 +132,7 @@
         <div class="d-flex justify-content-between small mb-1"><span class="text-muted">MAE</span><strong><span id="modelMae">{{ model_summary.mae if model_summary }}</span> L</strong></div>
         <div class="d-flex justify-content-between small"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
       </div>
-      <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>Scores appear here once training finishes.</p>
+      <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>Scores appear here once the trained model is uploaded under Model Performance.</p>
       {% else %}
       <a href="{{ url_for('prediction') }}" class="btn btn-blue mb-2"><i class="fa-solid fa-gas-pump me-1"></i> Request Fuel (New Prediction)</a>
       <a href="{{ url_for('prediction_history') }}" class="btn btn-outline-navy"><i class="fa-solid fa-clock-rotate-left me-1"></i> My Fuel Requests</a>

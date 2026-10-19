@@ -5,8 +5,8 @@
 {% block content %}
 <div class="alert alert-danger" id="modelUnavailable" {{ 'hidden' if model_available }}>
   <i class="fa-solid fa-triangle-exclamation me-1"></i>
-  <strong>Model unavailable.</strong> The system trains the model automatically from the
-  trip records. Predictions turn on here by themselves as soon as training finishes.
+  <strong>Model unavailable.</strong> The administrator trains the model in Google Colab and uploads it
+  under Model Performance. Predictions turn on here by themselves as soon as it is uploaded.
 </div>
 
 {% if errors %}
@@ -110,7 +110,7 @@ function refreshPredictionOptions() {
       document.getElementById('predModelMae').textContent = m.mae != null ? m.mae : '—';
       document.getElementById('modelUnavailable').hidden = m.available;
       document.getElementById('predictBtn').disabled = !m.available;
-      setPredLive(m.retraining ? 'is-updating' : '', m.retraining ? 'Updating model…' : 'Live');
+      setPredLive('', 'Live');
 
       const json = JSON.stringify(d.vehicles);
       if (json === lastOptionsJson) return;

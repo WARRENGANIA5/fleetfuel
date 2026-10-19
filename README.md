@@ -121,19 +121,23 @@ Visit **http://127.0.0.1:5000**.
 > port 5000, either stop it first or run this app on a different port, e.g.:
 > `python -c "from app import app; app.run(port=5050)"`.
 
-## 5. Retraining the Model
+## 5. Training the Model (Google Colab)
 
-Retraining is automatic. While the app runs, a background watcher retrains the Linear Regression
-model within a few seconds whenever the training data changes:
+The web application never retrains by itself (Chapter III: Flask loads the saved Joblib model for
+predictions without retraining). Adding or editing trip records changes the data, not the model. To
+train a new model:
 
-- a trip record is added, edited or deleted;
-- a vehicle's plate number, fuel type or engine power is edited, or a vehicle is deleted;
-- `data/historical_fleet_data.csv` or `data/supplementary_data.csv` is replaced.
+1. **Model Performance → Upload Trained Model from Google Colab:** download `trip_records.csv`,
+   `vehicle_records.csv` and `supplementary_data.csv`.
+2. Run `colab/fuel_consumption_linear_regression.ipynb` in Google Colab with those files
+   (see `colab/HOW_TO_TRAIN_IN_COLAB.txt`). It downloads `linear_regression_pipeline.joblib` and
+   `metrics_colab.json`.
+3. Upload both files on the same card. The system checks that the model is the notebook's Linear
+   Regression pipeline and that its predictions follow the equation in the results file, then the
+   Prediction, Dashboard and Model Performance pages switch to it; no restart is needed.
 
-The model trains on the supplementary dataset **plus** every trip record in the system (merged with its
-vehicle record). The Prediction, Dashboard and Model Performance pages switch to the new model by
-themselves; no restart is needed. `python model/train_model.py` and `python model/evaluate_model.py`
-still work for training outside the app and for regenerating the figures in `reports/figures/`.
+`python model/train_model.py` runs the same steps on this computer, and `python model/evaluate_model.py`
+regenerates the figures in `reports/figures/`.
 
 ## 5a. Database Backups
 
@@ -187,9 +191,9 @@ free plan.
 ## Collecting the real data
 
 * **Trip tickets:** Trip Records → **Add Trip Record** (one trip of the Monthly Report of Official Travel
-  each). The model retrains automatically.
+  each). Train a new model in Google Colab to include them (section 5).
 * **Supplementary dataset (open online sources):** `data/supplementary_data.csv` with the columns
-  `distance_km, engine_power_kw, fuel_type, actual_fuel_consumption`. The app detects a replaced file and retrains.
+  `distance_km, engine_power_kw, fuel_type, actual_fuel_consumption`. Train a new model in Google Colab to use it.
 
 ## Multicollinearity and assumption checks
 

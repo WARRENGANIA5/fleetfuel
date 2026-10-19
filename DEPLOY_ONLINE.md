@@ -4,7 +4,7 @@ Pagkatapos sini, may HTTPS link ang system (halimbawa `https://gsu-fleetfuel.up.
 nga mabuksan sa bisan ano nga phone, tablet, ukon computer nga may internet.
 
 > **Ngaa indi Vercel?** Indi magkasya sa Vercel ang Python libraries sang model (mga 350 MB). Wala man
-> sini sang background tasks (auto-retrain kag backup) kag storage para sa backups. Ang Railway
+> sini sang background tasks (backup kag reconnect sa Firestore) kag storage para sa backups. Ang Railway
 > may tanan sina. Ang database amo gihapon ang **Firebase Firestore** (pareho sa office computer).
 
 > **Antes mag-upload sang data sang gobyerno online,** pamangkot anay sa Data Protection Officer ukon
@@ -67,7 +67,8 @@ Buksan ini sa phone.
 ## Mga automatic nga nagadalagan online
 - **HTTPS**: ginahatag sang Railway. Secure-only man ang login cookie.
 - **Auto-restart**: kon mag-crash ang app, ginastart ini liwat sang Railway.
-- **Auto-retrain**: ang model nagatrain liwat kon magbag-o ang trips ukon vehicles.
+- **Model**: indi nagatrain liwat ang system sa iya lang. I-train sa Google Colab kag i-upload sa
+  **Model Performance → Upload Trained Model**.
 - **Backup kada 24 oras**: nakatago sa volume (`/data/backups`).
 - **Philippine time**: sa dates kag sa oras sang records.
 

@@ -2,12 +2,49 @@
 {% block title %}Model Performance{% endblock %}
 {% block page_title %}Linear Regression Model Performance{% endblock %}
 
+{# Chapter III: the model is trained in Google Colab, saved with Joblib, and
+   integrated into the web application, which loads it without retraining. #}
+{% macro upload_card() %}
+<div class="card-surface mb-3">
+  <div class="section-title"><i class="fa-solid fa-upload text-primary"></i> Upload Trained Model from Google Colab</div>
+  <ol class="text-muted small mb-3 ps-3">
+    <li>Download the three CSV files below (the trip records, vehicle records and supplementary dataset in the system).</li>
+    <li>In Google Colab, run <strong>colab/fuel_consumption_linear_regression.ipynb</strong> with those files (Runtime &gt; Run all).</li>
+    <li>Upload the two files it downloads. The system checks that they belong together, then predicts with the new model. It never retrains by itself.</li>
+  </ol>
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
+    <span class="text-muted">Data for Google Colab:</span>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
+      <i class="fa-solid fa-download me-1"></i> trip_records.csv</a>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='vehicle_records') }}">
+      <i class="fa-solid fa-download me-1"></i> vehicle_records.csv</a>
+    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='supplementary_data') }}">
+      <i class="fa-solid fa-download me-1"></i> supplementary_data.csv</a>
+  </div>
+  <form method="POST" action="{{ url_for('upload_model') }}" enctype="multipart/form-data" class="row g-2 align-items-end" data-loading="Uploading model...">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-md-5">
+      <label class="form-label small">Model (linear_regression_pipeline.joblib)</label>
+      <input type="file" class="form-control" name="model_file" accept=".joblib,.pkl" required>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label small">Results (metrics_colab.json)</label>
+      <input type="file" class="form-control" name="metrics_file" accept=".json,application/json" required>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-blue w-100"><i class="fa-solid fa-upload me-1"></i> Upload</button>
+    </div>
+  </form>
+</div>
+{% endmacro %}
+
 {% block content %}
 {% if not metrics %}
 <div class="alert alert-warning">
   <i class="fa-solid fa-triangle-exclamation me-1"></i>
-  <span id="noModelText">No trained model yet. The results appear here once training finishes.</span>
+  <span id="noModelText">No trained model yet. Train the model in Google Colab and upload it below.</span>
 </div>
+{{ upload_card() }}
 {% else %}
 
 <div class="row g-3 mb-3">
@@ -31,15 +68,6 @@
     <span class="live-badge" id="mpLive"><span class="live-dot"></span><span id="mpLiveText">Live</span></span>
     <span id="mpSources"></span>
   </p>
-  <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
-    <span class="text-muted">Data for Google Colab:</span>
-    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
-      <i class="fa-solid fa-download me-1"></i> trip_records.csv</a>
-    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='vehicle_records') }}">
-      <i class="fa-solid fa-download me-1"></i> vehicle_records.csv</a>
-    <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='supplementary_data') }}">
-      <i class="fa-solid fa-download me-1"></i> supplementary_data.csv</a>
-  </div>
   <div class="row g-2">
     <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Set Size</div><div class="value"><span id="mpTrain">{{ metrics.train_size }}</span> records</div></div></div>
     <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Testing Set Size</div><div class="value"><span id="mpTest">{{ metrics.test_size }}</span> records</div></div></div>
@@ -118,18 +146,18 @@
     </div>
   </div>
 </div>
+{{ upload_card() }}
 {% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
 {% if not metrics %}
 <script>
-// No model yet: watch for the first training to finish, then show the results.
+// No model yet: show the results as soon as a model is uploaded (also from another computer).
 setInterval(function () {
   fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
     if (!document.getElementById('noModelText')) return;  // the user moved to another page meanwhile
-    if (st.retraining) document.getElementById('noModelText').textContent = 'Training the Linear Regression model now…';
-    else if (st.model_version) window.location.reload();
+    if (st.model_version) window.location.reload();
   }).catch(function () {});
 }, 2000);
 </script>
@@ -299,7 +327,7 @@ function renderDiagnostics(m) {
           fmtVif(v) + '</td><td>' + level + '</td></tr>';
       }).join('');
   } else if (vifBody) {
-    vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Computed at the next automatic retrain.</td></tr>';
+    vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
   }
   const d = m.diagnostics;
   const diagBody = document.getElementById('diagBody');
@@ -313,11 +341,11 @@ function renderDiagnostics(m) {
     const met = d.tests.filter(function (t) { return t.passed; }).length;
     document.getElementById('diagSummary').textContent = met + ' of ' + d.tests.length + ' assumptions met.';
   } else if (diagBody) {
-    diagBody.innerHTML = '<tr><td colspan="6" class="text-muted">Assumption checks run at the next automatic retrain.</td></tr>';
+    diagBody.innerHTML = '<tr><td colspan="6" class="text-muted">Not in the uploaded results.</td></tr>';
   }
 }
 
-// ---- Live auto-refresh: re-fetch every 10s; charts redraw when the model is retrained ----
+// ---- Live auto-refresh: re-fetch every 10s; charts redraw when a new model is uploaded ----
 let lastChartsKey = null;
 function refreshModelPerformance() {
   return fetch('/api/model-performance-data')
@@ -347,7 +375,7 @@ function refreshModelPerformance() {
 refreshModelPerformance();
 
 // ---- Real-time: poll the tiny status endpoint every 2s; pull the full data
-// only when the model was retrained. A 30s full refresh is a safety net. ----
+// only when a new model was uploaded. A 30s full refresh is a safety net. ----
 let knownVersion = {{ metrics.model_version|tojson }};
 function setLive(state, text) {
   const badge = document.getElementById('mpLive');
@@ -359,7 +387,6 @@ function checkModelStatus() {
   fetch('/api/model-status')
     .then(function (res) { return res.json(); })
     .then(function (st) {
-      if (st.retraining) { setLive('is-updating', 'Updating model…'); return; }
       if (st.model_version && st.model_version !== knownVersion) {
         knownVersion = st.model_version;
         setLive('is-updating', 'Updating charts…');
