@@ -7,22 +7,27 @@
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-user text-primary"></i> Profile Information</div>
+      {% if not can_edit %}
+      <p class="text-muted small"><i class="fa-solid fa-lock me-1"></i> {{ staff_note }}</p>
+      {% endif %}
 
       <form method="POST" action="{{ url_for('update_profile') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
           <label class="form-label">Full Name</label>
-          <input type="text" class="form-control" name="full_name" id="settingsFullName" minlength="2" maxlength="100" value="{{ form.full_name if form else user.full_name }}" data-original="{{ user.full_name }}" required>
+          <input type="text" class="form-control" name="full_name" id="settingsFullName" minlength="2" maxlength="100" value="{{ form.full_name if form else user.full_name }}" data-original="{{ user.full_name }}" required{{ ' disabled' if not can_edit }}>
         </div>
         <div class="mb-3">
           <label class="form-label">Email</label>
-          <input type="email" class="form-control" name="email" id="settingsEmail" maxlength="120" value="{{ form.email if form else (user.email or '') }}" data-original="{{ user.email or '' }}">
+          <input type="email" class="form-control" name="email" id="settingsEmail" maxlength="120" value="{{ form.email if form else (user.email or '') }}" data-original="{{ user.email or '' }}"{{ ' disabled' if not can_edit }}>
         </div>
         <div class="mb-3">
           <label class="form-label">Username</label>
           <input type="text" class="form-control" id="settingsUsername" value="{{ user.username }}" disabled>
         </div>
+        {% if can_edit %}
         <button type="submit" class="btn btn-blue"><i class="fa-solid fa-floppy-disk me-1"></i> Save Profile</button>
+        {% endif %}
       </form>
     </div>
   </div>
@@ -30,8 +35,8 @@
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-lock text-primary"></i> Change Password</div>
-      {% if user.username == admin_account %}
-      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> The administrator password is fixed.</p>
+      {% if not can_edit %}
+      <p class="text-muted mb-0"><i class="fa-solid fa-lock me-1"></i> Your password is reset by the administrator under User Accounts.</p>
       {% else %}
       <form method="POST" action="{{ url_for('change_password') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

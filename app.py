@@ -166,9 +166,9 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
 
 
 # The one administrator account (GSO). Only this username, with its own
-# password, opens the administrator pages; every other account is staff, and
-# this account cannot be demoted or given a new password from the
-# system.
+# password, opens the administrator pages; every other account is staff. Only
+# this account itself changes its profile and password (Account Settings);
+# User Accounts cannot demote it or reset its password.
 ADMIN_ACCOUNT = "admin1114"
 
 
@@ -436,9 +436,14 @@ def login():
             if user["status"] != "active":
                 flash("Your account has been deactivated. Please contact the administrator.", "danger")
                 return render_template("login.html")
+            if password in DEFAULT_PASSWORDS and user["username"] != ADMIN_ACCOUNT:
+                # Staff cannot change their own password: the administrator resets it.
+                flash("Your account still uses a default password. Ask the administrator to reset your "
+                      "password under User Accounts, then log in with the new one.", "danger")
+                return render_template("login.html")
             start_session(user)
             flash(f"Welcome back, {user['full_name']}.", "success")
-            if password in DEFAULT_PASSWORDS and user["username"] != ADMIN_ACCOUNT:
+            if password in DEFAULT_PASSWORDS:
                 session["must_change_pw"] = True  # every other page stays locked until it is changed
                 flash("You are still using the default password that is printed in the setup guide. "
                       "Change it now under Change Password to continue using the system.", "warning")
@@ -1830,10 +1835,16 @@ def api_model_performance_data():
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
+# Account Settings: only the administrator changes its own profile and
+# password here; staff accounts are changed by the administrator under User Accounts.
+STAFF_SETTINGS_NOTE = ("Only the administrator can change account details. Ask the administrator to update "
+                       "your name, email or password under User Accounts.")
+
+
 def render_settings(form=None, status=200):
     user = db.get("users", session["user_id"])
     return render_template("settings.html", active="settings", user=user, form=form or {},
-                           admin_account=ADMIN_ACCOUNT), status
+                           can_edit=session.get("role") == "admin", staff_note=STAFF_SETTINGS_NOTE), status
 
 
 @app.route("/settings")
@@ -1857,6 +1868,9 @@ def api_me():
 @app.route("/settings/profile", methods=["POST"])
 @login_required
 def update_profile():
+    if session.get("role") != "admin":
+        flash(STAFF_SETTINGS_NOTE, "danger")
+        return redirect(url_for("settings"))
     full_name = " ".join((request.form.get("full_name") or "").split())
     email = (request.form.get("email") or "").strip()
     errors = []
@@ -1879,10 +1893,10 @@ def update_profile():
 @app.route("/settings/password", methods=["POST"])
 @login_required
 def change_password():
-    user = db.get("users", session["user_id"])
-    if user["username"] == ADMIN_ACCOUNT:
-        flash("The administrator account's password is fixed and cannot be changed.", "danger")
+    if session.get("role") != "admin":
+        flash(STAFF_SETTINGS_NOTE, "danger")
         return redirect(url_for("settings"))
+    user = db.get("users", session["user_id"])
     current_password = request.form.get("current_password", "")
     new_password = request.form.get("new_password", "")
     confirm_password = request.form.get("confirm_password", "")
@@ -2047,7 +2061,7 @@ def reset_user_password(user_id):
         flash("That account no longer exists.", "danger")
         return redirect(url_for("users"))
     if target["username"] == ADMIN_ACCOUNT:
-        flash("The administrator account's password is fixed and cannot be reset.", "danger")
+        flash("The administrator changes its own password under Account Settings.", "danger")
         return redirect(url_for("users"))
     password = request.form.get("password", "")
     problem = password_problem(password, target["username"])

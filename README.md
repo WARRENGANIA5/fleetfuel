@@ -107,8 +107,9 @@ Vehicles and trips are entered in the system (Vehicle Management, Trip Records);
 
 **Administrator:** there is exactly one administrator account, **`admin1114`** (`ADMIN_ACCOUNT` in
 `app.py`). Only that username with its own password opens the administrator pages: every other
-account is staff, no other account can be made an administrator, and the administrator's username,
-role and password cannot be changed from inside the system. Never write `ADMIN_PASSWORD` in a file in git.
+account is staff and no other account can be made an administrator. The administrator's username and
+role cannot be changed; its name, email and password are changed only by the administrator itself under
+**Account Settings**. Never write `ADMIN_PASSWORD` in a file in git.
 
 ### 4.7 Run the application
 ```bash
@@ -205,7 +206,8 @@ figures to `reports/figures/`.
 
 The administrator (`admin1114`) manages the staff accounts under **User Accounts**: create an account,
 edit its name and email, reset its password, and approve or reject sign-up requests. Resetting a password
-signs that user out right away.
+signs that user out right away. Staff see their Account Settings read-only: only the administrator
+changes a staff account's name, email or password.
 
 ## Deployment on the GSO network
 
