@@ -25,7 +25,8 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Username</label>
-          <input type="text" class="form-control" id="settingsUsername" value="{{ user.username }}" disabled>
+          <input type="text" class="form-control" name="username" id="settingsUsername" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" value="{{ form.username if form and form.username else user.username }}" data-original="{{ user.username }}" required{{ ' disabled' if not can_edit }}>
+          {% if can_edit %}<div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore. Use the new username the next time you log in.</div>{% endif %}
         </div>
         {% if can_edit %}
         <button type="submit" class="btn btn-blue"><i class="fa-solid fa-floppy-disk me-1"></i> Save Profile</button>

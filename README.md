@@ -105,11 +105,10 @@ python init_db.py
 Checks that Firestore can be reached and, on an empty database, creates the administrator account.
 Vehicles and trips are entered in the system (Vehicle Management, Trip Records); no sample data is added.
 
-**Administrator:** there is exactly one administrator account, **`admin1114`** (`ADMIN_ACCOUNT` in
-`app.py`). Only that username with its own password opens the administrator pages: every other
-account is staff and no other account can be made an administrator. The administrator's username and
-role cannot be changed; its name, email and password are changed only by the administrator itself under
-**Account Settings**. Never write `ADMIN_PASSWORD` in a file in git.
+**Administrator:** there is exactly one administrator account, created with the username **`admin1114`**
+(`ADMIN_ACCOUNT` in `app.py`). It is recognized by its administrator role, so it opens the administrator
+pages: every other account is staff and no other account can be made an administrator. Its username,
+name, email and password are changed only by the administrator itself under **Account Settings**. Never write `ADMIN_PASSWORD` in a file in git.
 
 ### 4.7 Run the application
 ```bash
@@ -204,7 +203,7 @@ figures to `reports/figures/`.
 
 ## User accounts
 
-The administrator (`admin1114`) manages the staff accounts under **User Accounts**: create an account,
+The administrator manages the staff accounts under **User Accounts**: create an account,
 edit its name and email, reset its password, and approve or reject sign-up requests. Resetting a password
 signs that user out right away. Staff see their Account Settings read-only: only the administrator
 changes a staff account's name, email or password.

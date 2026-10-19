@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (document.getElementById('settingsFullName')) {
           syncField('settingsFullName', me.full_name);
           syncField('settingsEmail', me.email);
-          const un = document.getElementById('settingsUsername'); if (un) un.value = me.username;
+          syncField('settingsUsername', me.username);
         }
       })
       .catch(function () { /* offline: try again on the next tick */ });

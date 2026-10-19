@@ -165,15 +165,16 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
                              "api_notifications_seen", "api_notifications_dismiss", "api_notifications_dismiss_all"}
 
 
-# The one administrator account (GSO). Only this username, with its own
-# password, opens the administrator pages; every other account is staff. Only
-# this account itself changes its profile and password (Account Settings);
-# User Accounts cannot demote it or reset its password.
+# The one administrator account (GSO) is the account with the role "admin": it
+# opens the administrator pages; every other account is staff and none can be
+# made an administrator. Only the administrator itself changes its username,
+# profile and password (Account Settings); User Accounts cannot change it.
+# ADMIN_ACCOUNT is the username it gets when it is first created (init_db.py).
 ADMIN_ACCOUNT = "admin1114"
 
 
 def effective_role(user):
-    return "admin" if user["role"] == "admin" and user["username"] == ADMIN_ACCOUNT else "staff"
+    return "admin" if user["role"] == "admin" else "staff"
 
 
 def admin_required(view):
@@ -436,7 +437,7 @@ def login():
             if user["status"] != "active":
                 flash("Your account has been deactivated. Please contact the administrator.", "danger")
                 return render_template("login.html")
-            if password in DEFAULT_PASSWORDS and user["username"] != ADMIN_ACCOUNT:
+            if password in DEFAULT_PASSWORDS and user["role"] != "admin":
                 # Staff cannot change their own password: the administrator resets it.
                 flash("Your account still uses a default password. Ask the administrator to reset your "
                       "password under User Accounts, then log in with the new one.", "danger")
@@ -1872,7 +1873,12 @@ def update_profile():
         return redirect(url_for("settings"))
     full_name = " ".join((request.form.get("full_name") or "").split())
     email = (request.form.get("email") or "").strip()
+    username = (request.form.get("username") or "").strip()
     errors = []
+    if not USERNAME_RE.fullmatch(username):
+        errors.append("Username must be 3-50 characters: letters, numbers, dot, dash or underscore.")
+    elif username_taken(username, session["user_id"]):
+        errors.append(f"Username {username} is already taken.")
     if not 2 <= len(full_name) <= 100:
         errors.append("Full name must be 2 to 100 characters.")
     if email:
@@ -1882,9 +1888,9 @@ def update_profile():
             errors.append("That email address is already used by another account.")
     if errors:
         flash("Could not save profile: " + " ".join(errors), "danger")
-        return render_settings({"full_name": request.form.get("full_name", ""), "email": email})
-    db.update("users", session["user_id"], full_name=full_name, email=email or None)
-    session["full_name"] = full_name
+        return render_settings({"full_name": request.form.get("full_name", ""), "email": email, "username": username})
+    db.update("users", session["user_id"], username=username, full_name=full_name, email=email or None)
+    session["full_name"], session["username"] = full_name, username
     flash("Profile updated successfully.", "success")
     return redirect(url_for("settings"))
 
@@ -1921,7 +1927,7 @@ def change_password():
 # ------------------------------------------------------------------
 # USER ACCOUNTS (admin only)
 # ------------------------------------------------------------------
-USER_ROLES = ["staff"]  # the only administrator is ADMIN_ACCOUNT
+USER_ROLES = ["staff"]  # the only administrator is the account created by init_db.py
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.-]{3,50}")
 
 
@@ -1941,7 +1947,7 @@ def password_problem(password, username=""):
 def user_record(u, num):
     return {"id": u["id"], "num": num, "username": u["username"], "full_name": u["full_name"],
             "email": u["email"] or "", "role": effective_role(u), "status": u["status"],
-            "locked": u["username"] == ADMIN_ACCOUNT,
+            "locked": u["role"] == "admin",
             "created_at": u["created_at"].strftime("%b %d, %Y") if u["created_at"] else "",
             "is_self": u["id"] == session.get("user_id")}
 
@@ -2013,7 +2019,7 @@ def edit_user(user_id):
     if not target:
         flash("That account no longer exists.", "danger")
         return redirect(url_for("users"))
-    if target["username"] == ADMIN_ACCOUNT:
+    if target["role"] == "admin":
         flash("The administrator account is fixed and cannot be changed here.", "danger")
         return redirect(url_for("users"))
     f = request.form
@@ -2059,7 +2065,7 @@ def reset_user_password(user_id):
     if not target:
         flash("That account no longer exists.", "danger")
         return redirect(url_for("users"))
-    if target["username"] == ADMIN_ACCOUNT:
+    if target["role"] == "admin":
         flash("The administrator changes its own password under Account Settings.", "danger")
         return redirect(url_for("users"))
     password = request.form.get("password", "")
