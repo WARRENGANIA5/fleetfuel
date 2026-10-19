@@ -37,7 +37,8 @@
     </div>
     {% endif %}
   </div>
-  <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model.</p>
+  <p class="text-muted small mb-3">From the Monthly Report of Official Travel. Every trip with its fuel consumed is used to train the model.
+    {% if is_admin %}Encode each trip after the vehicle returns: a fuel request that was not rejected, for the same vehicle (trip dated 1 day before to 7 days after the request, distance within ±20%) gets this trip's fuel consumed as its actual fuel automatically.{% endif %}</p>
 
   <div class="table-wrap">
     <table class="table-fleet" id="tripsTable">
