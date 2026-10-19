@@ -607,14 +607,15 @@ a { text-decoration: none; color: inherit; }
   transition: background-color 9999s ease-in-out 0s;
 }
 /* Hide native browser password-reveal buttons (Edge/IE ::-ms-reveal, Chrome/Safari
-   credentials auto-fill button) so they don't stack on top of our own eye icon. */
-.login-card input[type="password"]::-ms-reveal,
-.login-card input[type="password"]::-ms-clear {
+   credentials auto-fill button) on every password field (login, sign-up, Account
+   Settings, User Accounts) so they don't stack on top of our own eye icon. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
   display: none;
   width: 0; height: 0;
 }
-.login-card input[type="password"]::-webkit-credentials-auto-fill-button,
-.login-card input[type="password"]::-webkit-strong-password-auto-fill-button {
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-strong-password-auto-fill-button {
   display: none !important;
   visibility: hidden;
   pointer-events: none;
