@@ -363,7 +363,7 @@ document.getElementById('recentPredictionsBody').addEventListener('click', funct
   }
 });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = "#9698a9";
