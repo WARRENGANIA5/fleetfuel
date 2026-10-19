@@ -1786,7 +1786,15 @@ def complete_uploaded_metrics(metrics):
     df = clean_data(load_training_frame())
     X = df[FEATURE_COLUMNS]
     stamp = now_local()
+    # The notebook saves the fitted values unrounded; show them like a model
+    # trained by model/train_model.py (6 significant digits).
+    sig = lambda v: float(f"{float(v):.6g}")
     extra = {
+        "intercept": sig(metrics["intercept"]),
+        "coefficients": {t: sig(v) for t, v in metrics["coefficients"].items()},
+        "raw_intercept": sig(metrics["raw_intercept"]),
+        "raw_coefficients": {t: sig(v) for t, v in metrics["raw_coefficients"].items()},
+        "centering": {k: round(float(v), 4) for k, v in metrics["centering"].items()},
         "model_version": stamp.strftime("v%Y%m%d%H%M%S"),
         "trained_at": stamp.isoformat(timespec="seconds"),
         "status": "active",
