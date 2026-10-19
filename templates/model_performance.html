@@ -59,15 +59,10 @@
 
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-circle-info text-primary"></i> Training Details</div>
-  <p class="text-muted mb-3" style="font-size:12.5px;">
-    <span class="live-badge" id="mpLive"><span class="live-dot"></span><span id="mpLiveText">Live</span></span>
-    <span id="mpSources"></span>
-  </p>
   <div class="row g-2">
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Set Size</div><div class="value"><span id="mpTrain">{{ metrics.train_size }}</span> records</div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Testing Set Size</div><div class="value"><span id="mpTest">{{ metrics.test_size }}</span> records</div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Total Records</div><div class="value"><span id="mpTotal">{{ metrics.total_records }}</span></div></div></div>
-    <div class="col-6 col-md-3"><div class="summary-item"><div class="label">Training Date</div><div class="value"><span id="mpTrained">{{ metrics.trained_at_display }}</span></div></div></div>
+    <div class="col-6 col-md-4"><div class="summary-item"><div class="label">Training Set Size</div><div class="value"><span id="mpTrain">{{ metrics.train_size }}</span> records</div></div></div>
+    <div class="col-6 col-md-4"><div class="summary-item"><div class="label">Testing Set Size</div><div class="value"><span id="mpTest">{{ metrics.test_size }}</span> records</div></div></div>
+    <div class="col-12 col-md-4"><div class="summary-item"><div class="label">Total Records</div><div class="value"><span id="mpTotal">{{ metrics.total_records }}</span></div></div></div>
   </div>
 </div>
 
@@ -344,11 +339,9 @@ function refreshModelPerformance() {
       const setText = function (id, v) { const el = document.getElementById(id); if (el && v !== undefined) el.textContent = v; };
       if (m) {
         setText('mpR2', m.r2_score); setText('mpMae', m.mae + ' L'); setText('mpRmse', m.rmse + ' L');
-        setText('mpCv', m.cv_mean_r2); setText('mpTrained', m.trained_at_display);
+        setText('mpCv', m.cv_mean_r2);
         setText('mpTrain', m.train_size); setText('mpTest', m.test_size);
         setText('mpTotal', m.total_records);
-        const src = m.data_sources || {};
-        setText('mpSources', 'Training data: ' + (src.system || 0) + ' local trips + ' + (src.supplementary || 0) + ' supplementary records (after cleaning).');
         document.querySelectorAll('.mpFolds').forEach(function (el) { el.textContent = m.cv_folds; });
         const liters = function (v, sign) { return v == null ? '—' : (sign ? '±' : '') + v + ' L'; };
         setText('cvTestR2', m.r2_score); setText('cvMeanR2', m.cv_mean_r2); setText('cvStdR2', m.cv_std_r2);
@@ -366,27 +359,16 @@ refreshModelPerformance();
 // ---- Real-time: poll the tiny status endpoint every 2s; pull the full data
 // only when a new model was uploaded. A 30s full refresh is a safety net. ----
 let knownVersion = {{ metrics.model_version|tojson }};
-function setLive(state, text) {
-  const badge = document.getElementById('mpLive');
-  if (!badge) return;
-  badge.className = 'live-badge' + (state ? ' ' + state : '');
-  document.getElementById('mpLiveText').textContent = text;
-}
 function checkModelStatus() {
   fetch('/api/model-status')
     .then(function (res) { return res.json(); })
     .then(function (st) {
       if (st.model_version && st.model_version !== knownVersion) {
         knownVersion = st.model_version;
-        setLive('is-updating', 'Updating charts…');
-        refreshModelPerformance().then(function () {
-          setLive('', 'Live · updated ' + new Date().toLocaleTimeString());
-        });
-      } else if (document.getElementById('mpLive').className !== 'live-badge') {
-        setLive('', 'Live');  // recovered from "Updating…" / "Reconnecting…"
+        refreshModelPerformance();
       }
     })
-    .catch(function () { setLive('is-offline', 'Reconnecting…'); });
+    .catch(function () { /* silent retry on next interval */ });
 }
 setInterval(checkModelStatus, 2000);
 setInterval(refreshModelPerformance, 30000);
