@@ -7,11 +7,6 @@
 {% macro upload_card() %}
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-upload text-primary"></i> Upload Trained Model from Google Colab</div>
-  <ol class="text-muted small mb-3 ps-3">
-    <li>Download the three CSV files below (the trip records, vehicle records and supplementary dataset in the system).</li>
-    <li>In Google Colab, run <strong>colab/fuel_consumption_linear_regression.ipynb</strong> with those files (Runtime &gt; Run all).</li>
-    <li>Upload the two files it downloads. The system checks that they belong together, then predicts with the new model. It never retrains by itself.</li>
-  </ol>
   <div class="d-flex flex-wrap gap-2 align-items-center mb-3" style="font-size:12.5px;">
     <span class="text-muted">Data for Google Colab:</span>
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='trip_records') }}">
@@ -106,13 +101,12 @@
   </div>
   <div class="col-12">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Regression Assumption Checks</div>
-      <p class="diag-note">α = <span id="diagAlpha">0.05</span>. Durbin-Watson uses the local trips by date of travel.</p>
+      <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Durbin-Watson Test</div>
+      <p class="diag-note">Residuals of the local trips arranged by date of travel. A value close to 2 means the errors are independent.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
-        <thead><tr><th>Assumption</th><th>Test</th><th>Statistic</th><th>p-value</th><th>Rule</th><th>Result</th></tr></thead>
+        <thead><tr><th>Assumption</th><th>Statistic</th><th>Rule</th><th>Result</th></tr></thead>
         <tbody id="diagBody"></tbody>
       </table></div>
-      <p class="diag-note mb-0" id="diagSummary"></p>
     </div>
   </div>
 </div>
@@ -329,19 +323,14 @@ function renderDiagnostics(m) {
   } else if (vifBody) {
     vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
   }
-  const d = m.diagnostics;
+  // Only the Durbin-Watson statistic (the VIF has its own table above).
+  const dw = ((m.diagnostics || {}).tests || []).filter(function (t) { return t.key === 'independence'; })[0];
   const diagBody = document.getElementById('diagBody');
-  if (diagBody && d) {
-    document.getElementById('diagAlpha').textContent = d.alpha;
-    diagBody.innerHTML = d.tests.map(function (t) {
-      return '<tr title="' + escapeHtml(t.meaning) + '"><td>' + escapeHtml(t.assumption) + '</td><td>' + escapeHtml(t.test) + '</td><td>' + t.statistic +
-        '</td><td>' + (t.p_value == null ? '—' : (t.p_value < 0.0001 ? '&lt;0.0001' : t.p_value)) + '</td><td>' + escapeHtml(t.rule) + '</td><td>' +
-        badge(t.passed, 'Met', 'Not met') + '</td></tr>';
-    }).join('');
-    const met = d.tests.filter(function (t) { return t.passed; }).length;
-    document.getElementById('diagSummary').textContent = met + ' of ' + d.tests.length + ' assumptions met.';
+  if (diagBody && dw) {
+    diagBody.innerHTML = '<tr><td>' + escapeHtml(dw.assumption) + '</td><td>' + dw.statistic + '</td><td>' +
+      escapeHtml(dw.rule) + '</td><td>' + badge(dw.passed, 'Met', 'Not met') + '</td></tr>';
   } else if (diagBody) {
-    diagBody.innerHTML = '<tr><td colspan="6" class="text-muted">Not in the uploaded results.</td></tr>';
+    diagBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
   }
 }
 
