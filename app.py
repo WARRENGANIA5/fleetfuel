@@ -1843,8 +1843,7 @@ STAFF_SETTINGS_NOTE = ("Only the administrator can change account details. Ask t
 
 def render_settings(form=None, status=200):
     user = db.get("users", session["user_id"])
-    return render_template("settings.html", active="settings", user=user, form=form or {},
-                           can_edit=session.get("role") == "admin", staff_note=STAFF_SETTINGS_NOTE), status
+    return render_template("settings.html", active="settings", user=user, form=form or {}), status
 
 
 @app.route("/settings")

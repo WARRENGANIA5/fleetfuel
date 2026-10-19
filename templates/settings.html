@@ -3,12 +3,14 @@
 {% block page_title %}Account Settings{% endblock %}
 
 {% block content %}
+{# Read from the session so the page works even before the server reloads its code. #}
+{% set can_edit = session.get('role') == 'admin' %}
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-user text-primary"></i> Profile Information</div>
       {% if not can_edit %}
-      <p class="text-muted small"><i class="fa-solid fa-lock me-1"></i> {{ staff_note }}</p>
+      <p class="text-muted small"><i class="fa-solid fa-lock me-1"></i> Only the administrator can change account details. Ask the administrator to update your name, email or password under User Accounts.</p>
       {% endif %}
 
       <form method="POST" action="{{ url_for('update_profile') }}" class="needs-validation" novalidate>
