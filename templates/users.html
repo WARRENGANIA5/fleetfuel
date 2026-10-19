@@ -2,10 +2,6 @@
 {% block title %}User Accounts{% endblock %}
 {% block page_title %}User Accounts{% endblock %}
 
-{% macro status_badge(u) -%}
-  <span class="badge-status {{ {'active': 'badge-active', 'pending': 'badge-maintenance'}.get(u.status, 'badge-inactive') }}">{{ 'Pending approval' if u.status == 'pending' else u.status|capitalize }}</span>
-{%- endmacro %}
-
 {% block content %}
 <div class="card-surface">
   <div class="page-toolbar">
@@ -23,16 +19,15 @@
 
   <div class="table-wrap">
     <table class="table-fleet" id="usersTable">
-      <thead><tr><th>No.</th><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+      <thead><tr><th>No.</th><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
       <tbody id="usersBody">
         {% for u in users %}
         <tr data-record='{{ u|tojson }}'>
           <td>#{{ u.num }}</td>
-          <td><strong>{{ u.full_name }}</strong>{% if u.is_self %} <span class="text-muted small">(you)</span>{% endif %}</td>
+          <td><strong>{{ u.full_name }}</strong>{% if u.is_self %} <span class="text-muted small">(you)</span>{% endif %}{% if u.status == 'pending' %} <span class="badge-status badge-maintenance">Pending approval</span>{% endif %}</td>
           <td>{{ u.username }}</td>
           <td>{{ u.email or '—' }}</td>
           <td>{{ u.role|capitalize }}</td>
-          <td>{{ status_badge(u) }}</td>
           <td>{{ u.created_at }}</td>
           <td>
             {% if u.status == 'pending' %}
@@ -70,8 +65,6 @@
             <div class="form-text">3–50 characters: letters, numbers, dot, dash or underscore.</div></div>
           <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
           <input type="hidden" name="role" value="staff">
-          <div class="mb-2"><label class="form-label">Status</label>
-            <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
           <div class="mb-2"><label class="form-label">Password</label><input type="password" class="form-control" name="password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" autocomplete="new-password" required>
             <div class="form-text">8–128 characters with at least one letter and one number.</div></div>
           <div class="mb-2"><label class="form-label">Confirm Password</label><input type="password" class="form-control" name="confirm_password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
@@ -95,9 +88,6 @@
           <div class="mb-2"><label class="form-label">Full Name</label><input class="form-control" name="full_name" minlength="2" maxlength="100" required></div>
           <div class="mb-2"><label class="form-label">Email (optional)</label><input type="email" class="form-control" name="email" maxlength="120"></div>
           <input type="hidden" name="role" value="staff">
-          <div><label class="form-label">Status</label>
-            <select class="form-select" name="status" required>{% for st in statuses %}<option value="{{ st }}">{{ st|capitalize }}</option>{% endfor %}</select></div>
-          <div class="form-text mt-2">Inactive accounts are signed out immediately and cannot log in.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-navy" data-bs-dismiss="modal">Cancel</button>
@@ -181,11 +171,10 @@ document.getElementById('resetPwCopy').addEventListener('click', function () {
 function userRow(u) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(u);
-  tr.innerHTML = '<td>#' + u.num + '</td><td><strong>' + escapeHtml(u.full_name) + '</strong>' + (u.is_self ? ' <span class="text-muted small">(you)</span>' : '') + '</td>' +
+  tr.innerHTML = '<td>#' + u.num + '</td><td><strong>' + escapeHtml(u.full_name) + '</strong>' + (u.is_self ? ' <span class="text-muted small">(you)</span>' : '') +
+    (u.status === 'pending' ? ' <span class="badge-status badge-maintenance">Pending approval</span>' : '') + '</td>' +
     '<td>' + escapeHtml(u.username) + '</td><td>' + escapeHtml(u.email || '—') + '</td>' +
     '<td>' + escapeHtml(u.role.charAt(0).toUpperCase() + u.role.slice(1)) + '</td>' +
-    '<td><span class="badge-status ' + ({ active: 'badge-active', pending: 'badge-maintenance' }[u.status] || 'badge-inactive') + '">' +
-      escapeHtml(u.status === 'pending' ? 'Pending approval' : u.status.charAt(0).toUpperCase() + u.status.slice(1)) + '</span></td>' +
     '<td>' + escapeHtml(u.created_at) + '</td>' +
     '<td>' + (u.status === 'pending'
       ? '<form method="POST" action="' + APPROVE_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button></form> ' +

@@ -203,9 +203,9 @@ figures to `reports/figures/`.
 
 ## User accounts
 
-Administrators manage accounts under **User Accounts** (create, edit role/status, reset password).
-Staff accounts use the rest of the system. Deactivated accounts are signed out immediately; at least one
-active administrator always remains.
+The administrator (`admin1114`) manages the staff accounts under **User Accounts**: create an account,
+edit its name and email, reset its password, and approve or reject sign-up requests. Resetting a password
+signs that user out right away.
 
 ## Deployment on the GSO network
 

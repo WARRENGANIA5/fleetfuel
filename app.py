@@ -129,7 +129,7 @@ def login_required(view):
             if request.path.startswith("/api/"):
                 return session_ended("not_logged_in")
             return redirect(url_for("login"))
-        # Re-check the account on every request: a deactivated or deleted
+        # Re-check the account on every request: a deleted
         # account is signed out right away, and name/role/photo changes made
         # elsewhere show up without logging in again.
         user = db.get("users", session["user_id"])
@@ -167,7 +167,7 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
 
 # The one administrator account (GSO). Only this username, with its own
 # password, opens the administrator pages; every other account is staff, and
-# this account cannot be demoted, deactivated or given a new password from the
+# this account cannot be demoted or given a new password from the
 # system.
 ADMIN_ACCOUNT = "admin1114"
 
@@ -514,7 +514,7 @@ def signup():
         with _LOGIN_LOCK:
             recent = [t for t in _SIGNUPS.get(ip, []) if time.time() - t < 3600]
             _SIGNUPS[ip] = recent
-        errors, full_name, email = validate_user_form(dict(f, role="staff", status="active"))
+        errors, full_name, email = validate_user_form(dict(f, role="staff"))
         if not (f.get("email") or "").strip():
             errors.insert(0, "Email is required.")
         problem = password_problem(f.get("password", ""), f.get("username", ""))
@@ -1909,7 +1909,6 @@ def change_password():
 # USER ACCOUNTS (admin only)
 # ------------------------------------------------------------------
 USER_ROLES = ["staff"]  # the only administrator is ADMIN_ACCOUNT
-USER_STATUSES = ["active", "inactive"]
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.-]{3,50}")
 
 
@@ -1959,23 +1958,13 @@ def validate_user_form(f, user_id=None):
             errors.append("That email address is already used by another account.")
     if f.get("role") not in USER_ROLES:
         errors.append("Please choose a valid role.")
-    if f.get("status") not in USER_STATUSES:
-        errors.append("Please choose a valid status.")
     return errors, full_name, email
-
-
-def _would_remove_last_admin(user_id, new_role, new_status):
-    """True if this change leaves no active administrator."""
-    if new_role == "admin" and new_status == "active":
-        return False
-    others = sum(u["role"] == "admin" and u["status"] == "active" and u["id"] != user_id for u in db.records("users"))
-    return others == 0
 
 
 @app.route("/users")
 @admin_required
 def users():
-    return render_template("users.html", active="users", users=query_users(), statuses=USER_STATUSES)
+    return render_template("users.html", active="users", users=query_users())
 
 
 @app.route("/api/users")
@@ -1999,7 +1988,7 @@ def add_user():
         flash("Could not create account: " + " ".join(errors), "danger")
         return redirect(url_for("users"))
     db.insert("users", {"username": f["username"].strip(), "password_hash": generate_password_hash(f["password"]),
-                        "full_name": full_name, "email": email or None, "role": f["role"], "status": f["status"]})
+                        "full_name": full_name, "email": email or None, "role": f["role"], "status": "active"})
     flash(f"Account {f['username'].strip()} created. Share the username and password with the user.", "success")
     return redirect(url_for("users"))
 
@@ -2016,14 +2005,10 @@ def edit_user(user_id):
         return redirect(url_for("users"))
     f = request.form
     errors, full_name, email = validate_user_form(f, user_id)
-    if not errors and user_id == session["user_id"] and (f["role"] != "admin" or f["status"] != "active"):
-        errors.append("You cannot remove your own administrator access or deactivate your own account.")
-    if not errors and _would_remove_last_admin(user_id, f["role"], f["status"]):
-        errors.append("At least one active administrator account must remain.")
     if errors:
         flash("Could not update account: " + " ".join(errors), "danger")
         return redirect(url_for("users"))
-    db.update("users", user_id, full_name=full_name, email=email or None, role=f["role"], status=f["status"])
+    db.update("users", user_id, full_name=full_name, email=email or None, role=f["role"])
     flash(f"Account {target['username']} updated.", "success")
     return redirect(url_for("users"))
 
