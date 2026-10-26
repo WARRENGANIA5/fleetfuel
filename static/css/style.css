@@ -565,7 +565,7 @@ a { text-decoration: none; color: inherit; }
 }
 .welcome-title { font-size: 20px; font-weight: 800; color: var(--text-dark); }
 .welcome-meta { display: flex; flex-wrap: wrap; gap: 8px; }
-.welcome-role, .welcome-date {
+.welcome-date {
   font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px;
   background: rgba(255, 255, 255, 0.06); color: var(--text-dark); white-space: nowrap;
 }
