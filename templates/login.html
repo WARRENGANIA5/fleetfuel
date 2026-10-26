@@ -8,7 +8,7 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=29) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=30) }}" rel="stylesheet">
 </head>
 <body>
 <div class="login-page">
@@ -54,14 +54,13 @@
         <i class="fa-solid fa-right-to-bracket me-1"></i> Login
       </button>
     </form>
-    <div class="auth-switch">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></div>
-    <div class="auth-help">Forgot your password? Ask the administrator.</div>
+    <div class="auth-help">No account yet, or forgot your password? Ask the administrator.</div>
   </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=25) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=26) }}"></script>
 <script>
 // Warn before a wrong password is typed with Caps Lock on.
 (function () {

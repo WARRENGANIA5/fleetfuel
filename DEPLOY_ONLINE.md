@@ -62,7 +62,7 @@ Buksan ini sa phone.
 2. **Panason ang `ADMIN_PASSWORD`** sa Variables (indi na ini kinahanglan).
 3. Dugangi ang mga vehicle, dayon ang trip records (Trip Records → Add Trip Record). Ang model
    magatrain sa iya lang gamit ang data sang GSU fleet.
-4. Ang staff mag-sign up sa link, kag ang admin ang mag-approve sa **User Accounts**.
+4. Ang admin ang maghimo sang account sang staff sa **User Accounts**, dayon ihatag ang username kag password.
 
 ## Mga automatic nga nagadalagan online
 - **HTTPS**: ginahatag sang Railway. Secure-only man ang login cookie.

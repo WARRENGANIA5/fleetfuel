@@ -24,7 +24,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 if app.config["ONLINE"]:
     # Behind the hosting provider's HTTPS proxy: take the visitor's address and
-    # scheme from its headers, so login lockouts and sign-up limits apply per
+    # scheme from its headers, so login lockouts apply per
     # visitor instead of to everyone at once.
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -196,14 +196,13 @@ def admin_required(view):
 
 
 def _pending_counts():
-    """Sidebar badges (administrator only)."""
+    """Sidebar badge (administrator only): fuel requests waiting for approval."""
     if session.get("role") != "admin":
-        return {"requests": 0, "accounts": 0}
+        return {"requests": 0}
     try:
-        return {"requests": len(db.find("predictions", approval_status="pending")),
-                "accounts": len(db.find("users", status="pending"))}
+        return {"requests": len(db.find("predictions", approval_status="pending"))}
     except Exception:
-        return {"requests": 0, "accounts": 0}
+        return {"requests": 0}
 
 
 # ------------------------------------------------------------------
@@ -231,7 +230,6 @@ def inject_globals():
         "is_admin": session.get("role") == "admin",
         "current_year": today_local().year,
         "notif_count": g.get("notif_count", 0),
-        "pending_accounts": pending["accounts"],
         "pending_requests": pending["requests"],
     }
 
@@ -241,7 +239,7 @@ NOTIF_KEY_RE = re.compile(r"[a-z]+:\d+(:[a-z0-9]+)?")
 def build_notifications(limit=8):
     """Bell notifications for the current user, minus the ones they removed.
 
-    * administrators: sign-ups and fuel requests waiting for approval (actionable);
+    * administrators: fuel requests waiting for approval (actionable);
     * staff: approvals / rejections of their own fuel requests, counted as
       new until they open the bell.
     Each item has a `key`; a removed key stays hidden, but a new event gets a
@@ -253,15 +251,6 @@ def build_notifications(limit=8):
     if is_admin:
         users_by_id = {u["id"]: u for u in db.records("users")}
         vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
-        signups = [r for r in newest(db.find("users", status="pending"), "created_at")
-                   if f"account:{r['id']}" not in removed]
-        count += len(signups)
-        for r in signups[:limit]:
-            items.append({"kind": "account", "id": r["id"], "key": f"account:{r['id']}", "icon": "fa-user-plus",
-                          "text": f"New sign-up: {r['full_name']}",
-                          "sub": f"{r['username']} · waiting for approval",
-                          "time": r["created_at"].strftime("%b %d, %I:%M %p"),
-                          "url": url_for("users"), "new": True})
         pending = [r for r in newest(db.find("predictions", approval_status="pending"), "created_at")
                    if f"request:{r['id']}" not in removed]
         count += len(pending)
@@ -308,7 +297,7 @@ def api_notifications():
     data = build_notifications()
     if session.get("role") == "admin":
         pending = _pending_counts()
-        data.update(pending_requests=pending["requests"], pending_accounts=pending["accounts"])
+        data.update(pending_requests=pending["requests"])
     return data
 
 
@@ -394,8 +383,7 @@ def _record_login_failure(key):
 
 
 def start_session(user):
-    """Signs the account in on this browser (after a correct password, or
-    automatically once an administrator approves a sign-up made here)."""
+    """Signs the account in on this browser after a correct password."""
     session.clear()
     session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (8 hours)
     session["user_id"] = user["id"]
@@ -404,16 +392,6 @@ def start_session(user):
     session["role"] = effective_role(user)
     session["position"] = user["position"] or ""
     session["pw_sig"] = password_signature(user["password_hash"])
-
-
-def wait_for_approval(user):
-    """Remember, on this browser only, the pending account whose password was
-    just given: the waiting page then signs it in by itself once approved."""
-    session.clear()
-    session.permanent = True
-    session["pending_user_id"] = user["id"]
-    session["pending_pw_sig"] = password_signature(user["password_hash"])
-    return redirect(url_for("signup_pending"))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -434,8 +412,6 @@ def login():
         user = find_user(username)
         if user and check_password_hash(user["password_hash"], password):
             _LOGIN_FAILURES.pop(key, None)
-            if user["status"] == "pending":
-                return wait_for_approval(user)
             if user["status"] != "active":
                 flash("Your account has been deactivated. Please contact the administrator.", "danger")
                 return render_template("login.html")
@@ -454,10 +430,6 @@ def login():
     return render_template("login.html")
 
 
-_SIGNUPS = {}
-SIGNUP_LIMIT_PER_HOUR = 5
-
-
 def find_user(username):
     """Account with this username (exact match, like the login form)."""
     return next((u for u in db.records("users") if u["username"] == username), None)
@@ -471,133 +443,6 @@ def username_taken(username, except_id=None):
 def email_taken(email, except_id=None):
     email = (email or "").strip().lower()
     return any((u["email"] or "").lower() == email and u["id"] != except_id for u in db.records("users"))
-
-
-def signup_field_problem(field, value):
-    """Live check of one sign-up field (the same rules run again on submit). None when valid."""
-    value = (value or "").strip()
-    if field == "username":
-        if not USERNAME_RE.fullmatch(value):
-            return "3-50 characters: letters, numbers, dot, dash or underscore."
-        if username_taken(value):
-            return f"Username {value} is already taken."
-    elif field == "email":
-        if not value:
-            return "Email is required."
-        if len(value) > 120 or not EMAIL_RE.fullmatch(value):
-            return "Please enter a valid email address."
-        if email_taken(value):
-            return "That email address is already used by another account."
-    return None
-
-
-@app.route("/api/signup/check")
-def api_signup_check():
-    """Checked while the user types on the sign-up page."""
-    field = request.args.get("field", "")
-    if field not in ("username", "email"):
-        return {"error": "invalid_field"}, 400
-    problem = signup_field_problem(field, request.args.get("value", ""))
-    return {"ok": problem is None, "message": problem or ("Username is available." if field == "username" else "")}
-
-
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
-    """Self-registration for GSO and motorpool staff. New accounts are
-    created as 'pending' staff accounts; the browser that signed up waits on
-    the approval page and is signed in automatically once an administrator
-    approves the account under User Accounts."""
-    if session.get("user_id"):
-        return redirect(url_for("dashboard"))
-    form = {}
-    if request.method == "POST":
-        f = request.form
-        form = {"full_name": f.get("full_name", ""), "username": f.get("username", ""), "email": f.get("email", "")}
-        ip = request.remote_addr or ""
-        with _LOGIN_LOCK:
-            recent = [t for t in _SIGNUPS.get(ip, []) if time.time() - t < 3600]
-            _SIGNUPS[ip] = recent
-        errors, full_name, email = validate_user_form(dict(f, role="staff"))
-        if not (f.get("email") or "").strip():
-            errors.insert(0, "Email is required.")
-        problem = password_problem(f.get("password", ""), f.get("username", ""))
-        if problem:
-            errors.append(problem)
-        elif f.get("password") != f.get("confirm_password"):
-            errors.append("Password and confirmation do not match.")
-        if len(recent) >= SIGNUP_LIMIT_PER_HOUR:
-            errors = ["Too many sign-ups from this computer. Please try again later."]
-        if errors:
-            for e in errors:
-                flash(e, "danger")
-            return render_template("signup.html", form=form)
-        user_id = db.insert("users", {"username": f["username"].strip(), "password_hash": generate_password_hash(f["password"]),
-                                      "full_name": full_name, "email": email or None, "role": "staff", "status": "pending"})
-        with _LOGIN_LOCK:
-            _SIGNUPS.setdefault(ip, []).append(time.time())
-        return wait_for_approval(db.get("users", user_id))
-    return render_template("signup.html", form=form)
-
-
-def _pending_account():
-    """The account this browser waits on and its state: 'pending', 'approved',
-    'inactive', or 'gone' (rejected, or its password was reset meanwhile)."""
-    uid = session.get("pending_user_id")
-    if not uid:
-        return None, None
-    user = db.get("users", uid)
-    if not user or password_signature(user["password_hash"]) != session.get("pending_pw_sig"):
-        return None, "gone"
-    return user, {"active": "approved"}.get(user["status"], user["status"])
-
-
-def _end_wait(state):
-    session.clear()
-    flash("Your sign-up request was not approved. Please contact the administrator." if state == "gone"
-          else "Your account has been deactivated. Please contact the administrator.", "danger")
-
-
-@app.route("/signup/pending")
-def signup_pending():
-    if session.get("user_id"):
-        return redirect(url_for("dashboard"))
-    user, state = _pending_account()
-    if state is None:
-        return redirect(url_for("login"))
-    if state == "approved":
-        start_session(user)
-        flash(f"Your account was approved. Welcome, {user['full_name']}!", "success")
-        return redirect(url_for("dashboard"))
-    if state != "pending":
-        _end_wait(state)
-        return redirect(url_for("login"))
-    return render_template("signup_pending.html", user=user)
-
-
-@app.route("/api/signup/status")
-def api_signup_status():
-    """Polled by the waiting page every few seconds. Once the administrator
-    approves the account, this browser is signed in right away."""
-    user, state = _pending_account()
-    if state is None:
-        return {"state": "none", "redirect": url_for("login")}
-    if state == "approved":
-        start_session(user)
-        flash(f"Your account was approved. Welcome, {user['full_name']}!", "success")
-        return {"state": "approved", "redirect": url_for("dashboard")}
-    if state != "pending":
-        _end_wait(state)
-        return {"state": state, "redirect": url_for("login")}
-    return {"state": "pending"}
-
-
-@app.route("/signup/cancel", methods=["POST"])
-def signup_cancel():
-    """Stop waiting on this browser (the request stays for the administrator)."""
-    session.pop("pending_user_id", None)
-    session.pop("pending_pw_sig", None)
-    flash("You can log in once the administrator approves your account.", "info")
-    return redirect(url_for("login"))
 
 
 @app.route("/logout", methods=["GET", "POST"])
@@ -1983,7 +1828,7 @@ def user_record(u, num):
 
 
 def query_users():
-    rows = sorted(db.records("users"), key=lambda u: (u["status"] != "pending", u["role"] != "admin", u["full_name"] or ""))
+    rows = sorted(db.records("users"), key=lambda u: (u["role"] != "admin", u["full_name"] or ""))
     return [user_record(u, i) for i, u in enumerate(rows, 1)]
 
 
@@ -2020,7 +1865,7 @@ def users():
 @admin_required
 def api_users():
     users_list = query_users()
-    return {"users": users_list, "pending": sum(1 for u in users_list if u["status"] == "pending")}
+    return {"users": users_list}
 
 
 @app.route("/users/add", methods=["POST"])
@@ -2059,32 +1904,6 @@ def edit_user(user_id):
         return redirect(url_for("users"))
     db.update("users", user_id, full_name=full_name, email=email or None, role=f["role"])
     flash(f"Account {target['username']} updated.", "success")
-    return redirect(url_for("users"))
-
-
-@app.route("/users/<int:user_id>/approve", methods=["POST"])
-@admin_required
-def approve_user(user_id):
-    target = db.get("users", user_id)
-    if not target or target["status"] != "pending":
-        flash("That sign-up request no longer exists or was already handled.", "danger")
-        return redirect(url_for("users"))
-    db.update("users", user_id, status="active")
-    flash(f"Account {target['username']} approved. The user can now log in.", "success")
-    return redirect(url_for("users"))
-
-
-@app.route("/users/<int:user_id>/reject", methods=["POST"])
-@admin_required
-def reject_user(user_id):
-    target = db.get("users", user_id)
-    if not target or target["status"] != "pending":
-        flash("That sign-up request no longer exists or was already handled.", "danger")
-        return redirect(url_for("users"))
-    db.delete("users", user_id)
-    for d in db.find("notification_dismissals", user_id=user_id):
-        db.delete("notification_dismissals", d["id"])
-    flash(f"Sign-up request from {target['username']} was rejected and removed.", "success")
     return redirect(url_for("users"))
 
 
