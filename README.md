@@ -227,9 +227,9 @@ signs that user out right away.
 
 ## Roles and fuel requests
 
-* **Staff (GSO / motorpool):** predict fuel for a planned trip (each prediction is a *fuel request*), encode
-  trips from the Monthly Report of Official Travel (add, edit), record the actual fuel after the trip, and view the
-  dashboard and vehicles. The bell notifies them in real time when a request is
+* **Staff (GSO / motorpool):** predict fuel for a planned trip (each prediction is a *fuel request*), record
+  the actual fuel after the trip, and view the dashboard and the trip records (only the administrator adds,
+  edits and deletes trips and vehicles). The bell notifies them in real time when a request is
   approved (with the liters released) or rejected.
 * **Administrators:** everything staff can do, plus approve/reject fuel requests and set the fuel to release
   (the predicted figure and range are the reference), manage vehicles, delete records and manage user
