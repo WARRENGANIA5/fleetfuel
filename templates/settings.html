@@ -15,6 +15,11 @@
           <input type="text" class="form-control" name="full_name" id="settingsFullName" minlength="2" maxlength="100" value="{{ form.full_name if form else user.full_name }}" data-original="{{ user.full_name }}" required>
         </div>
         <div class="mb-3">
+          <label class="form-label">Role</label>
+          <input type="text" class="form-control" name="position" id="settingsPosition" maxlength="100" placeholder="e.g. Administrative Officer V" value="{{ form.position if form and 'position' in form else (user.position or user.role|capitalize) }}" data-original="{{ user.position or user.role|capitalize }}">
+          <div class="form-text">Shown under your name at the top of the page. Leave it blank to show {{ user.role|capitalize }}.</div>
+        </div>
+        <div class="mb-3">
           <label class="form-label">Email</label>
           <input type="email" class="form-control" name="email" id="settingsEmail" maxlength="120" value="{{ form.email if form else (user.email or '') }}" data-original="{{ user.email or '' }}">
         </div>

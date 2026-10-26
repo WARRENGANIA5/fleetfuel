@@ -603,6 +603,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (initial) initial.textContent = me.initial;
         if (document.getElementById('settingsFullName')) {
           syncField('settingsFullName', me.full_name);
+          syncField('settingsPosition', me.role);
           syncField('settingsEmail', me.email);
           syncField('settingsUsername', me.username);
         }

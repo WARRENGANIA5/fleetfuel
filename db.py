@@ -42,8 +42,8 @@ DATE_FIELDS = {"trip_date"}
 # Every field of each record, with its default, so a page never meets a
 # missing key (Firestore documents have no fixed columns).
 FIELDS = {
-    "users": {"username": None, "password_hash": None, "full_name": None, "email": None,
-              "role": "staff", "status": "active", "notif_seen_at": None, "created_at": None},
+    "users": {"username": None, "password_hash": None, "full_name": None, "position": None,
+              "email": None, "role": "staff", "status": "active", "notif_seen_at": None, "created_at": None},
     "vehicles": {"plate_number": None, "brand_model": None, "fuel_type": None, "engine_power_kw": None,
                  "created_at": None, "updated_at": None},
     "trip_records": {"vehicle_id": None, "trip_date": None, "distance_km": None,

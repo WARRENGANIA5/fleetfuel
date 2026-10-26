@@ -150,6 +150,7 @@ def login_required(view):
             return redirect(url_for("login"))
         session["username"], session["full_name"] = user["username"], user["full_name"]
         session["role"] = effective_role(user)
+        session["position"] = user["position"] or ""
         # Logged in with a default (published) password: only the password
         # change itself is allowed until a new one is set.
         if session.get("must_change_pw") and request.endpoint not in _ALLOWED_BEFORE_PW_CHANGE:
@@ -401,6 +402,7 @@ def start_session(user):
     session["username"] = user["username"]
     session["full_name"] = user["full_name"]
     session["role"] = effective_role(user)
+    session["position"] = user["position"] or ""
     session["pw_sig"] = password_signature(user["password_hash"])
 
 
@@ -1636,7 +1638,8 @@ def build_model_charts():
 
     # Residual histogram (normality check) on "nice" fixed-width bins centred on 0.
     spread = float(np.abs(residuals).max()) or 1.0
-    width = next(w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * spread / w <= 24)
+    width = next((w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * spread / w <= 24),
+                 float(np.ceil(spread / 12)))  # very large errors (e.g. a mis-encoded trip): about 24 bins
     half = np.ceil(spread / width) * width
     edges = np.arange(-half, half + width * 1.001, width)
     counts, edges = np.histogram(residuals, bins=edges)
@@ -1887,7 +1890,7 @@ def api_me():
     user = db.get("users", session["user_id"])
     return {
         "username": user["username"], "full_name": user["full_name"], "email": user["email"] or "",
-        "role": user["role"].capitalize(), "initial": (user["full_name"] or "U")[0].upper(),
+        "role": user["position"] or user["role"].capitalize(), "position": user["position"] or "", "initial": (user["full_name"] or "U")[0].upper(),
     }
 
 
@@ -1895,6 +1898,9 @@ def api_me():
 @login_required
 def update_profile():
     full_name = " ".join((request.form.get("full_name") or "").split())
+    position = " ".join((request.form.get("position") or "").split())
+    if position == session["role"].capitalize():
+        position = ""  # same as the account's own role: nothing custom to keep
     email = (request.form.get("email") or "").strip()
     username = (request.form.get("username") or "").strip()
     errors = []
@@ -1904,6 +1910,8 @@ def update_profile():
         errors.append(f"Username {username} is already taken.")
     if not 2 <= len(full_name) <= 100:
         errors.append("Full name must be 2 to 100 characters.")
+    if len(position) > 100:
+        errors.append("Role must be at most 100 characters.")
     if email:
         if len(email) > 120 or not EMAIL_RE.fullmatch(email):
             errors.append("Please enter a valid email address.")
@@ -1911,9 +1919,11 @@ def update_profile():
             errors.append("That email address is already used by another account.")
     if errors:
         flash("Could not save profile: " + " ".join(errors), "danger")
-        return render_settings({"full_name": request.form.get("full_name", ""), "email": email, "username": username})
-    db.update("users", session["user_id"], username=username, full_name=full_name, email=email or None)
-    session["full_name"], session["username"] = full_name, username
+        return render_settings({"full_name": request.form.get("full_name", ""), "position": position,
+                                "email": email, "username": username})
+    db.update("users", session["user_id"], username=username, full_name=full_name,
+              position=position or None, email=email or None)
+    session["full_name"], session["username"], session["position"] = full_name, username, position
     flash("Profile updated successfully.", "success")
     return redirect(url_for("settings"))
 
@@ -2128,7 +2138,8 @@ def handle_too_large(e):
     if _wants_json():
         return {"success": False, "message": "The file is too large (maximum 5 MB)."}, 413
     flash("The uploaded data is too large (maximum 5 MB).", "danger")
-    return redirect(request.referrer or url_for("index"))
+    ref = request.referrer or ""
+    return redirect(ref if ref.startswith(request.host_url) else url_for("index"))
 
 
 @app.errorhandler(404)
