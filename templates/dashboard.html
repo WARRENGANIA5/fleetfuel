@@ -19,7 +19,7 @@
     <div class="welcome-title">{{ greeting }}, {{ session.get('full_name') or 'there' }}!</div>
   </div>
   <div class="welcome-meta">
-    <span class="welcome-role"><i class="fa-solid {{ 'fa-user-shield' if is_admin else 'fa-user' }} me-1"></i>{{ 'Administrator' if is_admin else 'GSO / Motorpool Staff' }}</span>
+    {% if is_admin %}<span class="welcome-role"><i class="fa-solid fa-user-shield me-1"></i>Administrator</span>{% endif %}
     <span class="welcome-date"><i class="fa-regular fa-calendar me-1"></i>{{ today_long }}</span>
   </div>
 </div>
