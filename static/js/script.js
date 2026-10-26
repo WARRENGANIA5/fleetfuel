@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function () {
           setDot(data.count);
           renderList(data.notifications);
           // Sidebar counters (admin): pending fuel requests and pending sign-ups, on every page.
-          [['pendingReqBadge', data.pending_requests]].forEach(function (b) {
+          [['pendingReqBadge', data.pending_requests], ['pendingBadge', data.pending_accounts]].forEach(function (b) {
             const el = document.getElementById(b[0]);
             if (el && b[1] !== undefined) { el.textContent = b[1]; el.hidden = !b[1]; }
           });

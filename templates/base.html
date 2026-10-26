@@ -9,7 +9,7 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=30) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=29) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -50,6 +50,7 @@
       {% if session.get('role') == 'admin' %}
       <a href="{{ url_for('users') }}" class="nav-link {{ 'active' if active=='users' }}">
         <i class="fa-solid fa-users-gear"></i><span>User Accounts</span>
+        <span class="nav-badge" id="pendingBadge" title="Sign-ups waiting for approval" {{ 'hidden' if not pending_accounts }}>{{ pending_accounts }}</span>
       </a>
       {% endif %}
       <a href="{{ url_for('settings') }}" class="nav-link {{ 'active' if active=='settings' }}">
@@ -143,7 +144,7 @@
 <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=26) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=25) }}"></script>
 <div id="pageScripts" hidden>{% block extra_scripts %}{% endblock %}</div>
 </body>
 </html>

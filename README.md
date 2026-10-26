@@ -209,7 +209,7 @@ figures to `reports/figures/`.
 ## User accounts
 
 The administrator manages the staff accounts under **User Accounts**: create an account,
-edit its name and email, and reset its password. Resetting a password
+edit its name and email, reset its password, and approve or reject sign-up requests. Resetting a password
 signs that user out right away.
 
 ## Deployment on the GSO network
@@ -233,9 +233,10 @@ signs that user out right away.
   approved (with the liters released) or rejected.
 * **Administrators:** everything staff can do, plus approve/reject fuel requests and set the fuel to release
   (the predicted figure and range are the reference), manage vehicles, delete records and manage user
-  accounts. The bell and sidebar show pending requests in real time.
-* **Accounts:** there is no self sign-up; the administrator creates each staff account under User Accounts
-  and gives the username and password to the user.
+  accounts (including approving sign-ups). The bell and sidebar show pending requests and sign-ups in real time.
+* **Sign up:** a new account waits for approval. The sign-up page checks the username, email and password
+  while they are typed; after signing up (or logging in to a pending account) the waiting page checks every
+  3 seconds and signs the user in automatically as soon as an administrator approves the account.
 * After a trip, the actual fuel is flagged **outside the predicted range** when it differs from the prediction
   by more than the model's RMSE.
 

@@ -24,13 +24,22 @@
         {% for u in users %}
         <tr data-record='{{ u|tojson }}'>
           <td>#{{ u.num }}</td>
-          <td><strong>{{ u.full_name }}</strong>{% if u.is_self %} <span class="text-muted small">(you)</span>{% endif %}</td>
+          <td><strong>{{ u.full_name }}</strong>{% if u.is_self %} <span class="text-muted small">(you)</span>{% endif %}{% if u.status == 'pending' %} <span class="badge-status badge-maintenance">Pending approval</span>{% endif %}</td>
           <td>{{ u.username }}</td>
           <td>{{ u.email or '—' }}</td>
           <td>{{ u.role|capitalize }}</td>
           <td>{{ u.created_at }}</td>
           <td>
-            {% if u.locked %}
+            {% if u.status == 'pending' %}
+            <form method="POST" action="{{ url_for('approve_user', user_id=u.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button>
+            </form>
+            <form method="POST" action="{{ url_for('reject_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirmDelete('Reject and remove this sign-up request?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+            </form>
+            {% elif u.locked %}
             <span class="text-muted small" title="The administrator account is fixed"><i class="fa-solid fa-lock me-1"></i>Locked</span>
             {% else %}
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -120,6 +129,9 @@
 
 {% block extra_scripts %}
 <script>
+const APPROVE_URL = {{ url_for('approve_user', user_id=0)|tojson }};
+const REJECT_URL = {{ url_for('reject_user', user_id=0)|tojson }};
+const USERS_CSRF = {{ csrf_token()|tojson }};
 
 // The reset-password form must start empty (the shared modal would otherwise try to fill it).
 const resetPw = document.getElementById('resetPw'), resetPwConfirm = document.getElementById('resetPwConfirm');
@@ -159,11 +171,15 @@ document.getElementById('resetPwCopy').addEventListener('click', function () {
 function userRow(u) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(u);
-  tr.innerHTML = '<td>#' + u.num + '</td><td><strong>' + escapeHtml(u.full_name) + '</strong>' + (u.is_self ? ' <span class="text-muted small">(you)</span>' : '') + '</td>' +
+  tr.innerHTML = '<td>#' + u.num + '</td><td><strong>' + escapeHtml(u.full_name) + '</strong>' + (u.is_self ? ' <span class="text-muted small">(you)</span>' : '') +
+    (u.status === 'pending' ? ' <span class="badge-status badge-maintenance">Pending approval</span>' : '') + '</td>' +
     '<td>' + escapeHtml(u.username) + '</td><td>' + escapeHtml(u.email || '—') + '</td>' +
     '<td>' + escapeHtml(u.role.charAt(0).toUpperCase() + u.role.slice(1)) + '</td>' +
     '<td>' + escapeHtml(u.created_at) + '</td>' +
-    '<td>' + (u.locked ? '<span class="text-muted small" title="The administrator account is fixed"><i class="fa-solid fa-lock me-1"></i>Locked</span>'
+    '<td>' + (u.status === 'pending'
+      ? '<form method="POST" action="' + APPROVE_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn" title="Approve"><i class="fa-solid fa-check"></i></button></form> ' +
+        '<form method="POST" action="' + REJECT_URL.replace('/0/', '/' + u.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Reject and remove this sign-up request?\')"><input type="hidden" name="csrf_token" value="' + escapeHtml(USERS_CSRF) + '"><button type="submit" class="action-btn danger" title="Reject"><i class="fa-solid fa-xmark"></i></button></form>'
+      : u.locked ? '<span class="text-muted small" title="The administrator account is fixed"><i class="fa-solid fa-lock me-1"></i>Locked</span>'
       : '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
         '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#resetPwModal" title="Reset Password"><i class="fa-solid fa-key"></i></button>') + '</td>';
   return tr;
@@ -180,6 +196,8 @@ setInterval(function () {
     if (!Array.isArray(d.users)) throw new Error('unexpected answer');  // keep the rows on screen
     document.getElementById('userLive').className = 'live-badge';
     document.getElementById('userLiveText').textContent = 'Live';
+    const badge = document.getElementById('pendingBadge');
+    if (badge) { badge.textContent = d.pending; badge.hidden = !d.pending; }
     const json = JSON.stringify(d.users);
     if (json === lastUsersJson) return;
     lastUsersJson = json;
