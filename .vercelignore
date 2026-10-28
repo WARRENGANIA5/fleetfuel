@@ -10,3 +10,5 @@ reports/
 data/*.synthetic_*
 firebase-key.json
 *-firebase-adminsdk-*.json
+scripts/
+docs/

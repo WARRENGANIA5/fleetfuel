@@ -30,20 +30,34 @@ gov-fleets/
 │   ├── linear_regression_pipeline.joblib   (generated)
 │   └── metrics.json            (generated)
 ├── data/
-│   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from the online dataset
-│   ├── add_eea_diesel_vans.py        Adds the EEA diesel vans to supplementary_data.csv
+│   ├── gso_monthly_travel_SFA4714_2026.csv  Collected trips of SFA 4714 (Monthly Report of Official Travel)
+│   ├── supplementary_data.csv        Online records: 50,508 gasoline trips + 49,390 diesel vans
+│   ├── cleaned_merged_dataset.csv    Local + online records after cleaning (generated)
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
-│   └── supplementary_data.csv        Online trips: distance, engine power, fuel type, fuel consumed
+│   ├── SUPPLEMENTARY_DATASET_SOURCE.md  Sources, licenses and sampling of the online data
+│   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from Fan & Song (2022)
+│   └── add_eea_diesel_vans.py        Adds the EEA (2024) diesel vans to supplementary_data.csv
+├── colab/
+│   ├── fuel_consumption_linear_regression_AUTO.ipynb  Colab notebook with the data built in
+│   ├── fuel_consumption_linear_regression.ipynb       Colab notebook that asks for the 3 CSV files
+│   ├── trip_records.csv, vehicle_records.csv, supplementary_data.csv  The three training files
+│   ├── example_upload/          Model + results saved by Colab (for Upload Trained Model)
+│   └── HOW_TO_TRAIN_IN_COLAB.txt
 ├── templates/                  Jinja2 templates (login, dashboard, ...)
 ├── static/
 │   ├── css/style.css
 │   ├── js/script.js
-│   └── images/ (favicon, generated charts/)
-├── colab/                      Google Colab notebooks + the three training CSV files
-├── start_server.bat            Backs up the database, starts the web app
+│   ├── images/logo.svg         Logo and browser-tab icon
+│   └── vendor/                 Bootstrap, Chart.js, Font Awesome, Poppins (offline copies)
+├── reports/figures/            Evaluation figures (generated)
+├── backups/                    Firestore backups (.json); old_mysql_backups/ and old_code_snapshots/ are from before Firestore
 ├── backup_database.py          Database backup to backups/ (keeps the newest 30)
-├── allow_network_access.bat    One-time firewall rule for LAN access
-└── reports/figures/            Evaluation figures (generated)
+├── scripts/                    Server PC scripts (Windows)
+│   ├── start_server.bat, stop_server.bat       Start / stop the web app
+│   ├── install_autostart.bat, uninstall_autostart.bat, fleetfuel_watcher.ps1  Start the app when Windows signs in
+│   └── allow_network_access.bat  One-time firewall rule for LAN access
+├── docs/DEPLOY_ONLINE.md       How to put the system online
+└── api/, public/, deploy/, Dockerfile, vercel.json, railway.json  Online hosting (must stay in the root)
 ```
 
 ## 3. About the Dataset
@@ -141,7 +155,7 @@ regenerates the figures in `reports/figures/`.
 
 ## 5a. Database Backups
 
-`start_server.bat` backs up every Firestore collection to a `.json` file in `backups/` every time the
+`scripts/start_server.bat` backs up every Firestore collection to a `.json` file in `backups/` every time the
 system starts, and the running app backs it up again every 24 hours. The newest 30 backups are kept.
 To make a backup at any time:
 ```bash
@@ -215,14 +229,14 @@ signs that user out right away.
 ## Deployment on the GSO network
 
 1. Connect the server PC to the GSO network and set that network to **Private** in Windows
-   (Settings > Network > Properties). Run `allow_network_access.bat` once **as Administrator**; it opens
+   (Settings > Network > Properties). Run `scripts/allow_network_access.bat` once **as Administrator**; it opens
    port 5000 for Private/Domain networks only, never on public Wi-Fi.
-2. Double-click `start_server.bat` (backs up the database, then starts the app with Waitress). If the
+2. Double-click `scripts/start_server.bat` (backs up the database, then starts the app with Waitress). If the
    app ever stops unexpectedly, the script starts it again after 10 seconds.
 3. Other computers on the same network open `http://<this-PC-IP>:5000` (the script prints the address).
-4. To start the system automatically whenever Windows signs in, run `install_autostart.bat` once
-   (`uninstall_autostart.bat` turns it off). Also turn off Sleep on the server PC.
-5. Before turning the server PC off, run `stop_server.bat`. The data itself lives in Firebase Firestore, so
+4. To start the system automatically whenever Windows signs in, run `scripts/install_autostart.bat` once
+   (`scripts/uninstall_autostart.bat` turns it off). Also turn off Sleep on the server PC.
+5. Before turning the server PC off, run `scripts/stop_server.bat`. The data itself lives in Firebase Firestore, so
    it is safe even if the PC is turned off suddenly; the server PC only needs an internet connection.
 
 ## Roles and fuel requests

@@ -2,7 +2,6 @@
 # Keeps FleetFuel running: whenever the system is not running (after sign-in, or when its
 # window was closed or the app stopped), it starts start_server.bat again within seconds.
 # The database is Firebase Firestore (online), so nothing else has to be started first.
-# (The file keeps its old name so autostarts installed earlier keep working.)
 $ErrorActionPreference = "SilentlyContinue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 

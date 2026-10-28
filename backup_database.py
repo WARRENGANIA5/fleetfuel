@@ -1,6 +1,6 @@
 """Back up the Firebase Firestore database to backups/ (one .json file per run).
 
-Runs automatically from start_server.bat every time the system is started
+Runs automatically from scripts/start_server.bat every time the system is started
 (and every 24 hours while the server runs), and can be run by hand:
     venv\\Scripts\\python.exe backup_database.py
 Keeps the newest KEEP backups and deletes older ones.

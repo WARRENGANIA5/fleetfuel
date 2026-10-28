@@ -16,3 +16,5 @@ model/*.tmp
 model/metrics.json
 firebase-key.json
 *-firebase-adminsdk-*.json
+scripts/
+docs/

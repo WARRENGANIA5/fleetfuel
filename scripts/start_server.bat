@@ -5,7 +5,7 @@ REM 1. Backs up the Firestore database to backups\ (keeps the newest 30; the app
 REM 2. Starts the app with Waitress on port 5000 (reachable from other PCs on the same network).
 REM 3. If the app ever stops unexpectedly, it is started again automatically.
 REM Run install_autostart.bat once to start all of this automatically when Windows starts.
-cd /d "%~dp0"
+cd /d "%~dp0.."
 title FleetFuel Server
 
 netstat -ano | find ":5000 " | find "LISTENING" >nul
