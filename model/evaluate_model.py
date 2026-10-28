@@ -102,11 +102,21 @@ def main():
     fig.axes[0].set_title("Normal Q-Q Plot of Residuals")
     save(fig, "residual_qq_plot.png")
 
-    # 4. Histogram of residuals (normality check)
+    # 4. Histogram of residuals (normality check), like the web app: bins over
+    # 99% of the residuals, the few larger ones counted in the end bins.
+    resid = np.asarray(residuals, dtype=float)
+    half = max(float(np.ceil(np.percentile(np.abs(resid), 99))), 1.0)
+    width = next(w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * half / w <= 24)
+    half = np.ceil(half / width) * width
     fig, ax = plt.subplots(figsize=(6.4, 5.2))
-    sns.histplot(residuals, kde=True, color=BLUE, ax=ax)
+    sns.histplot(np.clip(resid, -half, half), bins=np.linspace(-half, half, int(round(2 * half / width)) + 1),
+                 kde=True, color=BLUE, ax=ax)
     ax.axvline(0, color=NAVY, linestyle="--", linewidth=1.5)
     ax.set(xlabel="Residual (Actual − Predicted, L)", ylabel="Number of Test Trips", title="Histogram of Residuals")
+    outside = int((np.abs(resid) > half).sum())
+    if outside:
+        ax.text(0.98, 0.97, f"{outside} residuals beyond ±{half:g} L\nare counted in the end bins",
+                transform=ax.transAxes, ha="right", va="top", fontsize=8, color=NAVY)
     save(fig, "residual_histogram.png")
 
     # 5. Correlation heatmap of the equation's terms and the fuel consumed

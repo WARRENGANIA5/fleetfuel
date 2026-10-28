@@ -1,10 +1,12 @@
 # Supplementary dataset — sources
 
-`supplementary_data.csv` combines two open online datasets (column `source`).
+`supplementary_data.csv` combines two open online datasets (column `source`): 50,508 gasoline trips
+and 49,390 diesel vans, **99,898 records**. With the 93 local trip records and the 9 fleet vehicles the
+study has **100,000 records**.
 
 ## 1. Gasoline trips — Fan & Song (2022)
 
-6,000 real-world trips taken from:
+50,508 real-world trips taken from:
 
 > Fan, P., & Song, G. (2022). *Which factor contributes more to the fuel consumption gap between
 > in-laboratory vs. real-world driving conditions? An independent component analysis* (Version 2)
@@ -13,11 +15,13 @@
 - **License:** CC BY 4.0 (free to use with citation).
 - **Original data:** 385,158 trips of 395 gasoline passenger vehicles (15 models) in Beijing, China
   (file `Vehicle fuel consumption.csv`, SHA-256 `7ef46102c29d04ae83f382b37e6ee181e6a2ed003c89a801afc72a67cc2a9590`).
-- **Sample:** 150 trips per vehicle model in each of four distance bands — 1–10, 10–30, 30–100 and
-  100–1000 km — (fixed random seed 42), keeping only complete trips with 1–1000 km, 1–1440 min,
-  5–130 km/h and 3–40 L/100 km. The bands make the training data cover the long inter-campus and
-  provincial trips the fleet makes; a plain random sample is almost all short city trips (about 20 km).
-  Result: 1,500 trips per band; 3,600 sedan, 1,200 SUV and 1,200 van trips; 1.5–690 km.
+- **Sample:** 50,508 trips spread evenly over the 10 vehicle models and four distance bands — 1–10,
+  10–30, 30–100 and 100–1000 km — (fixed random seed 42), keeping only complete trips with 1–1000 km,
+  1–1440 min, 5–130 km/h and 3–40 L/100 km. Every model × band gets the same number of trips (about
+  1,440); where the dataset has fewer long trips than that, all of them are taken. The bands make the
+  training data cover the long inter-campus and provincial trips the fleet makes; a plain random sample
+  is almost all short city trips (about 20 km). Result: 14,412 / 14,417 / 13,692 / 7,987 trips per band;
+  1.5–717 km.
 - **Vehicles:** Sedan (Audi A6L, Honda Accord, Nissan Teana, Nissan Tiida, Volkswagen Magotan,
   Volkswagen Passat), SUV (Chevrolet Captiva, Hyundai ix35), Van (Buick GL8, Honda Odyssey);
   engine 1.6–2.5 L, model years 2011–2017, all gasoline.
@@ -34,9 +38,10 @@
 - **Why:** the Fan & Song trips are all gasoline (104–147 kW) and the local trips come from one diesel
   van (95 kW), so without diesel records of other engine sizes the model cannot learn how engine power
   changes the fuel use of the fleet's diesel vehicles (51–177 kW).
-- **Sample:** diesel vans with 40–250 kW whose recorded distance is within the fleet's trip range
-  (30–1,000 km; the local trips are 32–372 km) and 3–40 L/100 km; 60 vans from every engine-power band
-  (40–60, 60–80, …, 160–250 kW) and distance band (30–100, 100–300, 300–1,000 km), fixed random seed 42.
+- **File:** 1,139,902 vans, SHA-256 `4bf949848c065bd5b8ae9f551561856169be35faa8482e540d0e99d56fde0c81`.
+- **Sample:** every diesel van with 40–250 kW whose recorded distance is within the fleet's trip range
+  (30–1,000 km; the local trips are 32–372 km) and 3–40 L/100 km — 49,390 vans, so about half of the
+  supplementary records are diesel, like the fleet.
 - **Why not shorter distances:** vans with under 30 km are brand new; their few kilometres are mostly
   warm-up and idling (median about 20 L/100 km), not trips. Including them made the model under-predict
   the local trips.

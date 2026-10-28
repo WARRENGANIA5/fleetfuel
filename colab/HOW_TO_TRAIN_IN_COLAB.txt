@@ -20,7 +20,7 @@ EASIEST WAY (AUTO version):
      Upload Trained Model from Google Colab, choose the two files and click Upload.
      The system then predicts with this model; it never retrains by itself.
 
-The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 7,260 online records).
+The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 99,898 online records = 100,000).
 For newer records, download the three CSV files again from the web app
 (Model Performance > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

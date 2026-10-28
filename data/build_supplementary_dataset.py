@@ -21,8 +21,30 @@ SRC, OUT = sys.argv[1], sys.argv[2]
 # covers short city trips as well as the long inter-campus / provincial trips the
 # fleet makes (a plain random sample is almost all short city trips).
 DISTANCE_BANDS = [(1, 10), (10, 30), (30, 100), (100, 1000)]   # km
-PER_MODEL_BAND = 150     # trips per vehicle model per band (all of them when fewer)
+# Trips to take in all. With the 49,390 EEA diesel vans (add_eea_diesel_vans.py) the
+# supplementary dataset has 99,898 records; with the 93 local trips and 9 fleet
+# vehicles the study has 100,000 records.
+TOTAL_TRIPS = 50_508
 SEED = 42
+
+
+def balanced_quotas(sizes, total):
+    """Split `total` as evenly as possible over the groups: every group gets the same
+    number, and a group with fewer trips than that gives all of them (the rest is
+    shared by the larger groups)."""
+    quotas, left, open_groups = {}, total, sorted(sizes, key=sizes.get)
+    while open_groups:
+        share = left // len(open_groups)
+        key = open_groups[0]
+        if sizes[key] <= share:
+            quotas[key] = sizes[key]
+            left -= sizes[key]
+            open_groups.pop(0)
+        else:
+            for i, key in enumerate(open_groups):
+                quotas[key] = share + (1 if i < left - share * len(open_groups) else 0)
+            break
+    return quotas
 
 # Vehicle model -> the web application's vehicle types (body style of each model).
 VEHICLE_TYPES = {
@@ -105,11 +127,13 @@ l_per_100 = df["actual_fuel_consumption"] / df["distance_km"] * 100
 df = df[l_per_100.between(3, 40)]
 print(f"complete, plausible trips: {len(df):,}")
 
-# Same number of trips from every vehicle model in every distance band (fixed seed, reproducible).
+# Same number of trips from every vehicle model in every distance band, or all of them when
+# fewer (fixed seed, reproducible).
 df["band"] = pd.cut(df["distance_km"], [b[0] for b in DISTANCE_BANDS] + [DISTANCE_BANDS[-1][1]],
                     labels=[f"{a}-{b} km" for a, b in DISTANCE_BANDS], include_lowest=True)
-sample = (df.dropna(subset=["band"]).groupby(["model_key", "band"], group_keys=False, observed=True)
-          .apply(lambda g: g.sample(min(PER_MODEL_BAND, len(g)), random_state=SEED)))
+groups = df.dropna(subset=["band"]).groupby(["model_key", "band"], observed=True)
+quotas = balanced_quotas(groups.size().to_dict(), TOTAL_TRIPS)
+sample = pd.concat([g.sample(quotas[key], random_state=SEED) for key, g in groups])
 print("trips per distance band:", sample.groupby("band", observed=True).size().to_dict())
 sample = sample.sort_values(["model_key", "start"]).reset_index(drop=True)
 
