@@ -2,10 +2,26 @@ import io
 import json
 import os
 import re
+import sys
 import threading
 import time
 from datetime import date, datetime, timedelta
 from functools import wraps
+
+# `python app.py` typed in a terminal runs the computer's own Python, which does
+# not have the system's libraries (they are installed in venv\): run this file
+# again with the project's venv Python instead of failing on the first import.
+_VENV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
+_VENV_PYTHON = os.path.join(_VENV_DIR, "Scripts", "python.exe")
+if (__name__ == "__main__" and os.path.exists(_VENV_PYTHON)
+        and os.path.normcase(os.path.abspath(sys.prefix)) != os.path.normcase(_VENV_DIR)):
+    import subprocess
+    try:
+        sys.exit(subprocess.call([_VENV_PYTHON, os.path.abspath(__file__), *sys.argv[1:]]))
+    except KeyboardInterrupt:  # Ctrl+C stops the server in the venv Python too
+        sys.exit(0)
+if __name__ == "__main__":
+    print(" * Starting FleetFuel... (loading the libraries takes a few seconds)", flush=True)
 
 import joblib
 import numpy as np
@@ -1593,7 +1609,7 @@ def _latest_backup_age_hours():
 
 def _backup_loop():
     """Backs up the database every BACKUP_INTERVAL_HOURS while the server
-    runs (start_server.bat also backs up on every start)."""
+    runs (scripts/start_server.bat also backs up on every start)."""
     import backup_database
     while True:
         try:
@@ -1637,13 +1653,22 @@ def build_model_charts():
     lo, hi = min(actual + predicted), max(actual + predicted)
 
     # Residual histogram (normality check) on "nice" fixed-width bins centred on 0.
-    spread = float(np.abs(residuals).max()) or 1.0
+    # The bins span 99% of the residuals; the few larger ones are counted in the
+    # first and last bins, so a handful of extreme trips cannot squeeze the
+    # whole distribution into one or two bars.
+    abs_resid = np.abs(residuals)
+    spread = float(np.percentile(abs_resid, 99)) or float(abs_resid.max()) or 1.0
     width = next((w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * spread / w <= 24),
                  float(np.ceil(spread / 12)))  # very large errors (e.g. a mis-encoded trip): about 24 bins
     half = np.ceil(spread / width) * width
-    edges = np.arange(-half, half + width * 1.001, width)
-    counts, edges = np.histogram(residuals, bins=edges)
+    edges = np.linspace(-half, half, int(round(2 * half / width)) + 1)
+    counts, edges = np.histogram(np.clip(residuals, edges[0], edges[-1]), bins=edges)
     fmt = (lambda v: f"{v:g}")
+    labels = [f"{fmt(round(edges[i], 2))} to {fmt(round(edges[i + 1], 2))}" for i in range(len(counts))]
+    if residuals.min() < edges[0]:
+        labels[0] = f"{fmt(round(edges[1], 2))} or less"
+    if residuals.max() > edges[-1]:
+        labels[-1] = f"{fmt(round(edges[-2], 2))} or more"
 
     # Correlation heatmap of the equation's terms and the fuel consumed. A term
     # with the same value in every record has no defined correlation; it is
@@ -1657,7 +1682,7 @@ def build_model_charts():
         "avp_line": [{"x": round(lo, 2), "y": round(lo, 2)}, {"x": round(hi, 2), "y": round(hi, 2)}],
         "residual_points": [{"x": p, "y": round(a - p, 2)} for a, p in zip(actual, predicted)],
         "residual_range": [round(min(predicted), 2), round(max(predicted), 2)],
-        "resid_labels": [f"{fmt(round(edges[i], 2))} to {fmt(round(edges[i + 1], 2))}" for i in range(len(counts))],
+        "resid_labels": labels,
         "resid_counts": [int(c) for c in counts],
         "resid_stats": {
             "records": int(len(residuals)),
@@ -2170,7 +2195,23 @@ def handle_server_error(e):
                                    "contact the system administrator."), 500
 
 
+def _already_running(port):
+    """True when a server (e.g. the one scripts\\start_server.bat started) already
+    answers on this port: on Windows a second one could share the port and leave
+    the browser talking to either of them."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 if __name__ == "__main__":
+    _port = int(os.environ.get("PORT", 5000))
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true" and _already_running(_port):
+        print(" * FleetFuel is ALREADY RUNNING in the background (started when Windows signed in).")
+        print(f"   Open it in the browser: http://127.0.0.1:{_port}")
+        print("   To run it from this terminal instead: scripts\\stop_server.bat, then python app.py again.")
+        sys.exit(0)
     # Serve with Waitress: on this Windows setup the Werkzeug development
     # server intermittently cut larger pages short (stalling ~19 s and
     # dropping the end of the HTML, including the page's JavaScript).
@@ -2186,6 +2227,7 @@ if __name__ == "__main__":
         app.run(debug=True, host="0.0.0.0", port=5000, threaded=True)
     else:
         from waitress import serve
+        print(" * Connecting to Firebase Firestore...", flush=True)
         with app.app_context():
             try:
                 db.warm_up()
