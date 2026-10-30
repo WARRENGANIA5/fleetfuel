@@ -17,7 +17,12 @@ nga mabuksan sa bisan ano nga phone, tablet, ukon computer nga may internet.
 Kadto sa <https://railway.com> kag mag-sign up. May trial credits sa umpisa. Para sa stable nga
 paggamit, kinahanglan ang **Hobby plan (mga $5 kada bulan)**.
 
-### 2. I-install ang Railway CLI kag mag-login
+### 2. Ikonektar ang GitHub (pinakamadali)
+Sa Railway dashboard: **New Project → Deploy from GitHub repo** → pili-a ang `WARRENGANIA5/fleetfuel`.
+Ginabuild sang Railway ang `Dockerfile` sa iya lang, kag kada `git push` sa `main` automatic nga
+nagaupdate ang online system. Kon amo ini ang ginhimo, laktawan ang step 2B kag 4.
+
+### 2B. (Ukon) I-install ang Railway CLI kag mag-login
 Sa terminal (PowerShell) sa sulod sang project folder:
 ```
 npm install -g @railway/cli
@@ -67,8 +72,9 @@ Buksan ini sa phone.
 ## Mga automatic nga nagadalagan online
 - **HTTPS**: ginahatag sang Railway. Secure-only man ang login cookie.
 - **Auto-restart**: kon mag-crash ang app, ginastart ini liwat sang Railway.
-- **Model**: indi nagatrain liwat ang system sa iya lang. I-train sa Google Colab kag i-upload sa
-  **Model Performance → Upload Trained Model**.
+- **Model**: indi nagatrain liwat ang system sa iya lang. Ang model sa `model/` ang gamiton sa umpisa;
+  para ilisan, i-train sa Google Colab kag i-upload sa **Model Performance → Upload Trained Model**.
+  Nakatago ang upload sa volume (`/data/model`), gani indi ini madula kon mag-redeploy.
 - **Backup kada 24 oras**: nakatago sa volume (`/data/backups`).
 - **Philippine time**: sa dates kag sa oras sang records.
 

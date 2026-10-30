@@ -4,6 +4,9 @@ __pycache__/
 **/__pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
+.vercel/
 .git/
 .vscode/
 *.log
@@ -11,9 +14,7 @@ __pycache__/
 backups/
 colab/
 reports/
-model/*.joblib
 model/*.tmp
-model/metrics.json
 firebase-key.json
 *-firebase-adminsdk-*.json
 scripts/

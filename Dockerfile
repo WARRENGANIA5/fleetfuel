@@ -17,5 +17,6 @@ RUN pip install --no-cache-dir -r requirements-train.txt
 
 COPY . .
 
-# The model is trained on this server's own data when it starts.
+# Uses the trained model in model/ (replace it online with Model Performance >
+# Upload Trained Model; on Railway the upload is kept on the volume).
 CMD ["sh", "deploy/start.sh"]

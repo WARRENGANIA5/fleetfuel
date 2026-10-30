@@ -40,8 +40,11 @@ class Config:
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # reject request bodies over 5 MB before reading them
 
     MODEL_DIR = os.path.join(BASE_DIR, "model")
-    MODEL_PATH = os.path.join(MODEL_DIR, "linear_regression_pipeline.joblib")
-    METRICS_PATH = os.path.join(MODEL_DIR, "metrics.json")
+    # Online, deploy/start.sh points MODEL_STORE at the persistent volume, so a
+    # model uploaded from Google Colab survives redeploys.
+    MODEL_STORE = os.environ.get("MODEL_STORE") or MODEL_DIR
+    MODEL_PATH = os.path.join(MODEL_STORE, "linear_regression_pipeline.joblib")
+    METRICS_PATH = os.path.join(MODEL_STORE, "metrics.json")
 
     DATA_DIR = os.path.join(BASE_DIR, "data")
     HISTORICAL_DATA_PATH = os.path.join(DATA_DIR, "historical_fleet_data.csv")
