@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% include '_theme_init.html' %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>{% block title %}Dashboard{% endblock %} | {{ org.org_short }} Fleet Fuel Prediction System</title>
-<link rel="icon" href="{{ url_for('static', filename='images/logo.svg', v=4) }}" type="image/svg+xml">
+<title>{% block title %}Dashboard{% endblock %} | {{ org.system_short }} &middot; Fuel Consumption Prediction System</title>
+<link rel="icon" href="{{ url_for('static', filename='images/seal.svg', v=14) }}" type="image/svg+xml">
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=32) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=40) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -17,10 +18,10 @@
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-icon"><img src="{{ url_for('static', filename='images/logo.svg', v=4) }}" alt="{{ org.system_short }} logo"></div>
+      <div class="brand-icon"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
       <div class="brand-text">
         <span class="brand-title">{{ org.system_short }}</span>
-        <span class="brand-sub">Fuel Prediction System</span>
+        <span class="brand-sub">Fuel Consumption Prediction System</span>
       </div>
     </div>
     <nav class="sidebar-nav">
@@ -77,6 +78,11 @@
         <h1>{% block page_title %}Dashboard{% endblock %}</h1>
       </div>
       <div class="topbar-actions">
+        <button type="button" class="theme-switch" id="themeToggle" data-theme-toggle role="switch" aria-checked="true" aria-label="Dark mode" title="Switch to light mode">
+          <span class="theme-switch-knob" aria-hidden="true"></span>
+          <i class="fa-solid fa-sun" aria-hidden="true"></i>
+          <i class="fa-solid fa-moon" aria-hidden="true"></i>
+        </button>
         <div class="dropdown notif-dropdown">
           <button class="icon-btn" id="notifBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Notifications">
             <i class="fa-regular fa-bell"></i>
@@ -109,7 +115,7 @@
     <main class="content-area">
       {# Shown only on paper: what was printed, when and by whom. #}
       <div class="print-header">
-        <div class="print-org">{{ org.org_name }} &middot; {{ org.office_name }} &middot; Fleet Fuel Prediction System</div>
+        <div class="print-org">{{ org.org_name }} &middot; {{ org.office_name }} &middot; {{ org.system_short }} Fuel Consumption Prediction System</div>
         <div class="print-title">{{ self.page_title() }}</div>
         <div class="print-meta">Printed <span id="printTime"></span> by {{ session.get('full_name', '') }}</div>
       </div>
@@ -144,7 +150,7 @@
 <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=27) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=31) }}"></script>
 <div id="pageScripts" hidden>{% block extra_scripts %}{% endblock %}</div>
 </body>
 </html>

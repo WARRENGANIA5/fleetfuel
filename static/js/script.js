@@ -33,9 +33,48 @@ function stopPageTimers() {
   pageIntervals.clear();
 }
 
+// ---- Light / dark mode (switch in the top bar) ----
+// Saved in this browser; templates/_theme_init.html applies it before the page
+// is drawn. Charts read their axis colours from chartTheme() when created.
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+function setTheme(theme) {
+  const root = document.documentElement;
+  root.classList.add('theme-switching');
+  if (theme === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+  root.setAttribute('data-bs-theme', theme);
+  try { localStorage.setItem('fleetfuel-theme', theme); } catch (e) {}
+  setTimeout(function () { root.classList.remove('theme-switching'); }, 350);
+}
+window.chartTheme = function () {
+  const light = currentTheme() === 'light';
+  return {
+    light: light,
+    text: light ? '#667085' : '#9698a9',
+    grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)'
+  };
+};
+// The top-bar switch: knob under the moon = dark, under the sun = light.
+function labelThemeToggle() {
+  const btn = document.querySelector('[data-theme-toggle]');
+  if (!btn) return;
+  const dark = currentTheme() === 'dark';
+  btn.setAttribute('aria-checked', dark ? 'true' : 'false');
+  btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('[data-theme-toggle]')) return;
+  setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+  labelThemeToggle();
+});
+
 // ---- Everything inside the page area that needs wiring up. Runs on the first
 // load and again after every in-app page switch (on the new content). ----
 function initPage() {
+  labelThemeToggle();
+
   // Tables on phones: each cell carries its column name (data-label), so
   // style.css can show every row as a card. Rows redrawn by the live refresh
   // are labelled again as they arrive.
@@ -412,7 +451,11 @@ document.addEventListener('DOMContentLoaded', function () {
     history.replaceState = function (s, t, u) { origReplaceState(s, t, u); shownPage = location.pathname + location.search; };
     window.addEventListener('popstate', function () {
       if (location.pathname + location.search === shownPage) return;
+      const samePath = location.pathname === shownPage.split('?')[0];
       shownPage = location.pathname + location.search;
+      // Same page, other ?page= or ?q= (e.g. Trip Records): the page may show it in
+      // place, without a reload or a jump to the top.
+      if (samePath && !document.dispatchEvent(new Event('pagestate', { cancelable: true }))) return;
       markNav(Array.from(document.querySelectorAll('.sidebar-nav .nav-link')).find(function (l) { return l.pathname === location.pathname; }));
       navigate(location.href, false);
     });

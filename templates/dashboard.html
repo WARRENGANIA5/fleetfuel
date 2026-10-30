@@ -184,7 +184,8 @@
 // status, recent predictions) keeps working even if the chart library is
 // slow to load; charts are (re)created as soon as Chart is available.
 const IS_ADMIN = {{ is_admin|tojson }};
-const gridColor = "rgba(255,255,255,0.06)";
+const chartColors = window.chartTheme();
+const gridColor = chartColors.grid;
 let fuelTrendChartInstance = null;
 let avpChartInstance = null;
 let lastDashboardData = {{ {
@@ -227,8 +228,8 @@ function renderFuelTrend(d) {
             label: function (item) { return ' ' + item.parsed.y.toFixed(2) + ' L consumed'; },
             footer: function () { return 'Click to see this month\'s trip records'; } } } },
         scales: {
-          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
-          x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: chartColors.text } },
+          x: { grid: { color: gridColor }, ticks: { color: chartColors.text } }
         }
       }
     });
@@ -272,8 +273,8 @@ function renderAvp(d) {
               return (noActual ? 'Actual fuel: not recorded yet\n' : '') + 'Click to open this fuel request';
             } } } },
         scales: {
-          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: '#9698a9' } },
-          x: { grid: { color: gridColor }, ticks: { color: '#9698a9' } }
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: chartColors.text } },
+          x: { grid: { color: gridColor }, ticks: { color: chartColors.text } }
         }
       }
     });
@@ -362,7 +363,7 @@ document.getElementById('recentPredictionsBody').addEventListener('click', funct
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
-Chart.defaults.color = "#9698a9";
+Chart.defaults.color = window.chartTheme().text;
 Chart.defaults.animation = false;  // charts appear at once, no draw-in
 renderCharts(lastDashboardData, true);
 // Seed the change-tracker with what is on screen so the first poll doesn't redraw.

@@ -197,8 +197,19 @@ function showTrips(d) {
 }
 let lastTripsJson = JSON.stringify(listing);
 let tripRequest = 0;
+function fadeTrips(dim) {  // a gentle fade while the next page loads
+  const body = document.getElementById('tripsBody');
+  body.style.transition = 'opacity .2s ease';
+  body.style.opacity = dim ? '0.35' : '1';
+}
+// The page and search last asked for (ahead of `listing` while it loads), so quick
+// clicks and the 5s refresh build on it instead of undoing a page change.
+let wanted = { page: listing.page, q: listing.q };
+// moved: 'push' = a new Back/Forward step (page buttons), 'replace' = same step (search).
 function loadTrips(page, q, moved) {
   const ticket = ++tripRequest;
+  wanted = { page: page, q: q };
+  if (moved) fadeTrips(true);
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   params.set('page', page);
@@ -215,15 +226,25 @@ function loadTrips(page, q, moved) {
         const url = new URLSearchParams();
         if (d.q) url.set('q', d.q);
         if (d.page > 1) url.set('page', d.page);
-        history.replaceState(null, '', window.location.pathname + (url.toString() ? '?' + url.toString() : ''));
+        const to = window.location.pathname + (url.toString() ? '?' + url.toString() : '');
+        if (moved === 'push' && to !== window.location.pathname + window.location.search) history.pushState(null, '', to);
+        else history.replaceState(null, '', to);
       }
+      if (moved) fadeTrips(false);
       const json = JSON.stringify(d);
       if (json === lastTripsJson) return;
       lastTripsJson = json;
+      // Keep the pager at the same spot on screen, so it stays under the mouse
+      // when a page has fewer or more rows (e.g. the last page).
+      const pager = document.getElementById('tripPager');
+      const top = pager.getBoundingClientRect().top;
       showTrips(d);
-      if (moved) document.getElementById('tripsTable').scrollIntoView({ block: 'nearest' });
+      window.scrollBy(0, pager.getBoundingClientRect().top - top);
     })
     .catch(function () {
+      if (ticket !== tripRequest) return;
+      wanted = { page: listing.page, q: listing.q };
+      fadeTrips(false);
       document.getElementById('tripLive').className = 'live-badge is-offline';
       document.getElementById('tripLiveText').textContent = 'Reconnecting…';
     });
@@ -232,24 +253,36 @@ showPager(listing);
 
 document.querySelectorAll('#tripPager [data-page]').forEach(function (b) {
   b.addEventListener('click', function () {
-    const to = { first: 1, prev: listing.page - 1, next: listing.page + 1, last: listing.pages }[b.dataset.page];
-    loadTrips(to, listing.q, true);
+    const to = { first: 1, prev: wanted.page - 1, next: wanted.page + 1, last: listing.pages }[b.dataset.page];
+    if (to >= 1 && to <= listing.pages) loadTrips(to, wanted.q, 'push');
   });
 });
 document.getElementById('tripPageInput').addEventListener('change', function () {
   const to = parseInt(this.value, 10);
-  if (to >= 1) loadTrips(Math.min(to, listing.pages), listing.q, true);
+  if (to >= 1) loadTrips(Math.min(to, listing.pages), wanted.q, 'push');
 });
 let searchTimer = null;
 document.getElementById('tripSearch').addEventListener('input', function () {
   const q = this.value.trim();
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(function () { loadTrips(1, q, true); }, 300);
+  searchTimer = setTimeout(function () { loadTrips(1, q, 'replace'); }, 300);
 });
 
 setInterval(function () {
   if (document.querySelector('.modal.show')) return;  // don't swap rows under an open form
-  loadTrips(listing.page, listing.q, false);
+  loadTrips(wanted.page, wanted.q, false);
 }, 5000);
+
+// Browser Back/Forward between pages of this list: show that page in place,
+// at the same scroll position (script.js asks first through "pagestate").
+const tripPager = document.getElementById('tripPager');
+document.addEventListener('pagestate', function onPageState(e) {
+  if (!document.body.contains(tripPager)) { document.removeEventListener('pagestate', onPageState); return; }
+  e.preventDefault();
+  const p = new URLSearchParams(window.location.search);
+  const q = p.get('q') || '';
+  document.getElementById('tripSearch').value = q;
+  loadTrips(parseInt(p.get('page'), 10) || 1, q, 'replace');
+});
 </script>
 {% endblock %}

@@ -101,16 +101,15 @@ a { text-decoration: none; color: inherit; }
 }
 
 .brand-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 14px rgba(38, 151, 255, 0.25);
 }
-.brand-icon img { width: 100%; height: 100%; display: block; }
+.brand-icon img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 3px 6px rgba(38, 151, 255, 0.35)); }
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 .brand-title { font-weight: 700; font-size: 15px; }
@@ -541,8 +540,8 @@ a { text-decoration: none; color: inherit; }
   animation: fadeUp 0.5s ease both;
 }
 .login-logo {
-  width: 72px; height: 72px;
-  border-radius: 16px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 18px;
   box-shadow: 0 8px 24px rgba(38, 151, 255, 0.35);
@@ -1001,3 +1000,298 @@ a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-off
 html.force-phone .app-shell,
 html.force-phone .login-page { min-height: calc(100vh / var(--fp-zoom, 1)); }
 html.force-phone .sidebar { height: calc(100vh / var(--fp-zoom, 1)); bottom: auto; }
+
+/* ================= Light mode (switch in the top bar) =================
+   Dark stays the default. html[data-theme="light"] swaps the palette for a
+   clean white-and-slate one; the rules below only fix the spots that were
+   drawn with fixed dark-theme colours. */
+html[data-theme="light"] {
+  --navy-950: #1c2540;
+  --navy-900: #24304f;
+  --navy-800: #2f3c5e;
+  --blue-600: #1f7ae0;
+  --blue-500: #2f8cf0;
+  --blue-100: rgba(31, 122, 224, 0.1);
+  --bg-page: #f4f6fb;
+  --card-bg: #ffffff;
+  --card-bg-alt: #f3f5fa;
+  --text-dark: #1b2236;
+  --text-muted: #667085;
+  --border-soft: #e4e8f0;
+  --success: #0e9f87;
+  --warning: #c27c0e;
+  --danger: #dc3545;
+  --cyan: #0891b2;
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 14px rgba(16, 24, 40, 0.05);
+  --shadow-hover: 0 2px 4px rgba(16, 24, 40, 0.05), 0 12px 28px rgba(16, 24, 40, 0.1);
+
+  --bs-body-bg: var(--bg-page);
+  --bs-body-color: var(--text-dark);
+  --bs-border-color: var(--border-soft);
+  --bs-primary-rgb: 31, 122, 224;
+  --bs-secondary-color: #667085;
+  --bs-emphasis-color: #0f172a;
+}
+/* Colours fade over when the mode is switched (script.js adds the class briefly). */
+html.theme-switching, html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Sidebar: white panel, slate text, blue pill for the open page. */
+html[data-theme="light"] .sidebar {
+  background: #ffffff;
+  color: var(--text-dark);
+  border-right: 1px solid var(--border-soft);
+}
+html[data-theme="light"] .sidebar-brand,
+html[data-theme="light"] .sidebar-footer { border-color: var(--border-soft); }
+html[data-theme="light"] .brand-sub { color: var(--text-muted); }
+html[data-theme="light"] .nav-link { color: #4a5568; }
+html[data-theme="light"] .nav-link:hover { background: var(--card-bg-alt); color: var(--text-dark); }
+html[data-theme="light"] .nav-link.active { background: var(--blue-600); color: #fff; box-shadow: 0 4px 12px rgba(31, 122, 224, 0.28); }
+html[data-theme="light"] .logout-link:hover { background: rgba(220, 53, 69, 0.08); color: var(--danger); }
+html[data-theme="light"] .sidebar.open { box-shadow: 12px 0 30px rgba(16, 24, 40, 0.12); }
+
+html[data-theme="light"] .topbar { box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02); }
+html[data-theme="light"] .icon-btn { background: #ffffff; }
+html[data-theme="light"] .icon-btn:hover { background: var(--card-bg-alt); }
+
+/* Bootstrap pop-ups sit on white cards, not on the grey page. */
+html[data-theme="light"] .modal-content { --bs-modal-bg: var(--card-bg); --bs-modal-border-color: var(--border-soft); box-shadow: var(--shadow-hover); }
+html[data-theme="light"] .dropdown-menu { --bs-dropdown-bg: var(--card-bg); --bs-dropdown-border-color: var(--border-soft); box-shadow: var(--shadow-hover); }
+html[data-theme="light"] .modal-backdrop { --bs-backdrop-opacity: 0.35; }
+
+/* Buttons */
+html[data-theme="light"] .btn-navy { background: var(--navy-900); border-color: var(--navy-900); color: #fff; }
+html[data-theme="light"] .btn-navy:hover { background: var(--navy-800); color: #fff; }
+html[data-theme="light"] .btn-outline-navy { border-color: #d5dbe6; }
+html[data-theme="light"] .btn-outline-navy:hover { background: var(--blue-100); color: var(--blue-600); border-color: var(--blue-600); }
+html[data-theme="light"] .action-btn { background: #ffffff; }
+
+/* Forms: soft grey fields with a visible edge. */
+html[data-theme="light"] .form-control,
+html[data-theme="light"] .form-select,
+html[data-theme="light"] .input-group-text { border-color: #d9dfe9; }
+html[data-theme="light"] .form-control:focus,
+html[data-theme="light"] .form-select:focus { background-color: #ffffff; }
+html[data-theme="light"] .form-check-input { border-color: #c3cad8; }
+
+/* Tables: swipe-hint edges fade to white. */
+@media (max-width: 991px) {
+  html[data-theme="light"] .table-wrap {
+    background:
+      linear-gradient(to right, var(--card-bg) 30%, rgba(255, 255, 255, 0)) left center / 32px 100% no-repeat local,
+      linear-gradient(to left, var(--card-bg) 30%, rgba(255, 255, 255, 0)) right center / 32px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(16, 24, 40, 0.14), rgba(16, 24, 40, 0)) left center / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(16, 24, 40, 0.14), rgba(16, 24, 40, 0)) right center / 12px 100% no-repeat scroll;
+  }
+}
+@media (max-width: 575px) { html[data-theme="light"] .table-wrap { background: none; } }
+html[data-theme="light"] .table-fleet thead th { color: #5b6478; }
+
+/* Small tinted surfaces */
+html[data-theme="light"] .welcome-banner { background: linear-gradient(120deg, rgba(31, 122, 224, 0.1), rgba(14, 159, 135, 0.06)); }
+html[data-theme="light"] .welcome-date { background: #ffffff; border: 1px solid var(--border-soft); }
+html[data-theme="light"] .dist-stat { background: var(--card-bg-alt); }
+html[data-theme="light"] a.notif-item:hover,
+html[data-theme="light"] .model-summary-link:hover { background: var(--card-bg-alt); }
+html[data-theme="light"] .notif-good .notif-item-icon { color: var(--success); }
+html[data-theme="light"] .notif-bad .notif-item-icon,
+html[data-theme="light"] .notif-remove:hover { color: var(--danger); }
+html[data-theme="light"] .badge-recorded { background: #eef1f6; }
+html[data-theme="light"] .result-hero { background: linear-gradient(135deg, #1f6fd6 0%, #2b8cf5 60%, #22b5d8 100%); }
+html[data-theme="light"] .spinner-overlay { background: rgba(244, 246, 251, 0.7); }
+
+/* Model Performance heatmap: "no relationship" is white instead of the dark card. */
+html[data-theme="light"] .corr-heatmap td.is-diag { background: var(--card-bg-alt); }
+html[data-theme="light"] .corr-heatmap td.is-target { box-shadow: inset 0 0 0 1px rgba(14, 159, 135, 0.6); }
+html[data-theme="light"] .corr-legend-bar { background: linear-gradient(90deg, rgb(255,138,76), #ffffff 50%, rgb(38,151,255)); }
+
+/* Login, sign-up and waiting pages: bright frosted card on a pale backdrop. */
+html[data-theme="light"] .login-page { background: linear-gradient(160deg, #eaf2fd 0%, #f5f8fd 50%, #e8f7f4 100%); }
+html[data-theme="light"] .login-page::before,
+html[data-theme="light"] .login-page::after { opacity: 0.28; }
+html[data-theme="light"] .login-card {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 60px rgba(31, 60, 110, 0.14);
+}
+html[data-theme="light"] .login-card .btn-navy { background: linear-gradient(135deg, var(--blue-600), var(--blue-500)); }
+html[data-theme="light"] .login-card .btn-navy:hover { background: linear-gradient(135deg, var(--blue-500), var(--blue-600)); }
+html[data-theme="light"] .login-card .form-control,
+html[data-theme="light"] .login-card .form-control:focus { background-color: #ffffff; }
+html[data-theme="light"] .login-card .form-control:-webkit-autofill,
+html[data-theme="light"] .login-card .form-control:-webkit-autofill:hover,
+html[data-theme="light"] .login-card .form-control:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #eef4ff inset;
+  box-shadow: 0 0 0 1000px #eef4ff inset;
+}
+
+/* ---------------- Top bar: dark / light switch (beside the bell) ----------------
+   A black pill with a sun and a moon; the blue knob slides under the mode in use. */
+.theme-switch {
+  position: relative; display: inline-flex; align-items: center;
+  width: 62px; height: 32px; padding: 0; border: 0; border-radius: 999px; flex-shrink: 0;
+  background: #000000; cursor: pointer;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.theme-switch:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 3px; }
+.theme-switch-knob {
+  position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%;
+  background: #1f6bff; box-shadow: 0 1px 5px rgba(31, 107, 255, 0.5);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.theme-switch-knob { transform: translateX(30px); }
+html[data-theme="light"] .theme-switch-knob { transform: none; }
+.theme-switch i {
+  position: relative; z-index: 1; width: 31px; text-align: center; font-size: 12px;
+  color: #b8bcc6; transition: color 0.3s ease;
+}
+.theme-switch .fa-moon { color: #ffffff; }
+html[data-theme="light"] .theme-switch { background: #e4e7ec; box-shadow: inset 0 1px 3px rgba(16, 24, 40, 0.12); }
+html[data-theme="light"] .theme-switch i { color: #667085; }
+html[data-theme="light"] .theme-switch .fa-sun { color: #ffffff; }
+
+/* ---------------- Light mode: clean professional finish ----------------
+   Calm, research-dashboard look: neutral greys, one blue accent, hairline
+   borders, almost no shadow and no decorative gradients. Layered on top of
+   the light palette above. */
+html[data-theme="light"] {
+  --bg-page: #f7f8fa;
+  --card-bg: #ffffff;
+  --card-bg-alt: #f9fafb;
+  --text-dark: #101828;
+  --text-muted: #667085;
+  --border-soft: #eaecf0;
+  --blue-600: #1d6fe0;
+  --blue-500: #2e7fef;
+  --blue-100: #eef4ff;
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-hover: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --bs-primary-rgb: 29, 111, 224;
+}
+html[data-theme="light"] body { -webkit-font-smoothing: antialiased; }
+
+/* Sidebar: white, grey icons; the open page is a soft blue row with a bar. */
+html[data-theme="light"] .sidebar { background: #ffffff; border-right: 1px solid var(--border-soft); box-shadow: none; }
+html[data-theme="light"] .brand-icon { box-shadow: none; }
+html[data-theme="light"] .brand-title { color: var(--text-dark); letter-spacing: -0.01em; }
+html[data-theme="light"] .nav-link { position: relative; color: #475467; border-radius: 8px; padding: 10px 14px; }
+html[data-theme="light"] .nav-link i { color: #98a2b3; }
+html[data-theme="light"] .nav-link:hover { background: #f9fafb; color: var(--text-dark); transform: none; }
+html[data-theme="light"] .nav-link:hover i { color: #667085; }
+html[data-theme="light"] .nav-link.active { background: var(--blue-100); color: var(--blue-600); font-weight: 600; box-shadow: none; }
+html[data-theme="light"] .nav-link.active i { color: var(--blue-600); }
+html[data-theme="light"] .nav-link.active::before {
+  content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--blue-600);
+}
+html[data-theme="light"] .nav-badge { background: #fef0c7; color: #93370d; }
+html[data-theme="light"] .logout-link:hover { background: #fef3f2; color: #b42318; }
+html[data-theme="light"] .logout-link:hover i { color: #b42318; }
+
+/* Top bar: plain white with a hairline. */
+html[data-theme="light"] .topbar { background: #ffffff; border-bottom: 1px solid var(--border-soft); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-theme="light"] .topbar-title h1 { color: var(--text-dark); font-weight: 600; letter-spacing: -0.01em; }
+html[data-theme="light"] .icon-btn { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+html[data-theme="light"] .icon-btn:hover { background: #f9fafb; }
+html[data-theme="light"] .user-chip { border-left-color: var(--border-soft); }
+html[data-theme="light"] .user-avatar { background: var(--blue-100); color: var(--blue-600); box-shadow: none; }
+html[data-theme="light"] .sidebar-toggle { background: #ffffff; border: 1px solid #d0d5dd; }
+
+/* Cards: white, hairline border, faint shadow, no lift. */
+html[data-theme="light"] .card-surface,
+html[data-theme="light"] .stat-card { border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
+html[data-theme="light"] .card-surface:hover { box-shadow: var(--shadow-soft); }
+html[data-theme="light"] .stat-card:hover { transform: none; box-shadow: var(--shadow-hover); border-color: #d0d5dd; }
+html[data-theme="light"] .section-title { color: var(--text-dark); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+
+/* Greeting: a plain card, not a coloured banner. */
+html[data-theme="light"] .welcome-banner { background: #ffffff; border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
+html[data-theme="light"] .welcome-title { color: var(--text-dark); font-weight: 700; letter-spacing: -0.02em; }
+html[data-theme="light"] .welcome-date { background: #f9fafb; border: 1px solid var(--border-soft); color: #344054; }
+
+/* Stat cards: soft tinted icon, big dark number, no side stripe. */
+html[data-theme="light"] .stat-card::before { display: none; }
+html[data-theme="light"] .stat-icon { width: 46px; height: 46px; border-radius: 10px; font-size: 18px; box-shadow: none; }
+html[data-theme="light"] .stat-icon.blue { background: #eef4ff; color: #1d6fe0; }
+html[data-theme="light"] .stat-icon.navy { background: #ecfdff; color: #0e7090; }
+html[data-theme="light"] .stat-icon.green { background: #ecfdf3; color: #067647; }
+html[data-theme="light"] .stat-icon.amber { background: #fffaeb; color: #b54708; }
+html[data-theme="light"] .stat-value { color: var(--text-dark); font-weight: 700; letter-spacing: -0.02em; }
+html[data-theme="light"] .stat-label { color: var(--text-muted); }
+
+/* Buttons: solid and flat. */
+html[data-theme="light"] .btn-blue { background: var(--blue-600); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+html[data-theme="light"] .btn-blue:hover { background: #175cd3; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); transform: none; }
+html[data-theme="light"] .btn-navy { background: #101828; border-color: #101828; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+html[data-theme="light"] .btn-navy:hover { background: #1d2939; transform: none; }
+html[data-theme="light"] .btn-outline-navy { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+html[data-theme="light"] .btn-outline-navy:hover { background: #f9fafb; color: var(--text-dark); border-color: #d0d5dd; }
+html[data-theme="light"] .login-card .btn-navy,
+html[data-theme="light"] .login-card .btn-navy:hover { background: var(--blue-600); }
+html[data-theme="light"] .login-card .btn-navy:hover { background: #175cd3; }
+
+/* Tables: grey header strip, hairline rows, faint hover. */
+html[data-theme="light"] .table-wrap { border: 1px solid var(--border-soft); }
+html[data-theme="light"] .table-fleet thead th { background: #f9fafb; color: #475467; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; border-bottom: 1px solid var(--border-soft); }
+html[data-theme="light"] .table-fleet tbody td { border-bottom: 1px solid var(--border-soft); color: #344054; }
+html[data-theme="light"] .table-fleet tbody tr:last-child td { border-bottom: 0; }
+html[data-theme="light"] .table-fleet tbody tr:hover { background: #f9fafb; }
+html[data-theme="light"] .action-btn { background: #ffffff; border: 1px solid #d0d5dd; color: #475467; }
+html[data-theme="light"] .action-btn:hover { background: #f9fafb; color: var(--blue-600); }
+html[data-theme="light"] .action-btn.danger:hover { background: #fef3f2; color: #b42318; }
+@media (max-width: 575px) {
+  html[data-theme="light"] .table-wrap { border: 0; }
+  html[data-theme="light"] .table-fleet thead th { text-transform: uppercase; }
+  html[data-theme="light"] .table-fleet tbody tr { background: #ffffff; box-shadow: none; }
+  html[data-theme="light"] .table-fleet tbody tr:hover { background: #ffffff; }
+  html[data-theme="light"] .table-fleet tbody td { border-bottom: 0; }
+}
+
+/* Status badges: outlined soft pills with a dot. */
+html[data-theme="light"] .badge-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border: 1px solid transparent; }
+html[data-theme="light"] .badge-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+html[data-theme="light"] .badge-active { background: #ecfdf3; color: #067647; border-color: #abefc6; }
+html[data-theme="light"] .badge-maintenance { background: #fffaeb; color: #b54708; border-color: #fedf89; }
+html[data-theme="light"] .badge-inactive { background: #fef3f2; color: #b42318; border-color: #fecdca; }
+
+/* Forms: white fields, grey border, blue focus ring. */
+html[data-theme="light"] .form-label { color: #344054; font-weight: 500; }
+html[data-theme="light"] .form-control,
+html[data-theme="light"] .form-select { background-color: #ffffff; border: 1px solid #d0d5dd; color: var(--text-dark); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+html[data-theme="light"] .form-control::placeholder { color: #98a2b3; }
+html[data-theme="light"] .form-floating > .form-control::placeholder { color: transparent; }
+html[data-theme="light"] .form-control:focus,
+html[data-theme="light"] .form-select:focus { background-color: #ffffff; border-color: #84adff; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 0 0 4px #eef4ff; }
+html[data-theme="light"] .form-control:disabled,
+html[data-theme="light"] .form-select:disabled { background-color: #f9fafb; color: #667085; opacity: 1; }
+html[data-theme="light"] .input-group-text { background: #ffffff; border-color: #d0d5dd; color: #667085; }
+html[data-theme="light"] .form-section-title { color: var(--blue-600); }
+html[data-theme="light"] .form-section-title::after { background: var(--border-soft); }
+html[data-theme="light"] .form-text { color: var(--text-muted); }
+
+/* Small surfaces */
+html[data-theme="light"] .summary-item,
+html[data-theme="light"] .dist-stat { background: #f9fafb; border: 1px solid var(--border-soft); }
+html[data-theme="light"] .metric-tile { background: #ffffff; }
+html[data-theme="light"] .notif-panel-header { background: #ffffff; }
+html[data-theme="light"] .result-hero { background: var(--blue-600); box-shadow: var(--shadow-soft); }
+html[data-theme="light"] .chart-card img { border: 1px solid var(--border-soft); }
+
+/* Login, sign-up and waiting pages: plain grey page, white card. */
+html[data-theme="light"] .login-page { background: #f7f8fa; }
+html[data-theme="light"] .login-page::before,
+html[data-theme="light"] .login-page::after { display: none; }
+html[data-theme="light"] .login-card {
+  background: #ffffff; border: 1px solid var(--border-soft);
+  box-shadow: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-theme="light"] .login-logo { box-shadow: none; }
+
+/* Thin, quiet scrollbars. */
+html[data-theme="light"] { scrollbar-color: #d0d5dd transparent; }
+html[data-theme="light"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }

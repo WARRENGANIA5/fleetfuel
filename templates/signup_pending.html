@@ -3,17 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Waiting for Approval | {{ org.org_short }} Fleet Fuel Prediction System</title>
-<link rel="icon" href="{{ url_for('static', filename='images/logo.svg', v=4) }}" type="image/svg+xml">
+{% include '_theme_init.html' %}
+<title>Waiting for Approval | {{ org.system_short }} &middot; Fuel Consumption Prediction System</title>
+<link rel="icon" href="{{ url_for('static', filename='images/seal.svg', v=14) }}" type="image/svg+xml">
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=32) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=40) }}" rel="stylesheet">
 </head>
 <body>
 <div class="login-page">
   <div class="login-card text-center">
-    <div class="login-logo"><img src="{{ url_for('static', filename='images/logo.svg', v=4) }}" alt="{{ org.system_short }} logo"></div>
+    <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
     <div class="login-title">Waiting for approval</div>
     <div class="login-sub">Fuel Consumption Prediction System</div>
 

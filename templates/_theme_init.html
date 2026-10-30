@@ -1,0 +1,10 @@
+{# Light / dark mode chosen in Settings > Appearance (saved in this browser).
+   Runs before the page is drawn, so a light-mode page never flashes dark. #}
+<script>
+try {
+  if (localStorage.getItem('fleetfuel-theme') === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-bs-theme', 'light');
+  }
+} catch (e) {}
+</script>

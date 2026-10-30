@@ -153,12 +153,13 @@ setInterval(function () {
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
-Chart.defaults.color = "#9698a9";
+Chart.defaults.color = window.chartTheme().text;
 Chart.defaults.animation = false;  // charts appear at once, no draw-in
-const gridColor = "rgba(255,255,255,0.06)";
+const chartColors = window.chartTheme();
+const gridColor = chartColors.grid;
 const axis = function (title) {
-  return { grid: { color: gridColor }, ticks: { color: '#9698a9' },
-           title: { display: true, text: title, color: '#9698a9' } };
+  return { grid: { color: gridColor }, ticks: { color: chartColors.text },
+           title: { display: true, text: title, color: chartColors.text } };
 };
 let avpChart = null, residualChart = null, distChart = null;
 // Tooltips describe the data points only (not the reference lines).
@@ -179,7 +180,7 @@ function strength(v) {
 // Diverging scale: blue = positive, orange = negative, card colour = no relationship.
 function corrColor(v) {
   const a = Math.min(Math.abs(v), 1);
-  const base = [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
+  const base = chartColors.light ? [255, 255, 255] : [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
   const t = v >= 0 ? pos : neg;
   return 'rgb(' + base.map(function (b, i) { return Math.round(b + (t[i] - b) * a); }).join(',') + ')';
 }
@@ -200,7 +201,9 @@ function renderHeatmap(c) {
           const tip = featureName(labels[i]) + ' vs ' + featureName(labels[j]) + ': ' + v.toFixed(2) +
             (i === j ? ' (same feature)' : ' (' + strength(v) + ')');
           const cls = [i === j ? 'is-diag' : '', (i === ti || j === ti) && i !== j ? 'is-target' : ''].join(' ');
-          return '<td class="' + cls + '" style="background:' + (i === j ? '' : corrColor(v)) + '" title="' +
+          return '<td class="' + cls + '" style="background:' + (i === j ? '' : corrColor(v)) +
+            // Light mode: pale cells (weak relationships) get dark text so the number stays readable.
+            (i !== j && chartColors.light && Math.abs(v) < 0.5 ? ';color:var(--text-dark)' : '') + '" title="' +
             escapeHtml(tip) + '">' + v.toFixed(2) + '</td>';
         }).join('') + '</tr>';
     }).join('') + '</tbody></table>';
