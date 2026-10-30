@@ -4,19 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include '_theme_init.html' %}
+<script>
+// Opened from the Login / Sign Up link: start with the form hidden so the
+// switch animation (script.js) can bring it in.
+try {
+  if (sessionStorage.getItem('fleetfuel-auth-switch')) {
+    sessionStorage.removeItem('fleetfuel-auth-switch');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('auth-switched', 'auth-arriving');
+  }
+} catch (e) {}
+</script>
 <title>Sign Up | {{ org.system_short }} &middot; Fuel Consumption Prediction System</title>
 <link rel="icon" href="{{ url_for('static', filename='images/seal.svg', v=14) }}" type="image/svg+xml">
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=40) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=65) }}" rel="stylesheet">
+<style>
+  /* Login <-> Sign Up: the browser cross-fades the two pages (no white flash). */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.25s; }
+</style>
 </head>
 <body>
 <div class="login-page">
+  {% include '_auth_bg.html' %}
+  <div class="auth-frame auth-wide">
+  <span class="glass-shard shard-tl" aria-hidden="true"><i></i></span>
   <div class="login-card">
-    <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
-    <div class="login-title">{{ org.system_short }}</div>
-    <div class="login-sub">Fuel Consumption Prediction System</div>
+    <div class="auth-brand">
+      <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
+      <div>
+        <div class="login-title">{{ org.system_short }}</div>
+        <div class="login-sub">Fuel Consumption Prediction System</div>
+      </div>
+    </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -32,58 +54,72 @@
     <form method="POST" action="{{ url_for('signup') }}" class="needs-validation" novalidate autocomplete="off" data-loading="Creating account...">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-      <div class="mb-3 form-floating">
-        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" placeholder="Full Name" minlength="2" maxlength="100" required>
-        <label for="full_name">Full Name</label>
+      <div class="mb-3">
+        <label class="auth-label" for="full_name">Full Name</label>
+        <div class="auth-input">
+          <i class="fa-regular fa-user field-icon"></i>
+          <input type="text" class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" placeholder="Swizzy" minlength="2" maxlength="100" required>
+        </div>
         <div class="invalid-feedback">Enter your full name.</div>
       </div>
-      <div class="mb-3 form-floating">
-        <input type="text" class="form-control" id="username" name="username" value="{{ form.get('username', '') }}" placeholder="Username" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
-        <label for="username">Username</label>
-        <div class="field-hint" id="usernameHint" aria-live="polite"></div>
+      <div class="auth-pair">
+        <div class="mb-3">
+          <label class="auth-label" for="username">Username</label>
+          <div class="auth-input">
+            <i class="fa-solid fa-at field-icon"></i>
+            <input type="text" class="form-control" id="username" name="username" value="{{ form.get('username', '') }}" placeholder="swizzy" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
+          </div>
+          <div class="field-hint" id="usernameHint" aria-live="polite"></div>
+        </div>
+        <div class="mb-3">
+          <label class="auth-label" for="email">Email Address</label>
+          <div class="auth-input">
+            <i class="fa-regular fa-envelope field-icon"></i>
+            <input type="email" class="form-control" id="email" name="email" value="{{ form.get('email', '') }}" placeholder="swizzy@gmail.com" maxlength="120" required>
+          </div>
+          <div class="field-hint" id="emailHint" aria-live="polite"></div>
+        </div>
       </div>
-      <div class="mb-3 form-floating">
-        <input type="email" class="form-control" id="email" name="email" value="{{ form.get('email', '') }}" placeholder="Email" maxlength="120" required>
-        <label for="email">Email</label>
-        <div class="field-hint" id="emailHint" aria-live="polite"></div>
-      </div>
-      <div class="mb-3">
-        <div class="password-field-wrap">
-          <div class="form-floating">
+      <div class="auth-pair">
+        <div class="mb-2">
+          <label class="auth-label" for="password">Password</label>
+          <div class="auth-input password-field-wrap">
+            <i class="fa-solid fa-lock field-icon"></i>
             <input type="password" class="form-control" id="password" name="password" placeholder="Password" minlength="8" maxlength="128" pattern="(?=.*[A-Za-z])(?=.*\d).{8,128}" autocomplete="new-password" required>
-            <label for="password">Password</label>
+            <i class="fa-regular fa-eye password-toggle" data-target="password"></i>
           </div>
-          <i class="fa-regular fa-eye password-toggle" data-target="password"></i>
         </div>
-        <ul class="pw-rules" id="pwRules">
-          <li data-rule="length">8 to 128 characters</li>
-          <li data-rule="letter">At least one letter</li>
-          <li data-rule="number">At least one number</li>
-          <li data-rule="username">Not the same as the username</li>
-        </ul>
-      </div>
-      <div class="mb-3">
-        <div class="password-field-wrap">
-          <div class="form-floating">
-            <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm Password" minlength="8" maxlength="128" autocomplete="new-password" required>
-            <label for="confirm_password">Confirm Password</label>
+        <div class="mb-2">
+          <label class="auth-label" for="confirm_password">Confirm Password</label>
+          <div class="auth-input password-field-wrap">
+            <i class="fa-solid fa-lock field-icon"></i>
+            <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm" minlength="8" maxlength="128" autocomplete="new-password" required>
+            <i class="fa-regular fa-eye password-toggle" data-target="confirm_password"></i>
           </div>
-          <i class="fa-regular fa-eye password-toggle" data-target="confirm_password"></i>
+          <div class="field-hint" id="confirmHint" aria-live="polite"></div>
         </div>
-        <div class="field-hint" id="confirmHint" aria-live="polite"></div>
       </div>
+      <ul class="pw-rules mb-4" id="pwRules">
+        <li data-rule="length">8 to 128 characters</li>
+        <li data-rule="letter">At least one letter</li>
+        <li data-rule="number">At least one number</li>
+        <li data-rule="username">Not the same as the username</li>
+      </ul>
 
       <button type="submit" class="btn btn-navy w-100 py-2">
-        <i class="fa-solid fa-user-plus me-1"></i> Sign Up
+        Sign Up <i class="fa-solid fa-arrow-right"></i>
       </button>
     </form>
     <div class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Log in</a></div>
+  </div>
+  <div class="card-beam" aria-hidden="true"><i class="beam beam-a"></i><i class="beam beam-b"></i></div>
+  <span class="glass-shard shard-br" aria-hidden="true"><i></i></span>
   </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=31) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=43) }}"></script>
 <script>
 // Real-time checks while typing: username/email availability come from the
 // server, the password rules and the confirmation are checked right here.

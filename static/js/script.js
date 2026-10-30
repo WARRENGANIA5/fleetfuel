@@ -53,7 +53,12 @@ window.chartTheme = function () {
   return {
     light: light,
     text: light ? '#667085' : '#9698a9',
-    grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)'
+    grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)',
+    // Line colours: charcoal and amber on the light glass, blue and teal on dark.
+    line: light ? '#2b251d' : '#2697ff',
+    lineFill: light ? 'rgba(43, 37, 29, 0.08)' : 'rgba(38,151,255,0.12)',
+    line2: light ? '#c8792b' : '#26e5c5',
+    line2Fill: light ? 'rgba(200, 121, 43, 0.12)' : 'rgba(38,229,197,0.12)'
   };
 };
 // The top-bar switch: knob under the moon = dark, under the sun = light.
@@ -726,3 +731,138 @@ document.addEventListener('show.bs.modal', function (e) {
   if (!modal.id || !/^add/i.test(modal.id)) return;
   modal.querySelectorAll('input[type="date"]').forEach(function (el) { if (!el.value) el.value = phToday(); });
 });
+
+// ---------------------------------------------------------------------------
+// Login <-> Sign Up switch. Leaving: the form fades out, the two glass shards
+// light up, slip into the cut corners and glide to the middle, where they join
+// as one mark. Arriving: the other page opens on that mark (its head hides the
+// form first with auth-arriving), the card grows or shrinks from the old
+// page's size to its own, then the halves split back to the corners and the
+// form comes in row by row.
+// ---------------------------------------------------------------------------
+(function () {
+  const frame = document.querySelector('.auth-frame');
+  if (!frame) return;
+  const card = frame.querySelector('.login-card');
+  const root = document.documentElement;
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SIZE_KEY = 'fleetfuel-auth-size';
+  const later = function (ms, fn) { setTimeout(fn, ms); };
+
+  // Two lights running around the card's edge, cut corners included. They are
+  // moved with transform-only keyframes (head on the outline, tail turned along
+  // it), so the browser never redraws the card for them. Rebuilt when the card
+  // changes size, keeping each light where it was.
+  const beamLights = Array.from(frame.querySelectorAll('.card-beam .beam'));
+  let beamRuns = [], beamTimer = null;
+  function runBeams() {
+    if (!beamLights.length || calm || !card.animate) return;
+    const w = card.offsetWidth, h = card.offsetHeight, e = 0.5;
+    const c = parseFloat(getComputedStyle(card).getPropertyValue('--cut')) || 30;
+    const pts = [[c, e], [w - e, e], [w - e, h - c], [w - c, h - e], [e, h - e], [e, c], [c, e]];
+    // Keep the lights on the edge: right after a corner a tail would otherwise
+    // stick out past it. The clip is the card's shape grown by o px.
+    const o = 3, d = o * 0.414;
+    beamLights[0].parentNode.style.clipPath = 'polygon(' + [[c - d, -o], [w + o, -o], [w + o, h - c + d], [w - c + d, h + o], [-o, h + o], [-o, c - d]]
+      .map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
+    let total = 0, last = null;
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      let angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+      if (last !== null) while (angle - last < -180) angle += 360;  // keep turning the same way round
+      segs.push({ a: a, b: b, len: len, at: total, angle: angle });
+      total += len;
+      last = angle;
+    }
+    const done = beamRuns.map(function (r) { return r.currentTime || 0; });
+    beamRuns.forEach(function (r) { r.cancel(); });
+    beamRuns = beamLights.map(function (el, n) {
+      const bw = el.offsetWidth, frames = [];
+      const at = function (sg, d) { return [sg.a[0] + (sg.b[0] - sg.a[0]) * d / sg.len, sg.a[1] + (sg.b[1] - sg.a[1]) * d / sg.len]; };
+      const key = function (offset, p, angle) {
+        frames.push({ offset: offset / total, transform: 'translate(' + (p[0] - bw).toFixed(1) + 'px,' + (p[1] - 1).toFixed(1) + 'px) rotate(' + angle.toFixed(1) + 'deg)' });
+      };
+      // Along each side the light keeps that side's angle; it turns only in
+      // the first few px after a corner.
+      segs.forEach(function (sg, i) {
+        const turn = Math.min(8, sg.len / 3);
+        key(sg.at, sg.a, i === 0 ? sg.angle : segs[i - 1].angle);
+        key(sg.at + turn, at(sg, turn), sg.angle);
+        if (i === segs.length - 1) key(total, sg.b, sg.angle);
+      });
+      const run = el.animate(frames, { duration: 7000, iterations: Infinity, easing: 'linear' });
+      run.currentTime = done[n] != null ? done[n] : n * 3500;
+      return run;
+    });
+  }
+  function beamSpeed(rate) { beamRuns.forEach(function (r) { r.playbackRate = rate; }); }
+  runBeams();
+  if (window.ResizeObserver) new ResizeObserver(function () { clearTimeout(beamTimer); beamTimer = setTimeout(runBeams, 120); }).observe(card);
+
+  function leave(href) {
+    if (calm) { location.href = href; return; }
+    try {
+      sessionStorage.setItem('fleetfuel-auth-switch', '1');
+      sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: frame.offsetWidth, h: card.offsetHeight }));
+    } catch (e) {}
+    Array.from(card.children).forEach(function (el, i) { el.style.transitionDelay = (i * 35) + 'ms'; });
+    frame.classList.add('is-leaving', 'shards-lit', 'shards-in');
+    beamSpeed(3);
+    later(380, function () { frame.classList.add('shards-center'); });
+    later(880, function () { frame.classList.add('shards-pulse'); });
+    later(1000, function () { location.href = href; });
+  }
+
+  // Card size: start at the previous page's size and ease into this one's.
+  function morphFromPrevious() {
+    let old = null;
+    try { old = JSON.parse(sessionStorage.getItem(SIZE_KEY) || 'null'); sessionStorage.removeItem(SIZE_KEY); } catch (e) {}
+    if (!old) return;
+    const w = frame.offsetWidth, h = card.offsetHeight;
+    if (Math.abs(old.w - w) < 2 && Math.abs(old.h - h) < 2) return;
+    frame.style.maxWidth = old.w + 'px';
+    card.style.height = old.h + 'px';
+    void card.offsetWidth;
+    const ease = '0.5s cubic-bezier(0.65, 0, 0.35, 1)';
+    frame.style.transition = 'max-width ' + ease;
+    card.style.transition = 'height ' + ease;
+    later(60, function () { frame.style.maxWidth = w + 'px'; card.style.height = h + 'px'; });
+    later(650, function () { frame.style.maxWidth = frame.style.transition = card.style.height = card.style.transition = ''; });
+  }
+
+  function arrive() {
+    if (!root.classList.contains('auth-arriving')) return;
+    const rows = Array.from(card.children);
+    frame.classList.add('no-anim', 'shards-lit', 'shards-in', 'shards-center', 'is-leaving');
+    beamSpeed(3);
+    later(1000, function () { beamSpeed(1); });
+    void frame.offsetWidth;  // the mark is already in the middle; no slide in
+    frame.classList.remove('no-anim');
+    root.classList.remove('auth-arriving');
+    morphFromPrevious();
+    later(560, function () { frame.classList.remove('shards-center'); });            // split to the cut corners
+    later(980, function () { frame.classList.remove('shards-in', 'shards-lit'); });  // back outside, plain glass
+    later(900, function () {
+      rows.forEach(function (el, i) { el.style.transitionDelay = (i * 60) + 'ms'; });
+      frame.classList.remove('is-leaving');
+    });
+    later(1900, function () { rows.forEach(function (el) { el.style.transitionDelay = ''; }); });
+  }
+
+  document.addEventListener('click', function (e) {
+    const a = e.target.closest('.auth-switch a[href]');
+    if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    if (frame.classList.contains('is-leaving')) return;  // already switching
+    leave(a.href);
+  });
+
+  // Back button after a switch: show the form again instead of the empty card.
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) frame.classList.remove('is-leaving', 'shards-lit', 'shards-in', 'shards-center', 'shards-pulse');
+  });
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrive);
+  else arrive();
+})();

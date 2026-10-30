@@ -9,14 +9,21 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=40) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=65) }}" rel="stylesheet">
 </head>
 <body>
 <div class="login-page">
+  {% include '_auth_bg.html' %}
+  <div class="auth-frame">
+  <span class="glass-shard shard-tl" aria-hidden="true"><i></i></span>
   <div class="login-card text-center">
-    <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
-    <div class="login-title">Waiting for approval</div>
-    <div class="login-sub">Fuel Consumption Prediction System</div>
+    <div class="auth-brand">
+      <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
+      <div>
+        <div class="login-title">Waiting for approval</div>
+        <div class="login-sub">Fuel Consumption Prediction System</div>
+      </div>
+    </div>
 
     <div class="pending-spinner" aria-hidden="true"><i class="fa-solid fa-hourglass-half"></i></div>
     <p class="mb-1">Hello, <strong>{{ user.full_name }}</strong> ({{ user.username }}).</p>
@@ -29,6 +36,9 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-outline-navy w-100"><i class="fa-solid fa-arrow-left me-1"></i> Back to Login</button>
     </form>
+  </div>
+  <div class="card-beam" aria-hidden="true"><i class="beam beam-a"></i><i class="beam beam-b"></i></div>
+  <span class="glass-shard shard-br" aria-hidden="true"><i></i></span>
   </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>

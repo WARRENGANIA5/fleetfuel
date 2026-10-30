@@ -4,19 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include '_theme_init.html' %}
+<script>
+// Opened from the Login / Sign Up link: start with the form hidden so the
+// switch animation (script.js) can bring it in.
+try {
+  if (sessionStorage.getItem('fleetfuel-auth-switch')) {
+    sessionStorage.removeItem('fleetfuel-auth-switch');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('auth-switched', 'auth-arriving');
+  }
+} catch (e) {}
+</script>
 <title>Login | {{ org.system_short }} &middot; Fuel Consumption Prediction System</title>
 <link rel="icon" href="{{ url_for('static', filename='images/seal.svg', v=14) }}" type="image/svg+xml">
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=40) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=65) }}" rel="stylesheet">
+<style>
+  /* Login <-> Sign Up: the browser cross-fades the two pages (no white flash). */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.25s; }
+</style>
 </head>
 <body>
 <div class="login-page">
+  {% include '_auth_bg.html' %}
+  <div class="auth-frame">
+  <span class="glass-shard shard-tl" aria-hidden="true"><i></i></span>
   <div class="login-card">
-    <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
-    <div class="login-title">{{ org.system_short }}</div>
-    <div class="login-sub">Fuel Consumption Prediction System</div>
+    <div class="auth-brand">
+      <div class="login-logo"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
+      <div>
+        <div class="login-title">{{ org.system_short }}</div>
+        <div class="login-sub">Fuel Consumption Prediction System</div>
+      </div>
+    </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -32,19 +54,19 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div class="mb-3">
-        <div class="form-floating">
-          <input type="text" class="form-control" id="username" name="username" value="{{ request.form.get('username', '') }}" placeholder="Username" required autocomplete="off">
-          <label for="username">Username</label>
-          <div class="invalid-feedback">Username is required.</div>
+        <label class="auth-label" for="username">Username</label>
+        <div class="auth-input">
+          <i class="fa-regular fa-user field-icon"></i>
+          <input type="text" class="form-control" id="username" name="username" value="{{ request.form.get('username', '') }}" placeholder="Enter your username" required autocomplete="off">
         </div>
+        <div class="invalid-feedback">Username is required.</div>
       </div>
 
-      <div class="mb-3">
-        <div class="password-field-wrap">
-          <div class="form-floating">
-            <input type="password" class="form-control" id="password" name="password" value="" placeholder="Password" required>
-            <label for="password">Password</label>
-          </div>
+      <div class="mb-4">
+        <label class="auth-label" for="password">Password</label>
+        <div class="auth-input password-field-wrap">
+          <i class="fa-solid fa-lock field-icon"></i>
+          <input type="password" class="form-control" id="password" name="password" value="" placeholder="Enter your password" required>
           <i class="fa-regular fa-eye password-toggle" data-target="password"></i>
         </div>
         <div class="invalid-feedback">Password is required.</div>
@@ -52,17 +74,20 @@
       </div>
 
       <button type="submit" class="btn btn-navy w-100 py-2">
-        <i class="fa-solid fa-right-to-bracket me-1"></i> Login
+        Login <i class="fa-solid fa-arrow-right"></i>
       </button>
     </form>
     <div class="auth-switch">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></div>
     <div class="auth-help">Forgot your password? Ask the administrator.</div>
   </div>
+  <div class="card-beam" aria-hidden="true"><i class="beam beam-a"></i><i class="beam beam-b"></i></div>
+  <span class="glass-shard shard-br" aria-hidden="true"><i></i></span>
+  </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=31) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=43) }}"></script>
 <script>
 // Warn before a wrong password is typed with Caps Lock on.
 (function () {

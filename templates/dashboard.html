@@ -47,7 +47,7 @@
       <div class="stat-icon green"><i class="fa-solid fa-hourglass-half"></i></div>
       <div>
         <div class="stat-value" id="statPending">{{ stats.pending }}</div>
-        <div class="stat-label">Fuel Requests Waiting for Approval</div>
+        <div class="stat-label" title="Fuel Requests Waiting for Approval">Pending Fuel Requests</div>
       </div>
     </a>
   </div>
@@ -56,7 +56,7 @@
       <div class="stat-icon amber"><i class="fa-solid fa-chart-simple"></i></div>
       <div>
         <div class="stat-value"><span id="statAvgFuel">{{ stats.avg_fuel }}</span> L</div>
-        <div class="stat-label">Avg. Fuel Consumption / Trip</div>
+        <div class="stat-label" title="Average Fuel Consumption per Trip">Avg. Fuel per Trip</div>
       </div>
     </a>
   </div>
@@ -211,8 +211,8 @@ function renderFuelTrend(d) {
   if (!fuelTrendChartInstance) {
     fuelTrendChartInstance = new Chart(document.getElementById('fuelTrendChart'), {
       type: 'line',
-      data: { labels: [], datasets: [{ label: 'Liters Consumed', data: [], borderColor: '#2697ff',
-        backgroundColor: 'rgba(38,151,255,0.12)', fill: true, tension: 0.35, pointRadius: 3 }] },
+      data: { labels: [], datasets: [{ label: 'Liters Consumed', data: [], borderColor: chartColors.line,
+        backgroundColor: chartColors.lineFill, fill: true, tension: 0.35, pointRadius: 3 }] },
       options: {
         // Click anywhere in a month's column to open that month's trip records.
         interaction: { mode: 'index', intersect: false },
@@ -251,8 +251,8 @@ function renderAvp(d) {
     avpChartInstance = new Chart(document.getElementById('avpChart'), {
       type: 'line',
       data: { labels: [], datasets: [
-        { label: 'Actual (L)', data: [], borderColor: '#2697ff', backgroundColor: 'rgba(38,151,255,0.12)', fill: true, tension: 0.35, pointRadius: 3 },
-        { label: 'Predicted (L)', data: [], borderColor: '#26e5c5', backgroundColor: 'rgba(38,229,197,0.12)', fill: true, tension: 0.35, pointRadius: 3 }
+        { label: 'Actual (L)', data: [], borderColor: chartColors.line, backgroundColor: chartColors.lineFill, fill: true, tension: 0.35, pointRadius: 3 },
+        { label: 'Predicted (L)', data: [], borderColor: chartColors.line2, backgroundColor: chartColors.line2Fill, fill: true, tension: 0.35, pointRadius: 3 }
       ] },
       options: {
         interaction: { mode: 'index', intersect: false },

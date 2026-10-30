@@ -308,13 +308,13 @@ a { text-decoration: none; color: inherit; }
 .stat-card:has(.stat-icon.amber)::before { background: var(--warning); }
 
 .stat-value { font-size: 24px; font-weight: 800; color: var(--text-dark); line-height: 1.1; }
-/* break-word (not anywhere): wrap between words, split a word only if it cannot fit at all */
-.stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; overflow-wrap: break-word; }
+/* one line only, so every stat card keeps the same height; the full wording is in the title tooltip */
+.stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-card > div:last-child { min-width: 0; }
 @media (max-width: 575px) {
   .stat-card { padding: 14px; gap: 10px; }
   .stat-value { font-size: 20px; }
-  /* smaller icon leaves room for labels like "Avg. Fuel Consumption / Trip" on two-column phones */
+  /* smaller icon leaves room for labels like "Pending Fuel Requests" on two-column phones */
   .stat-icon { width: 40px; height: 40px; font-size: 16px; border-radius: 12px; }
   .stat-label { font-size: 11.5px; line-height: 1.3; }
 }
@@ -1107,25 +1107,6 @@ html[data-theme="light"] .corr-heatmap td.is-diag { background: var(--card-bg-al
 html[data-theme="light"] .corr-heatmap td.is-target { box-shadow: inset 0 0 0 1px rgba(14, 159, 135, 0.6); }
 html[data-theme="light"] .corr-legend-bar { background: linear-gradient(90deg, rgb(255,138,76), #ffffff 50%, rgb(38,151,255)); }
 
-/* Login, sign-up and waiting pages: bright frosted card on a pale backdrop. */
-html[data-theme="light"] .login-page { background: linear-gradient(160deg, #eaf2fd 0%, #f5f8fd 50%, #e8f7f4 100%); }
-html[data-theme="light"] .login-page::before,
-html[data-theme="light"] .login-page::after { opacity: 0.28; }
-html[data-theme="light"] .login-card {
-  background: rgba(255, 255, 255, 0.78);
-  border-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 24px 60px rgba(31, 60, 110, 0.14);
-}
-html[data-theme="light"] .login-card .btn-navy { background: linear-gradient(135deg, var(--blue-600), var(--blue-500)); }
-html[data-theme="light"] .login-card .btn-navy:hover { background: linear-gradient(135deg, var(--blue-500), var(--blue-600)); }
-html[data-theme="light"] .login-card .form-control,
-html[data-theme="light"] .login-card .form-control:focus { background-color: #ffffff; }
-html[data-theme="light"] .login-card .form-control:-webkit-autofill,
-html[data-theme="light"] .login-card .form-control:-webkit-autofill:hover,
-html[data-theme="light"] .login-card .form-control:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #eef4ff inset;
-  box-shadow: 0 0 0 1000px #eef4ff inset;
-}
 
 /* ---------------- Top bar: dark / light switch (beside the bell) ----------------
    A black pill with a sun and a moon; the blue knob slides under the mode in use. */
@@ -1228,9 +1209,6 @@ html[data-theme="light"] .btn-navy { background: #101828; border-color: #101828;
 html[data-theme="light"] .btn-navy:hover { background: #1d2939; transform: none; }
 html[data-theme="light"] .btn-outline-navy { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 html[data-theme="light"] .btn-outline-navy:hover { background: #f9fafb; color: var(--text-dark); border-color: #d0d5dd; }
-html[data-theme="light"] .login-card .btn-navy,
-html[data-theme="light"] .login-card .btn-navy:hover { background: var(--blue-600); }
-html[data-theme="light"] .login-card .btn-navy:hover { background: #175cd3; }
 
 /* Tables: grey header strip, hairline rows, faint hover. */
 html[data-theme="light"] .table-wrap { border: 1px solid var(--border-soft); }
@@ -1279,19 +1257,335 @@ html[data-theme="light"] .notif-panel-header { background: #ffffff; }
 html[data-theme="light"] .result-hero { background: var(--blue-600); box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .chart-card img { border: 1px solid var(--border-soft); }
 
-/* Login, sign-up and waiting pages: plain grey page, white card. */
-html[data-theme="light"] .login-page { background: #f7f8fa; }
-html[data-theme="light"] .login-page::before,
-html[data-theme="light"] .login-page::after { display: none; }
-html[data-theme="light"] .login-card {
-  background: #ffffff; border: 1px solid var(--border-soft);
-  box-shadow: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-}
-html[data-theme="light"] .login-logo { box-shadow: none; }
 
 /* Thin, quiet scrollbars. */
 html[data-theme="light"] { scrollbar-color: #d0d5dd transparent; }
 html[data-theme="light"] ::-webkit-scrollbar { width: 10px; height: 10px; }
 html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
+
+/* ================= Login, sign-up and waiting pages: glassy look =================
+   Dark backdrop with flowing blue light streaks (_auth_bg.html), a frosted
+   card with cut corners and glass shards at two corners. Overrides the older
+   login rules above. */
+.login-page { background: radial-gradient(ellipse at 30% 20%, #0c1626 0%, #05080f 60%, #020306 100%); }
+.login-page::before, .login-page::after { display: none; }
+.auth-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.auth-bg .streak { fill: none; stroke-linecap: round; }
+.auth-bg .streak-glow { filter: blur(10px); opacity: 0.75; }
+.auth-bg .streak-group { animation: auth-drift 18s ease-in-out infinite alternate; transform-origin: center; }
+@keyframes auth-drift { from { transform: translate(-1.5%, 0) scale(1); } to { transform: translate(1.5%, -1%) scale(1.03); } }
+
+.auth-frame { position: relative; z-index: 1; width: 100%; max-width: 440px; animation: fadeUp 0.5s ease both; }
+.auth-frame.auth-wide { max-width: 500px; }
+.login-card {
+  --cut: 30px;
+  max-width: none; border: 0; border-radius: 0;
+  padding: 34px 34px 28px;
+  background: linear-gradient(160deg, rgba(40, 58, 84, 0.55) 0%, rgba(16, 24, 38, 0.62) 55%, rgba(12, 18, 30, 0.7) 100%);
+  box-shadow: none;
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  animation: none;
+}
+/* Hairline edge, brighter at the top, plus the two diagonal edges. */
+.login-card::before, .login-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.login-card::before {
+  padding: 1px;
+  background: linear-gradient(170deg, rgba(160, 205, 255, 0.55), rgba(255, 255, 255, 0.08) 45%, rgba(74, 169, 255, 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.login-card::after {
+  background:
+    linear-gradient(135deg, transparent calc(50% - 1px), rgba(160, 205, 255, 0.6) 50%, transparent calc(50% + 1px)) top left / var(--cut) var(--cut) no-repeat,
+    linear-gradient(135deg, transparent calc(50% - 1px), rgba(74, 169, 255, 0.45) 50%, transparent calc(50% + 1px)) bottom right / var(--cut) var(--cut) no-repeat,
+    radial-gradient(ellipse at 20% 0%, rgba(120, 180, 255, 0.12), transparent 55%);
+}
+/* The outer span moves and glows; the inner <i> carries the rounded shape (a
+   mask would cut the glow off if both were on one element).
+   --s: shard size, --o: offset outside the corner, --in: spot inside the cut
+   corner, --n: how far each half leans toward the other in the middle. */
+.glass-shard {
+  --s: 58px; --o: -16px; --in: 12px; --n: 6px;
+  position: absolute; z-index: 2; pointer-events: none;
+  width: var(--s); height: var(--s);
+  transform: scale(1);
+  transition: top 0.5s cubic-bezier(0.65, 0, 0.35, 1), left 0.5s cubic-bezier(0.65, 0, 0.35, 1),
+              bottom 0.5s cubic-bezier(0.65, 0, 0.35, 1), right 0.5s cubic-bezier(0.65, 0, 0.35, 1),
+              transform 0.5s cubic-bezier(0.65, 0, 0.35, 1), filter 0.35s ease;
+}
+.glass-shard > i {
+  display: block; width: 100%; height: 100%;
+  background: linear-gradient(135deg, rgba(190, 220, 255, 0.35), rgba(60, 110, 170, 0.12));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  -webkit-mask: var(--shape) center / 100% 100% no-repeat;
+  mask: var(--shape) center / 100% 100% no-repeat;
+  transition: background 0.35s ease;
+}
+/* Each shard sits just outside a cut corner, its long edge parallel to the cut. */
+.shard-tl { top: var(--o); left: var(--o); }
+.shard-br { bottom: var(--o); right: var(--o); }
+.shard-tl > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='7,7 65,7 7,65' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.shard-br > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='93,35 93,93 35,93' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+
+/* Two lights running around the card's edge, cut corners included
+   (script.js draws the outline to the card's size). */
+.card-beam { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.card-beam .beam {
+  position: absolute; left: 0; top: 0; width: 130px; height: 2px; border-radius: 2px;
+  transform-origin: 100% 50%; will-change: transform;
+  background: linear-gradient(90deg, rgba(154, 216, 255, 0), #c9ecff);
+  box-shadow: 0 0 8px 1px rgba(76, 180, 255, 0.85), 0 0 18px 2px rgba(38, 151, 255, 0.45);
+}
+.card-beam .beam-b { background: linear-gradient(90deg, rgba(76, 180, 255, 0), #4cb4ff); }
+html.auth-arriving .card-beam { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .card-beam { display: none; } }
+
+/* Switching between Login and Sign Up (script.js runs the steps):
+   1. the form fades out and both shards light up and slip into the cut corners,
+   2. they glide to the middle and join as one mark,
+   3. the other page opens on that mark while the card takes its new size,
+   4. the halves split back to the corners and the form comes in row by row. */
+.login-card > * { transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+.auth-frame.is-leaving .login-card > *,
+html.auth-arriving .login-card > * { opacity: 0; transform: translateY(8px); }
+html.auth-switched .auth-frame { animation: none; }
+html.auth-arriving .glass-shard { opacity: 0; }
+.auth-frame.shards-lit .glass-shard { filter: drop-shadow(0 0 8px rgba(38, 151, 255, 0.9)) drop-shadow(0 0 20px rgba(38, 151, 255, 0.5)); }
+.auth-frame.shards-lit .glass-shard > i { background: linear-gradient(135deg, #8fd3ff 0%, #2b98ff 45%, #0e5cc0 100%); }
+.auth-frame.shards-in .shard-tl { top: var(--in); left: var(--in); }
+.auth-frame.shards-in .shard-br { bottom: var(--in); right: var(--in); }
+.auth-frame.shards-center .shard-tl { top: calc(50% - var(--s) / 2 + var(--n)); left: calc(50% - var(--s) / 2 + var(--n)); transform: scale(1.4); }
+.auth-frame.shards-center .shard-br { bottom: calc(50% - var(--s) / 2 + var(--n)); right: calc(50% - var(--s) / 2 + var(--n)); transform: scale(1.4); }
+.auth-frame.shards-pulse .glass-shard { animation: shard-pulse 0.5s ease-in-out; }
+@keyframes shard-pulse { 50% { filter: drop-shadow(0 0 14px rgba(76, 180, 255, 1)) drop-shadow(0 0 34px rgba(38, 151, 255, 0.7)); } }
+.auth-frame.no-anim .glass-shard,
+.auth-frame.no-anim .glass-shard > i { transition: none; }
+
+/* Heading: logo beside the system name, left-aligned. */
+.auth-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.auth-brand .login-logo { width: 52px; height: 52px; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(38, 151, 255, 0.35); }
+.auth-brand .login-title { text-align: left; font-size: 24px; font-weight: 700; margin: 0; line-height: 1.15; }
+.auth-brand .login-sub { text-align: left; font-size: 12.5px; margin: 2px 0 0; }
+.login-card.text-center .auth-brand { justify-content: center; text-align: left; }
+
+
+/* Labels above the boxes; icon inside on the left. */
+.auth-label { display: block; font-size: 12.5px; font-weight: 500; color: #c3cad8; margin-bottom: 6px; }
+.auth-input { position: relative; }
+.auth-input > .field-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #7d8799; font-size: 14px; pointer-events: none; z-index: 4; }
+.login-card .auth-input .form-control {
+  height: 44px; padding-left: 40px;
+  background-color: rgba(8, 14, 26, 0.55);
+  border: 1px solid rgba(140, 180, 230, 0.16);
+  border-radius: 10px; color: var(--text-dark); font-size: 14px;
+}
+.login-card .auth-input .form-control::placeholder { color: #5f6a7d; }
+.login-card .auth-input .form-control:focus {
+  background-color: rgba(10, 20, 36, 0.7);
+  border-color: rgba(74, 169, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(38, 151, 255, 0.18), 0 0 18px rgba(38, 151, 255, 0.2);
+}
+.auth-input:focus-within > .field-icon { color: var(--blue-500); }
+.login-card .form-control:-webkit-autofill,
+.login-card .form-control:-webkit-autofill:hover,
+.login-card .form-control:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px #0b1424 inset; box-shadow: 0 0 0 1000px #0b1424 inset; }
+.was-validated .auth-input:has(.form-control:invalid) ~ .invalid-feedback { display: block; }
+
+.login-card .btn-navy {
+  height: 46px; border: 0; border-radius: 10px; font-weight: 600; letter-spacing: 0.01em;
+  background: linear-gradient(180deg, #4cb4ff 0%, #1f8bff 55%, #1474e0 100%);
+  box-shadow: 0 8px 22px rgba(31, 139, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.login-card .btn-navy:hover { background: linear-gradient(180deg, #4cb4ff 0%, #1f8bff 55%, #1474e0 100%); filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(31, 139, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.login-card .btn-navy .fa-arrow-right { font-size: 13px; transition: transform .15s ease; }
+.login-card .btn-navy:hover .fa-arrow-right { transform: translateX(3px); }
+.auth-note { background: rgba(38, 151, 255, 0.1); border: 1px solid rgba(74, 169, 255, 0.18); }
+.auth-switch { margin-top: 18px; font-size: 12.5px; }
+.auth-switch a { color: #4cb4ff; }
+.login-footer { margin-top: 26px; position: relative; z-index: 1; }
+.auth-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 480px) {
+  .auth-pair { grid-template-columns: 1fr; }
+  .login-card { padding: 28px 22px 24px; --cut: 22px; }
+  .glass-shard { --s: 40px; --o: -14px; --in: 8px; --n: 4px; }
+  .auth-brand .login-title { font-size: 21px; }
+}
+@media (prefers-reduced-motion: reduce) { .auth-bg .streak-group { animation: none; } }
+
+/* Light mode: same streak design, in the dashboard's soft colours (light
+   cream with a faint warm and sage tint), behind a bright frosted card. */
+html[data-theme="light"] .login-page {
+  background:
+    radial-gradient(ellipse at 85% 10%, rgba(255, 250, 238, 0.95), transparent 45%),
+    radial-gradient(ellipse at 10% 15%, rgba(236, 214, 180, 0.4), transparent 50%),
+    radial-gradient(ellipse at 0% 55%, rgba(196, 208, 184, 0.3), transparent 35%),
+    radial-gradient(ellipse at 10% 100%, rgba(214, 194, 166, 0.4), transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(222, 204, 178, 0.35), transparent 50%),
+    linear-gradient(180deg, #f7f2e8 0%, #ebe0cf 100%);
+}
+html[data-theme="light"] .auth-bg { opacity: 0.45; }
+html[data-theme="light"] .auth-bg .streak-band { display: none; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(1),
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(4) { stop-color: #e2a35a; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(2) { stop-color: #d08a3c; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(3) { stop-color: #fff3dc; }
+html[data-theme="light"] .auth-bg #streakB stop:nth-child(1),
+html[data-theme="light"] .auth-bg #streakB stop:nth-child(3) { stop-color: #f2c98e; }
+html[data-theme="light"] .auth-bg #streakB stop:nth-child(2) { stop-color: #c8792b; }
+html[data-theme="light"] .login-card .btn-navy,
+html[data-theme="light"] .login-card .btn-navy:hover { background: linear-gradient(180deg, #4cb4ff 0%, #1f8bff 55%, #1474e0 100%); border: 0; box-shadow: 0 8px 20px rgba(31, 139, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+html[data-theme="light"] .login-card { background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(240, 246, 255, 0.72)); box-shadow: none; border: 0; }
+html[data-theme="light"] .login-card::before { background: linear-gradient(170deg, rgba(38, 151, 255, 0.45), rgba(16, 24, 40, 0.08) 45%, rgba(38, 151, 255, 0.3)); }
+html[data-theme="light"] .glass-shard > i { background: linear-gradient(135deg, rgba(120, 185, 255, 0.55), rgba(38, 151, 255, 0.2)); }
+html[data-theme="light"] .auth-label { color: #344054; }
+html[data-theme="light"] .login-card .auth-input .form-control { background-color: rgba(255, 255, 255, 0.9); border-color: #d0d5dd; color: #101828; }
+html[data-theme="light"] .login-card .auth-input .form-control::placeholder { color: #98a2b3; }
+html[data-theme="light"] .login-card .auth-input .form-control:focus { background-color: #ffffff; border-color: var(--blue-600); }
+html[data-theme="light"] .login-card .form-control:-webkit-autofill,
+html[data-theme="light"] .login-card .form-control:-webkit-autofill:hover,
+html[data-theme="light"] .login-card .form-control:-webkit-autofill:focus { -webkit-text-fill-color: #101828; -webkit-box-shadow: 0 0 0 1000px #eef4ff inset; box-shadow: 0 0 0 1000px #eef4ff inset; }
+html[data-theme="light"] .auth-brand .login-logo { box-shadow: 0 6px 16px rgba(38, 151, 255, 0.2); }
+html[data-theme="light"] .auth-switch a { color: var(--blue-600); }
+html[data-theme="light"] .card-beam .beam-a { background: linear-gradient(90deg, rgba(43, 152, 255, 0), #2b98ff); }
+
+/* ================= Light mode: glassy dashboard =================
+   A soft cream backdrop with a faint warm glow, sunlight beams and light spots (images/glass-soft.jpg) behind the app,
+   with frosted-glass panels on top: translucent white, blurred backdrop,
+   bright hairline edge. Dark pills mark the open page and the main buttons,
+   soft yellow chips mark pending items. Only the signed-in pages get it
+   (:has(.app-shell)); the login pages keep their own look. */
+html[data-theme="light"]:has(.app-shell) {
+  --bg-page: #f1ebe1;
+  --card-bg: rgba(255, 255, 255, 0.42);
+  --card-bg-alt: rgba(255, 255, 255, 0.32);
+  --text-dark: #26211a;
+  --text-muted: #6e6253;
+  --border-soft: rgba(255, 255, 255, 0.55);
+  --blue-600: #b0661c;
+  --blue-500: #c8792b;
+  --blue-100: rgba(255, 255, 255, 0.5);
+  --glass-line: rgba(110, 86, 54, 0.14);
+  --glass-blur: blur(22px) saturate(1.45);
+  --shadow-soft: 0 8px 30px rgba(84, 60, 28, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --shadow-hover: 0 14px 40px rgba(84, 60, 28, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --bs-primary-rgb: 176, 102, 28;
+  --bs-link-color-rgb: 176, 102, 28;
+  --bs-secondary-color: #6e6253;
+  --bs-border-color: var(--glass-line);
+  scrollbar-color: rgba(90, 68, 40, 0.3) transparent;
+}
+/* isolation keeps the picture above the body's own background. */
+html[data-theme="light"] .app-shell { isolation: isolate; }
+html[data-theme="light"] .app-shell::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: #f1ebe1 url("../images/glass-soft.jpg") center / cover no-repeat;
+}
+
+/* Frosted panels */
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] .card-surface,
+html[data-theme="light"] .stat-card,
+html[data-theme="light"] .welcome-banner,
+html[data-theme="light"]:has(.app-shell) .modal-content,
+html[data-theme="light"] .app-shell .dropdown-menu {
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+html[data-theme="light"] .sidebar { background: rgba(255, 255, 255, 0.34); border-width: 0 1px 0 0; }
+html[data-theme="light"] .topbar { background: rgba(255, 255, 255, 0.3); border-width: 0 0 1px 0; box-shadow: none; }
+html[data-theme="light"] .card-surface,
+html[data-theme="light"] .stat-card,
+html[data-theme="light"] .welcome-banner { border-radius: 20px; }
+html[data-theme="light"] .card-surface:hover { box-shadow: var(--shadow-soft); }
+html[data-theme="light"] .stat-card:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.55); border-color: rgba(255, 255, 255, 0.8); box-shadow: var(--shadow-hover); }
+html[data-theme="light"]:has(.app-shell) .modal-content { background: rgba(255, 255, 255, 0.72); border-radius: 20px; }
+html[data-theme="light"] .app-shell .dropdown-menu { background: rgba(255, 255, 255, 0.78); --bs-dropdown-link-hover-bg: rgba(255, 255, 255, 0.6); border-radius: 14px; }
+html[data-theme="light"] .notif-panel-header { background: transparent; }
+html[data-theme="light"]:has(.app-shell) .modal-backdrop { --bs-backdrop-bg: #3a2c1a; --bs-backdrop-opacity: 0.25; }
+
+/* Sidebar: dark pill for the open page. */
+html[data-theme="light"] .sidebar-brand,
+html[data-theme="light"] .sidebar-footer { border-color: var(--glass-line); }
+html[data-theme="light"] .nav-link { color: #4a4034; border-radius: 999px; }
+html[data-theme="light"] .nav-link i { color: #8a7b66; }
+html[data-theme="light"] .nav-link:hover { background: rgba(255, 255, 255, 0.5); color: var(--text-dark); }
+html[data-theme="light"] .nav-link:hover i { color: #4a4034; }
+html[data-theme="light"] .nav-link.active { background: #211d18; color: #fff; box-shadow: 0 6px 16px rgba(33, 29, 24, 0.25); }
+html[data-theme="light"] .nav-link.active i { color: #fff; }
+html[data-theme="light"] .nav-link.active::before { display: none; }
+html[data-theme="light"] .nav-badge { background: #f5d76e; color: #4a3800; }
+html[data-theme="light"] .logout-link:hover { background: rgba(255, 236, 232, 0.7); }
+
+/* Top bar */
+html[data-theme="light"] .icon-btn,
+html[data-theme="light"] .sidebar-toggle { background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.7); color: #3d342a; box-shadow: none; }
+html[data-theme="light"] .icon-btn:hover { background: rgba(255, 255, 255, 0.75); }
+html[data-theme="light"] .user-chip { border-left-color: var(--glass-line); }
+html[data-theme="light"] .user-avatar { background: #211d18; color: #fff; }
+html[data-theme="light"] .app-shell .theme-switch { background: rgba(255, 255, 255, 0.5); box-shadow: inset 0 1px 3px rgba(84, 60, 28, 0.15); }
+
+/* Greeting and stat cards */
+html[data-theme="light"] .welcome-date { background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.7); color: #3d342a; border-radius: 999px; }
+html[data-theme="light"] .stat-icon { border-radius: 50%; background: rgba(255, 255, 255, 0.6) !important; box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(84, 60, 28, 0.08); }
+html[data-theme="light"] .stat-icon.blue { color: #2f6db5; }
+html[data-theme="light"] .stat-icon.navy { color: #26211a; }
+html[data-theme="light"] .stat-icon.green { color: #2f7d4f; }
+html[data-theme="light"] .stat-icon.amber { color: #b0661c; }
+
+/* Buttons: dark pill for the main action, glass pill for the rest. */
+html[data-theme="light"]:has(.app-shell) .btn-blue,
+html[data-theme="light"]:has(.app-shell) .btn-navy { background: #211d18; border: 1px solid #211d18; color: #fff; border-radius: 999px; box-shadow: 0 6px 16px rgba(33, 29, 24, 0.2); }
+html[data-theme="light"]:has(.app-shell) .btn-blue:hover,
+html[data-theme="light"]:has(.app-shell) .btn-navy:hover { background: #3a332a; border-color: #3a332a; color: #fff; }
+html[data-theme="light"]:has(.app-shell) .btn-outline-navy { background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.75); color: #3d342a; border-radius: 999px; box-shadow: none; }
+html[data-theme="light"]:has(.app-shell) .btn-outline-navy:hover { background: rgba(255, 255, 255, 0.8); color: var(--text-dark); border-color: #fff; }
+html[data-theme="light"] .btn-blue .badge.text-bg-light { background: #f5d76e !important; color: #4a3800 !important; }
+html[data-theme="light"] .action-btn { background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.75); color: #4a4034; }
+html[data-theme="light"] .action-btn:hover { background: rgba(255, 255, 255, 0.85); color: var(--text-dark); }
+
+/* Tables sit straight on the glass. */
+html[data-theme="light"] .table-wrap { background: transparent; border: 1px solid var(--glass-line); border-radius: 14px; }
+html[data-theme="light"] .table-fleet thead th { background: rgba(255, 255, 255, 0.35); color: #5a4e40; border-bottom: 1px solid var(--glass-line); }
+html[data-theme="light"] .table-fleet tbody td { border-bottom: 1px solid var(--glass-line); color: #3d342a; }
+html[data-theme="light"] .table-fleet tbody tr:hover { background: rgba(255, 255, 255, 0.4); }
+@media (max-width: 575px) {
+  html[data-theme="light"] .table-wrap { border: 0; }
+  html[data-theme="light"] .table-fleet tbody tr,
+  html[data-theme="light"] .table-fleet tbody tr:hover { background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.7); }
+}
+
+/* Status chips: yellow for pending, as in the reference look. */
+html[data-theme="light"] .badge-active { background: rgba(214, 245, 224, 0.8); color: #1f6b3e; border-color: rgba(140, 210, 165, 0.8); }
+html[data-theme="light"] .badge-maintenance { background: #f8e08a; color: #5a4300; border-color: #f0cf5c; }
+html[data-theme="light"] .badge-inactive { background: rgba(255, 226, 222, 0.85); color: #a3291b; border-color: rgba(245, 180, 170, 0.9); }
+html[data-theme="light"] .badge-recorded { background: rgba(255, 255, 255, 0.6); }
+
+/* Forms and small surfaces */
+html[data-theme="light"]:has(.app-shell) .form-control,
+html[data-theme="light"]:has(.app-shell) .form-select,
+html[data-theme="light"]:has(.app-shell) .input-group-text { background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.8); color: var(--text-dark); box-shadow: none; }
+html[data-theme="light"]:has(.app-shell) .form-control:focus,
+html[data-theme="light"]:has(.app-shell) .form-select:focus { background-color: rgba(255, 255, 255, 0.85); border-color: #d9a25e; box-shadow: 0 0 0 4px rgba(217, 162, 94, 0.2); }
+html[data-theme="light"]:has(.app-shell) .form-control:disabled,
+html[data-theme="light"]:has(.app-shell) .form-select:disabled { background-color: rgba(255, 255, 255, 0.35); color: var(--text-muted); }
+html[data-theme="light"]:has(.app-shell) .form-label { color: #3d342a; }
+html[data-theme="light"] .form-section-title::after { background: var(--glass-line); }
+html[data-theme="light"] .summary-item,
+html[data-theme="light"] .dist-stat,
+html[data-theme="light"] .metric-tile { background: rgba(255, 255, 255, 0.4); border: 1px solid rgba(255, 255, 255, 0.65); }
+html[data-theme="light"] .result-hero { background: #211d18; }
+html[data-theme="light"] .app-shell hr { border-color: var(--glass-line); opacity: 1; }
+html[data-theme="light"] .spinner-overlay { background: rgba(240, 228, 208, 0.55); }
+html[data-theme="light"]:has(.app-shell) .page-progress { background: linear-gradient(90deg, #211d18, #c8792b); box-shadow: none; }
+html[data-theme="light"]:has(.app-shell) ::-webkit-scrollbar-thumb { background: rgba(90, 68, 40, 0.3); background-clip: padding-box; }
+html[data-theme="light"] .app-shell .theme-switch-knob { background: #211d18; box-shadow: 0 2px 6px rgba(33, 29, 24, 0.35); }
