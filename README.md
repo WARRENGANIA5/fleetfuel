@@ -19,6 +19,8 @@ gov-fleets/
 ├── app.py                     Flask application (routes, auth, CRUD)
 ├── config.py                  Configuration (reads .env)
 ├── db.py                      Firebase Firestore data layer (real-time sync)
+├── trip_dataset.py            Trip Records: the online-dataset trips and their saved changes
+├── timeutil.py                Philippine time helpers
 ├── init_db.py                 Checks Firestore; creates the first administrator (online setup)
 ├── requirements.txt          Web app libraries (what Vercel installs)
 ├── requirements-train.txt    + training, diagnostics and Waitress (office server)
@@ -32,22 +34,26 @@ gov-fleets/
 ├── data/
 │   ├── gso_monthly_travel_SFA4714_2026.csv  Collected trips of SFA 4714 (Monthly Report of Official Travel)
 │   ├── supplementary_data.csv        Online records: 50,508 gasoline trips + 49,390 diesel vans
+│   ├── trip_records_dataset.csv      7,496 online-dataset trips shown in Trip Records
 │   ├── cleaned_merged_dataset.csv    Local + online records after cleaning (generated)
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
 │   ├── SUPPLEMENTARY_DATASET_SOURCE.md  Sources, licenses and sampling of the online data
 │   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from Fan & Song (2022)
-│   └── add_eea_diesel_vans.py        Adds the EEA (2024) diesel vans to supplementary_data.csv
+│   ├── add_eea_diesel_vans.py        Adds the EEA (2024) diesel vans to supplementary_data.csv
+│   └── build_trip_records_dataset.py  Builds trip_records_dataset.csv (seed 42)
 ├── colab/
 │   ├── fuel_consumption_linear_regression_AUTO.ipynb  Colab notebook with the data built in
 │   ├── fuel_consumption_linear_regression.ipynb       Colab notebook that asks for the 3 CSV files
 │   ├── trip_records.csv, vehicle_records.csv, supplementary_data.csv  The three training files
 │   ├── example_upload/          Model + results saved by Colab (for Upload Trained Model)
+│   ├── make_colab_files.py      Rebuilds the notebooks and the three training files
 │   └── HOW_TO_TRAIN_IN_COLAB.txt
-├── templates/                  Jinja2 templates (login, dashboard, ...)
+├── templates/                  Jinja2 templates (login, dashboard, ...); _auth_bg.html = login/sign-up background
 ├── static/
 │   ├── css/style.css
 │   ├── js/script.js
-│   ├── images/logo.svg         Logo and browser-tab icon
+│   ├── images/seal.svg         Logo and browser-tab icon
+│   ├── images/glass-soft.jpg   Login and sign-up background
 │   └── vendor/                 Bootstrap, Chart.js, Font Awesome, Poppins (offline copies)
 ├── reports/figures/            Evaluation figures (generated)
 ├── backups/                    Firestore backups (.json); old_mysql_backups/ and old_code_snapshots/ are from before Firestore
@@ -56,8 +62,10 @@ gov-fleets/
 │   ├── start_server.bat, stop_server.bat       Start / stop the web app
 │   ├── install_autostart.bat, uninstall_autostart.bat, fleetfuel_watcher.ps1  Start the app when Windows signs in
 │   └── allow_network_access.bat  One-time firewall rule for LAN access
-├── docs/DEPLOY_ONLINE.md       How to put the system online
-└── api/, public/, deploy/, Dockerfile, vercel.json, railway.json  Online hosting (must stay in the root)
+├── docs/
+│   ├── DEPLOY_ONLINE.md, DEPLOY_RENDER.md  How to put the system online
+│   └── THESIS_*.md             Thesis text: Chapter III code, Chapters IV and V, updates
+└── api/, public/, deploy/, Dockerfile, vercel.json, railway.json, render.yaml  Online hosting (must stay in the root)
 ```
 
 ## 3. About the Dataset
