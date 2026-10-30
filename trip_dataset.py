@@ -2,16 +2,17 @@
 by data/build_trip_records_dataset.py), shown on the Trip Records page next to
 the trips saved in Firestore.
 
-They are kept in a file, not in Firestore: about 100,000 documents would take
-5 days of the free plan's daily writes (20,000) and every start of the server
-would read twice the daily read limit (50,000). The administrator edits and
-deletes them like the other trips (update() / delete() rewrite the file); their
-ids on the page are "d" + row_id. They are not part of the "system" trips the
-model is trained with (the model uses the same records from
-supplementary_data.csv instead).
+The trips themselves are kept in the file (read-only), not in Firestore, to
+save the free plan's daily reads and writes. What the administrator changes -
+editing or deleting a trip, changing a vehicle's plate number, deleting a
+vehicle - is saved in Firestore (collection CHANGES, one small record per
+change) and applied on top of the file, so the changes last and show the same
+everywhere: on the office computer and online (Vercel's files are read-only,
+and Render's are lost on every restart). Their ids on the page are "d" + row_id.
 
 Each record is linked to its vehicle by the plate number, like the local trips
-and the vehicle records are merged for training.
+and the vehicle records are merged for training. Rebuilding the file starts
+over from the online data, so the change records must then be cleared.
 """
 import os
 import threading
@@ -19,34 +20,72 @@ from datetime import date
 
 import pandas as pd
 
+import db
+
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "trip_records_dataset.csv")
+CHANGES = "trip_dataset_changes"
+EDITED = ["trip_date", "plate_number", "distance_km", "actual_fuel_consumption"]
 
 _lock = threading.Lock()
-_write_lock = threading.Lock()   # one edit or delete of the file at a time
-_cache = {"mtime": None, "frame": None, "listing": (None, None), "summary": (None, None)}
+_cache = {"mtime": None, "base": None, "key": None, "frame": None, "listing": (None, None), "summary": (None, None)}
 
 
 def _num(v):
     return str(float(v))
 
 
-def frame():
-    """The dataset trips, oldest first (empty if the file is missing)."""
+def _base():
+    """The file as built (cached until it changes on disk)."""
     try:
         mtime = os.path.getmtime(PATH)
     except OSError:
         mtime = None
     with _lock:
-        if _cache["mtime"] == mtime and _cache["frame"] is not None:
+        if _cache["mtime"] == mtime and _cache["base"] is not None:
+            return _cache["base"], mtime
+    if mtime is None:
+        df = pd.DataFrame(columns=["row_id", "trip_date", "plate_number", "distance_km",
+                                   "actual_fuel_consumption", "source", "source_vehicle", "source_row"])
+    else:
+        df = pd.read_csv(PATH, dtype={"trip_date": str, "plate_number": str})
+    with _lock:
+        _cache.update(mtime=mtime, base=df)
+    return df, mtime
+
+
+def _changes():
+    """The administrator's changes, oldest first (none outside a request or script)."""
+    try:
+        return sorted(db.records(CHANGES), key=lambda c: c["id"])
+    except RuntimeError:   # no application context
+        return []
+
+
+def frame():
+    """The dataset trips with the administrator's changes applied, oldest first."""
+    base, mtime = _base()
+    changes = _changes()
+    key = (mtime, tuple((c["id"], c["kind"], c["row_id"], str(c["trip_date"]), c["plate_number"], c["old_plate"],
+                         c["distance_km"], c["actual_fuel_consumption"]) for c in changes))
+    with _lock:
+        if _cache["key"] == key:
             return _cache["frame"]
-        if mtime is None:
-            df = pd.DataFrame(columns=["row_id", "trip_date", "plate_number", "distance_km",
-                                       "actual_fuel_consumption", "source", "source_vehicle"])
-        else:
-            df = pd.read_csv(PATH, dtype={"trip_date": str, "plate_number": str})
-        df = df.sort_values(["trip_date", "row_id"], kind="mergesort").reset_index(drop=True)
-        _cache.update(mtime=mtime, frame=df, listing=(None, None), summary=(None, None))
-        return df
+    df = base.copy()
+    for c in changes:
+        if c["kind"] == "edit":
+            hit = df["row_id"] == c["row_id"]
+            df.loc[hit, EDITED] = [str(c["trip_date"]), c["plate_number"], float(c["distance_km"]),
+                                   float(c["actual_fuel_consumption"])]
+        elif c["kind"] == "delete":
+            df = df[df["row_id"] != c["row_id"]]
+        elif c["kind"] == "rename_plate":
+            df.loc[df["plate_number"] == c["old_plate"], "plate_number"] = c["plate_number"]
+        elif c["kind"] == "delete_plate":
+            df = df[df["plate_number"] != c["plate_number"]]
+    df = df.sort_values(["trip_date", "row_id"], kind="mergesort").reset_index(drop=True)
+    with _lock:
+        _cache.update(key=key, frame=df, listing=(None, None), summary=(None, None))
+    return df
 
 
 def listing(own_trips, vehicles_by_plate):
@@ -55,7 +94,7 @@ def listing(own_trips, vehicles_by_plate):
     dicts) plus the dataset trips of the vehicles that exist. Returns a
     DataFrame with the columns of the page's rows plus `search` text."""
     ds = frame()
-    key = (_cache["mtime"], tuple(sorted((k, v["id"], v["brand_model"]) for k, v in vehicles_by_plate.items())),
+    key = (_cache["key"], tuple(sorted((k, v["id"], v["brand_model"]) for k, v in vehicles_by_plate.items())),
            tuple((t["id"], str(t["trip_date"]), t["plate_number"], t["distance_km"], t["actual_fuel_consumption"],
                   t.get("prediction_id"))
                  for t in own_trips))
@@ -100,7 +139,7 @@ def summary(plates):
     plates = tuple(sorted(plates))
     ds = frame()
     with _lock:
-        if _cache["summary"][0] == (_cache["mtime"], plates):
+        if _cache["summary"][0] == (_cache["key"], plates):
             return _cache["summary"][1]
     ds = ds[ds["plate_number"].isin(plates)]
     per_plate = ds.groupby("plate_number")["trip_date"].agg(["count", "max"])
@@ -111,7 +150,7 @@ def summary(plates):
         "per_plate": {p: (int(r["count"]), date.fromisoformat(r["max"])) for p, r in per_plate.iterrows()},
     }
     with _lock:
-        _cache["summary"] = ((_cache["mtime"], plates), result)
+        _cache["summary"] = ((_cache["key"], plates), result)
     return result
 
 
@@ -122,56 +161,30 @@ def get(row_id):
     return hit.iloc[0].to_dict() if len(hit) else None
 
 
-def _save(df):
-    """Write the file (to a temporary file first, so a failed write never
-    leaves half a file) and drop the cached copies."""
-    df = df.sort_values("row_id")
-    tmp = PATH + ".tmp"
-    df.to_csv(tmp, index=False)
-    os.replace(tmp, PATH)
-    with _lock:
-        _cache.update(mtime=None, frame=None)
-
-
 def update(row_id, trip_date, plate_number, distance_km, actual_fuel_consumption):
     """Change one dataset trip (Edit on the Trip Records page). False if it no longer exists."""
-    with _write_lock:
-        df = frame().copy()
-        hit = df["row_id"] == row_id
-        if not hit.any():
-            return False
-        df.loc[hit, ["trip_date", "plate_number", "distance_km", "actual_fuel_consumption"]] = [
-            trip_date.isoformat(), plate_number, distance_km, actual_fuel_consumption]
-        _save(df)
-        return True
+    if get(row_id) is None:
+        return False
+    db.insert(CHANGES, {"kind": "edit", "row_id": int(row_id), "trip_date": trip_date, "plate_number": plate_number,
+                        "distance_km": float(distance_km), "actual_fuel_consumption": float(actual_fuel_consumption)})
+    return True
 
 
 def delete(row_id):
     """Remove one dataset trip (Delete on the Trip Records page). False if it no longer exists."""
-    with _write_lock:
-        df = frame()
-        hit = df["row_id"] == row_id
-        if not hit.any():
-            return False
-        _save(df[~hit])
-        return True
+    if get(row_id) is None:
+        return False
+    db.insert(CHANGES, {"kind": "delete", "row_id": int(row_id)})
+    return True
 
 
 def rename_plate(old, new):
     """A vehicle's plate number was changed: its dataset trips follow it."""
-    with _write_lock:
-        df = frame()
-        hit = df["plate_number"] == old
-        if hit.any():
-            df = df.copy()
-            df.loc[hit, "plate_number"] = new
-            _save(df)
+    if (frame()["plate_number"] == old).any():
+        db.insert(CHANGES, {"kind": "rename_plate", "old_plate": old, "plate_number": new})
 
 
 def delete_plate(plate):
     """A vehicle was deleted: its dataset trips are deleted with it."""
-    with _write_lock:
-        df = frame()
-        hit = df["plate_number"] == plate
-        if hit.any():
-            _save(df[~hit])
+    if (frame()["plate_number"] == plate).any():
+        db.insert(CHANGES, {"kind": "delete_plate", "plate_number": plate})

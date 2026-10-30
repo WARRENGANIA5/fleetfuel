@@ -2,7 +2,8 @@
 vehicle records and the prediction history of the web application).
 
 Collections (one document per record):
-    users, vehicles, trip_records, predictions, notification_dismissals
+    users, vehicles, trip_records, predictions, notification_dismissals,
+    trip_dataset_changes (changes to the online-dataset trips, see trip_dataset.py)
 
 Records keep whole-number IDs (1, 2, 3 ...), like the record numbers the pages
 and links use. A new record takes the next number above the highest one in use
@@ -32,7 +33,8 @@ from datetime import date, datetime
 
 from timeutil import LOCAL_TZ, now_local
 
-COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification_dismissals")
+COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification_dismissals",
+               "trip_dataset_changes")
 COUNTERS = "_counters"
 CHANGES = "_changes"   # document in COUNTERS: how many writes so far (see module doc)
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
@@ -54,6 +56,11 @@ FIELDS = {
                     "actual_source": None, "created_at": None, "approval_status": "pending",
                     "approved_fuel": None, "reviewed_by": None, "reviewed_at": None, "review_note": None},
     "notification_dismissals": {"user_id": None, "notif_key": None, "dismissed_at": None},
+    # Changes to the online-dataset trips of Trip Records (see trip_dataset.py):
+    # kind = edit / delete (row_id) or rename_plate / delete_plate (plate numbers).
+    "trip_dataset_changes": {"kind": None, "row_id": None, "trip_date": None, "plate_number": None,
+                             "old_plate": None, "distance_km": None, "actual_fuel_consumption": None,
+                             "created_at": None},
 }
 
 
