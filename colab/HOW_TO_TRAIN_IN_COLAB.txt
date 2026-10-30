@@ -3,9 +3,11 @@ TRAIN THE MODEL IN GOOGLE COLAB
 Files in this folder:
   fuel_consumption_linear_regression_AUTO.ipynb   EASIEST: the data is built in, no file upload
   fuel_consumption_linear_regression.ipynb        asks you to upload the 3 CSV files below
-  trip_records.csv          Monthly Report of Official Travel: date, plate number, distance (km), fuel consumed (L)
+  trip_records.csv          every trip of Trip Records: date, plate number, distance (km), fuel consumed (L);
+                            column source is empty for the GSO's own trips, filled for the online-dataset trips
   vehicle_records.csv       plate number, vehicle model, fuel type, engine power (kW)
-  supplementary_data.csv    online data, same variables: gasoline trips (Fan & Song 2022) + diesel vans (EEA 2024)
+  supplementary_data.csv    the other online records, same variables: gasoline trips (Fan & Song 2022)
+                            + diesel vans (EEA 2024); each online record is used once
 
 EASIEST WAY (AUTO version):
   1. Open https://colab.research.google.com (signed in to your Google account).
@@ -20,7 +22,9 @@ EASIEST WAY (AUTO version):
      Upload Trained Model from Google Colab, choose the two files and click Upload.
      The system then predicts with this model; it never retrains by itself.
 
-The AUTO version contains the data from the day it was made (93 trips, 9 vehicles, 99,898 online records = 100,000).
+The AUTO version contains the data from the day it was made (7,589 trips of Trip Records = 93 GSO + 7,496 online,
+9 vehicles, 92,402 other online records = 99,991 records + 9 vehicles = 100,000).
+To rebuild the four files from the system's current data: python colab/make_colab_files.py
 For newer records, download the three CSV files again from the web app
 (Model Performance > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

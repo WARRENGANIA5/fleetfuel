@@ -110,18 +110,24 @@ def supplementary_info(supplementary_path):
     return {"kind": "trips", "dropped_features": [], "missing_columns": missing, "columns": columns}
 
 
-def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None):
+def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None, exclude_supplementary_rows=()):
     """Combine the local trips (the historical CSV plus the trip records in the
     system, already merged with their vehicles) and the supplementary dataset on
     their shared variables. Each record is labeled with its source
-    (`data_source`), so the local trips can be identified after merging."""
+    (`data_source`), so the local trips can be identified after merging: the
+    trip records keep a `data_source` they already have (the online records
+    shown as trip records), the others are "system". The supplementary rows in
+    `exclude_supplementary_rows` are already among the trip records, so they
+    are left out (no record is counted twice)."""
     frames = []
     historical = pd.read_csv(historical_path)
     if not historical.empty:
         frames.append(historical.assign(data_source="historical"))
     if extra_df is not None and not extra_df.empty:
-        frames.append(extra_df.assign(data_source="system"))
+        label = extra_df["data_source"].fillna("system") if "data_source" in extra_df else "system"
+        frames.append(extra_df.assign(data_source=label))
     supplementary = pd.read_csv(supplementary_path)
+    supplementary = supplementary.drop(index=[i for i in exclude_supplementary_rows if i in supplementary.index])
     frames.append(supplementary.assign(data_source="supplementary"))
     df = pd.concat(frames, ignore_index=True)
     for col in FEATURE_COLUMNS + [TARGET_COLUMN, "trip_date", "plate_number"]:

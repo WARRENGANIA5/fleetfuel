@@ -24,7 +24,7 @@
     <div class="d-flex gap-2 flex-wrap align-items-center">
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" class="form-control" id="tripSearch" data-search-input="tripsTable" placeholder="Search date, vehicle, month (2026-06)..."
+        <input type="search" class="form-control" id="tripSearch" placeholder="Search date, vehicle, month (2026-06)..."
                value="{{ request.args.get('q', '') }}">
       </div>
       <span class="live-badge" id="tripLive"><span class="live-dot"></span><span id="tripLiveText">Live</span></span>
@@ -46,17 +46,17 @@
         </tr>
       </thead>
       <tbody id="tripsBody">
-        {% for t in trips %}
+        {% for t in listing.trips %}
         <tr data-record='{{ t|tojson }}'>
           <td>#{{ t.num }}</td>
           <td>{{ t.trip_date }}</td>
           <td>{{ t.plate_number }}</td>
           <td>{{ t.distance_km }}</td>
-          <td>{{ t.actual_fuel_consumption or '—' }}</td>
+          <td>{% if t.pending %}<span class="badge-recorded" title="Added by a fuel request; filled in when the actual fuel is recorded">Pending</span>{% else %}{{ t.actual_fuel_consumption or '—' }}{% endif %}</td>
           {% if is_admin %}
           <td>
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
-            <form method="POST" action="{{ url_for('delete_trip', trip_id=t.id) }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
+            <form method="POST" action="{{ url_for('delete_trip', trip_id=0)|replace('/0/', '/' ~ t.id ~ '/') }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </form>
@@ -64,10 +64,22 @@
           {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 6 if is_admin else 5 }}" class="text-center text-muted py-4">No trip records yet.</td></tr>
+        <tr><td colspan="{{ 6 if is_admin else 5 }}" class="text-center text-muted py-4">{{ 'No matching trip records.' if listing.q else 'No trip records yet.' }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  {# About 100,000 records: shown 50 per page, searched on the server. #}
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" id="tripPager">
+    <div class="small text-muted" id="tripCount"></div>
+    <div class="d-flex align-items-center gap-1">
+      <button type="button" class="btn btn-sm btn-outline-navy" data-page="first" title="First page"><i class="fa-solid fa-angles-left"></i></button>
+      <button type="button" class="btn btn-sm btn-outline-navy" data-page="prev" title="Previous page"><i class="fa-solid fa-angle-left"></i></button>
+      <span class="small px-2">Page <input type="number" min="1" class="form-control form-control-sm d-inline-block text-center" id="tripPageInput" style="width: 80px"> of <span id="tripPages"></span></span>
+      <button type="button" class="btn btn-sm btn-outline-navy" data-page="next" title="Next page"><i class="fa-solid fa-angle-right"></i></button>
+      <button type="button" class="btn btn-sm btn-outline-navy" data-page="last" title="Last page"><i class="fa-solid fa-angles-right"></i></button>
+    </div>
   </div>
 </div>
 
@@ -137,12 +149,16 @@ if (REOPEN && IS_ADMIN) {
   bootstrap.Modal.getOrCreateInstance(document.getElementById('addTripModal')).show();
 }
 
-// ---- Real-time: refresh the table every 5s (keeps the search term) ----
+// ---- Real-time: refresh the shown page every 5s (keeps the page and search term) ----
+let listing = {{ listing|tojson }};
 function tripRow(t) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(t);
   const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km, t.actual_fuel_consumption || '—'];
-  tr.innerHTML = cells.map(function (c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') +
+  tr.innerHTML = cells.map(function (c, i) {
+      if (i === 4 && t.pending) return '<td><span class="badge-recorded" title="Added by a fuel request; filled in when the actual fuel is recorded">Pending</span></td>';
+      return '<td>' + escapeHtml(c) + '</td>';
+    }).join('') +
     (IS_ADMIN ? '<td>' +
       '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
       '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
@@ -152,34 +168,88 @@ function tripRow(t) {
     '</td>' : '');
   return tr;
 }
-let lastTripsJson = JSON.stringify([...document.querySelectorAll('#tripsBody tr[data-record]')].map(function (tr) { return JSON.parse(tr.dataset.record); }));
-function refreshTrips() {
-  if (document.querySelector('.modal.show')) return;  // don't swap rows under an open form
-  fetch('/api/trips')
+function showPager(d) {
+  const first = (d.page - 1) * d.per_page + 1, last = Math.min(d.page * d.per_page, d.matches);
+  document.getElementById('tripCount').textContent = d.matches
+    ? 'Showing ' + first.toLocaleString() + '–' + last.toLocaleString() + ' of ' + d.matches.toLocaleString() +
+      (d.q ? ' matching (' + d.total.toLocaleString() + ' trip records in all)' : ' trip records')
+    : '';
+  document.getElementById('tripPages').textContent = d.pages.toLocaleString();
+  const input = document.getElementById('tripPageInput');
+  input.max = d.pages;
+  if (document.activeElement !== input) input.value = d.page;
+  document.querySelectorAll('#tripPager [data-page]').forEach(function (b) {
+    const back = b.dataset.page === 'first' || b.dataset.page === 'prev';
+    b.disabled = back ? d.page <= 1 : d.page >= d.pages;
+  });
+}
+function showTrips(d) {
+  const body = document.getElementById('tripsBody');
+  body.innerHTML = '';
+  if (!d.trips.length) {
+    body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 6 : 5) + '" class="text-center text-muted py-4">' +
+      (d.q ? 'No matching trip records.' : 'No trip records yet.') + '</td></tr>';
+  } else {
+    const frag = document.createDocumentFragment();
+    d.trips.forEach(function (t) { frag.appendChild(tripRow(t)); });
+    body.appendChild(frag);
+  }
+}
+let lastTripsJson = JSON.stringify(listing);
+let tripRequest = 0;
+function loadTrips(page, q, moved) {
+  const ticket = ++tripRequest;
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  params.set('page', page);
+  return fetch('/api/trips?' + params.toString())
     .then(function (res) { return res.json(); })
     .then(function (d) {
       if (!d || !Array.isArray(d.trips)) throw new Error('unexpected answer');  // keep the rows on screen
+      if (ticket !== tripRequest) return;  // a newer page or search was asked for meanwhile
       document.getElementById('tripLive').className = 'live-badge';
       document.getElementById('tripLiveText').textContent = 'Live';
-      const json = JSON.stringify(d.trips);
+      listing = d;
+      showPager(d);
+      if (moved) {  // keep the page and search in the address, for Back and reload
+        const url = new URLSearchParams();
+        if (d.q) url.set('q', d.q);
+        if (d.page > 1) url.set('page', d.page);
+        history.replaceState(null, '', window.location.pathname + (url.toString() ? '?' + url.toString() : ''));
+      }
+      const json = JSON.stringify(d);
       if (json === lastTripsJson) return;
       lastTripsJson = json;
-      const body = document.getElementById('tripsBody');
-      body.innerHTML = '';
-      if (!d.trips.length) {
-        body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 6 : 5) + '" class="text-center text-muted py-4">No trip records yet.</td></tr>';
-      } else {
-        const frag = document.createDocumentFragment();
-        d.trips.forEach(function (t) { frag.appendChild(tripRow(t)); });
-        body.appendChild(frag);
-      }
-      document.getElementById('tripSearch').dispatchEvent(new Event('keyup'));
+      showTrips(d);
+      if (moved) document.getElementById('tripsTable').scrollIntoView({ block: 'nearest' });
     })
     .catch(function () {
       document.getElementById('tripLive').className = 'live-badge is-offline';
       document.getElementById('tripLiveText').textContent = 'Reconnecting…';
     });
 }
-setInterval(refreshTrips, 5000);
+showPager(listing);
+
+document.querySelectorAll('#tripPager [data-page]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    const to = { first: 1, prev: listing.page - 1, next: listing.page + 1, last: listing.pages }[b.dataset.page];
+    loadTrips(to, listing.q, true);
+  });
+});
+document.getElementById('tripPageInput').addEventListener('change', function () {
+  const to = parseInt(this.value, 10);
+  if (to >= 1) loadTrips(Math.min(to, listing.pages), listing.q, true);
+});
+let searchTimer = null;
+document.getElementById('tripSearch').addEventListener('input', function () {
+  const q = this.value.trim();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () { loadTrips(1, q, true); }, 300);
+});
+
+setInterval(function () {
+  if (document.querySelector('.modal.show')) return;  // don't swap rows under an open form
+  loadTrips(listing.page, listing.q, false);
+}, 5000);
 </script>
 {% endblock %}

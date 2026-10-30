@@ -72,3 +72,46 @@ Download `Vehicle fuel consumption.csv` (Fan & Song DOI) and `2024_Vans_Raw.csv`
 venv\Scripts\python.exe data\build_supplementary_dataset.py "Vehicle fuel consumption.csv" data\supplementary_data.csv
 venv\Scripts\python.exe data\add_eea_diesel_vans.py 2024_Vans_Raw.csv data\supplementary_data.csv
 ```
+
+## Trip Records page — `trip_records_dataset.csv`
+
+Online records are also shown on the **Trip Records** page as trips of the fleet vehicles (built by
+`build_trip_records_dataset.py`), used the way the GSO's own trips show the fleet travels, so with the
+93 GSO trips the page lists **7,589 trip records** (7,496 online):
+
+- **How often**: from the GSO trips of SFA 4714 (Jan–Jun 2026): at most one trip a vehicle a day, on
+  about half of the days, mostly Monday to Thursday (by weekday: 22 / 20 / 18 / 15 / 13 / 9 / 3 %).
+  SFA 4714 travels as often as in the GSO reports (0.53 trips a day); the less-used vehicles less often.
+- **No trips on Philippine regular holidays** (New Year, Holy Thursday and Good Friday, April 9, May 1,
+  June 12, National Heroes Day, November 30, December 25 and 30).
+- **Distance Traveled (km) and Fuel Consumed (L)**: unchanged from the online datasets (rounded to
+  0.01). All fleet vehicles are diesel, so only the EEA diesel vans are used, each vehicle getting vans
+  whose engine power is within ±10 kW of its own (Vehicle Management), so the fuel use fits the vehicle
+  (median L/100 km: L300 7.2, Revo/Crosswind 7.1–7.2, Nissan Vans 9.7–9.8, Innova/Grandia 11.4,
+  Hino Bus 16.3). Distances of 30–400 km are drawn like the GSO trips' (GSO mean 176 km; online
+  172 km). The other online records are not used on this page.
+- **Date of Travel**: in order from 2019-03-05 to 2026-10-29; a vehicle has no trips before GSU acquired
+  it, and SFA 4714's online trips stop before 2026 (its 2026 trips are the GSO reports).
+- **Vehicle**: one of the 9 vehicles of Vehicle Management that GSU already had on that date, drawn at
+  random (seed 42) with a different share per vehicle (vans and Innova most, bus least). Acquisition dates
+  (`ACQUIRED` in the script):
+  - published by GSU: Isuzu Crosswind SJC 955 donated by NTC Region VI on 2023-05-12, Toyota Revo SGF 810
+    donated by BFAR 6, announced 2023-05-25 (https://www.gsu.edu.ph/?p=8017); new university bus SFA 1741,
+    blessed 2025-05-07 (gsu.edu.ph news);
+  - **estimated** (earliest possible date, to be replaced with the GSO property records' "date acquired"):
+    Grandia SFA 1172 — 130 kW is the 2.8 Hiace sold in the Philippines from 2019-03-05; Innova SFA 1173 —
+    plate follows SFA 1172, so registered with it; Nissan NV350 vans SFA 4712–4714 (launched 2015-06-15) —
+    plates come after SFA 1172/1173; L300 SEF 535 — old 2.5 non-turbo, sold before the 2019 Euro 4 model,
+    so already GSU's by 2019-03-05.
+- `source` and `source_vehicle` keep where each record came from; the administrator edits and deletes
+  them on the page like the other trips (this changes the file; rebuilding it undoes those changes).
+
+They are kept in this file, not in Firestore (saves the free plan's daily reads and writes).
+
+**Training (since 2026-10-30):** the model is trained on every trip of Trip Records, merged with the vehicle
+records by plate number (`data_source` "system" = the 93 GSO trips, "trip_records_online" = the 7,496 online
+trips, with their vehicle's engine power, at most 10 kW from the source van's), plus the 92,402 other online
+records ("supplementary"). Each online record is used once (`source_row` links a trip to its row in
+`supplementary_data.csv`, which training then leaves out): 99,991 records, 96,134 after cleaning.
+The local-trip checks (Durbin-Watson, local R²) use only the GSO trips. `python colab/make_colab_files.py`
+refreshes the Colab files.

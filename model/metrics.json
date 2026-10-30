@@ -1,45 +1,45 @@
 {
-  "r2_score": 0.9507,
-  "mae": 2.4738,
-  "rmse": 4.7789,
+  "r2_score": 0.9502,
+  "mae": 2.5137,
+  "rmse": 4.8378,
   "cv_folds": 5,
-  "cv_mean_r2": 0.9512,
-  "cv_std_r2": 0.0017,
-  "cv_mean_mae": 2.4922,
-  "cv_std_mae": 0.0242,
-  "cv_mean_rmse": 4.7971,
-  "cv_std_rmse": 0.1154,
-  "train_size": 76880,
-  "test_size": 19220,
-  "total_records": 96100,
+  "cv_mean_r2": 0.951,
+  "cv_std_r2": 0.0008,
+  "cv_mean_mae": 2.503,
+  "cv_std_mae": 0.0183,
+  "cv_mean_rmse": 4.8099,
+  "cv_std_rmse": 0.0349,
+  "train_size": 76907,
+  "test_size": 19227,
+  "total_records": 96134,
   "equation_terms": [
     "distance_km",
     "engine_power_kw",
     "fuel_type_code",
     "distance_x_power"
   ],
-  "intercept": 17.8902,
+  "intercept": 17.8184,
   "coefficients": {
-    "distance_km": 0.0960492,
-    "engine_power_kw": 0.120384,
-    "fuel_type_code": -3.11262,
-    "distance_x_power": 0.000509319
+    "distance_km": 0.0960242,
+    "engine_power_kw": 0.11658,
+    "fuel_type_code": -3.01608,
+    "distance_x_power": 0.000503143
   },
   "centering": {
-    "distance_km": 166.978,
-    "engine_power_kw": 110.7272
+    "distance_km": 166.9518,
+    "engine_power_kw": 110.6327
   },
-  "raw_intercept": -2.06088,
+  "raw_intercept": -1.81739,
   "raw_coefficients": {
-    "distance_km": 0.0396537,
-    "engine_power_kw": 0.0353388,
-    "fuel_type_code": -3.11262,
-    "distance_x_power": 0.000509319
+    "distance_km": 0.0403601,
+    "engine_power_kw": 0.0325798,
+    "fuel_type_code": -3.01608,
+    "distance_x_power": 0.000503143
   },
   "vif": {
     "distance_km": 1.64,
-    "engine_power_kw": 1.77,
-    "fuel_type_code": 2.29,
+    "engine_power_kw": 1.76,
+    "fuel_type_code": 2.28,
     "distance_x_power": 1.25
   },
   "diagnostics": {
@@ -48,7 +48,7 @@
         "key": "linearity",
         "assumption": "Linearity",
         "test": "Ramsey RESET test",
-        "statistic": 926.8,
+        "statistic": 1024.354,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
@@ -58,7 +58,7 @@
         "key": "independence",
         "assumption": "Independence of errors",
         "test": "Durbin-Watson statistic",
-        "statistic": 0.942,
+        "statistic": 0.936,
         "p_value": null,
         "passed": false,
         "rule": "1.5 to 2.5 (close to 2 = independent)",
@@ -68,17 +68,17 @@
         "key": "normality",
         "assumption": "Normality of errors",
         "test": "Jarque-Bera test",
-        "statistic": 2010739.134,
+        "statistic": 2179153.993,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
-        "meaning": "Residuals follow a normal distribution (skew 2.19, kurtosis 27.67)."
+        "meaning": "Residuals follow a normal distribution (skew 2.21, kurtosis 28.70)."
       },
       {
         "key": "equal_variance",
         "assumption": "Equal variance of errors",
         "test": "Breusch-Pagan test",
-        "statistic": 14570.438,
+        "statistic": 13776.987,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
@@ -88,7 +88,7 @@
         "key": "multicollinearity",
         "assumption": "No multicollinearity",
         "test": "Variance Inflation Factor",
-        "statistic": 2.29,
+        "statistic": 2.28,
         "p_value": null,
         "passed": true,
         "rule": "every VIF \u2264 5",
@@ -98,50 +98,50 @@
     "coefficients": [
       {
         "feature": "Intercept",
-        "coef": 17.89,
-        "std_err": 0.0251,
+        "coef": 17.82,
+        "std_err": 0.02517,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "distance_km",
-        "coef": 0.09605,
-        "std_err": 0.0002477,
+        "coef": 0.09602,
+        "std_err": 0.0002458,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "engine_power_kw",
-        "coef": 0.1204,
-        "std_err": 0.0008468,
+        "coef": 0.1166,
+        "std_err": 0.0008334,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "fuel_type_code",
-        "coef": -3.113,
-        "std_err": 0.04314,
+        "coef": -3.016,
+        "std_err": 0.04327,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "distance_x_power",
-        "coef": 0.0005093,
-        "std_err": 8.536e-06,
+        "coef": 0.0005031,
+        "std_err": 8.598e-06,
         "p_value": 0.0,
         "significant": true
       }
     ],
     "constant_terms": [],
-    "ols_r2": 0.9514,
-    "ols_adj_r2": 0.9514,
+    "ols_r2": 0.9512,
+    "ols_adj_r2": 0.9512,
     "alpha": 0.05,
     "std_err_type": "HC3 (heteroskedasticity-robust)"
   },
-  "model_version": "v20261028201206",
-  "trained_at": "2026-10-28T20:12:06",
+  "model_version": "v20261030104247",
+  "trained_at": "2026-10-30T10:42:47",
   "status": "active",
-  "source": "Google Colab",
+  "source": "Google Colab notebook (colab/fuel_consumption_linear_regression_AUTO.ipynb), run on this computer",
   "vif_threshold": 5.0,
   "selected_numeric_features": [
     "distance_km",
@@ -151,7 +151,8 @@
   ],
   "selected_categorical_features": [],
   "data_sources": {
-    "supplementary": 96007,
+    "supplementary": 88847,
+    "trip_records_online": 7194,
     "system": 93
   },
   "feature_ranges": {
@@ -160,7 +161,7 @@
       1000.0
     ],
     "engine_power_kw": [
-      55.0,
+      51.0,
       221.0
     ]
   },
@@ -177,10 +178,10 @@
         1000.0
       ],
       "engine_power_kw": [
-        55.0,
+        51.0,
         221.0
       ],
-      "records": 46880
+      "records": 46937
     },
     "Gasoline": {
       "distance_km": [
@@ -191,7 +192,7 @@
         104.0,
         147.0
       ],
-      "records": 49220
+      "records": 49197
     }
   }
 }

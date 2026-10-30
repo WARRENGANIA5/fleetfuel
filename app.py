@@ -32,6 +32,7 @@ from flask_wtf import CSRFProtect
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
+import trip_dataset
 from config import Config
 from timeutil import now_local, today_local
 from model.preprocess import build_prediction_frame
@@ -643,12 +644,15 @@ def build_dashboard_context():
     all_predictions = db.records("predictions")
     # Scope of the fuel-request figures: everyone's for the admin, own for staff.
     scoped = all_predictions if is_admin else [p for p in all_predictions if p["user_id"] == session.get("user_id")]
-    total_vehicles, total_trips = len(vehicles_by_id), len(trips)
+    # Plus the trip records from the online datasets (trip_dataset.py).
+    dataset = trip_dataset.summary(v["plate_number"] for v in vehicles_by_id.values())
+    total_vehicles, total_trips = len(vehicles_by_id), len(trips) + dataset["count"]
     total_predictions = len(scoped)
     requests_summary = {k: sum(p["approval_status"] == k for p in scoped) for k in ("pending", "approved", "rejected")}
 
-    if fuel_trips:
-        avg_fuel = sum(float(t["actual_fuel_consumption"]) for t in fuel_trips) / len(fuel_trips)
+    if fuel_trips or dataset["count"]:
+        avg_fuel = ((sum(float(t["actual_fuel_consumption"]) for t in fuel_trips) + dataset["fuel_sum"])
+                    / (len(fuel_trips) + dataset["count"]))
     elif all_predictions:
         avg_fuel = sum(float(p["predicted_fuel"]) for p in all_predictions) / len(all_predictions)
     else:
@@ -678,18 +682,19 @@ def build_dashboard_context():
     # Fuel consumed per month from the trip records (Monthly Report of Official
     # Travel): the last 6 calendar months up to the latest month with records
     # (the reports are often encoded months later), empty months shown as 0.
-    latest = max((t["trip_date"] for t in fuel_trips), default=None) or today_local()
+    latest = max([t["trip_date"] for t in fuel_trips] + [d for _, d in dataset["per_plate"].values()],
+                 default=None) or today_local()
     months = []
     y, m = latest.year, latest.month
     for _ in range(6):
         months.append((y, m))
         y, m = (y, m - 1) if m > 1 else (y - 1, 12)
     months.reverse()
-    totals = {}
+    totals = dict(dataset["monthly"])
     for t in fuel_trips:
         ym = t["trip_date"].strftime("%Y-%m")
         totals[ym] = totals.get(ym, 0.0) + float(t["actual_fuel_consumption"])
-    has_fuel_records = bool(fuel_trips)
+    has_fuel_records = bool(fuel_trips or dataset["count"])
     fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months] if has_fuel_records else []
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
     fuel_trend_months = [f"{y:04d}-{m:02d}" for y, m in months] if has_fuel_records else []  # click -> that month's trips
@@ -852,9 +857,50 @@ def prediction():
         "user_id": session["user_id"], "vehicle_id": vehicle["id"], "distance_km": values["distance_km"],
         "engine_power_kw": values["engine_power_kw"], "fuel_type": values["fuel_type"],
         "predicted_fuel": predicted_fuel})
-    flash("Prediction saved and submitted as a fuel request for administrator approval.", "success")
-    _link_actuals_quietly()  # the trip may already be encoded
+    try:
+        add_request_trip(db.get("predictions", pred_id))
+        flash("Prediction saved, submitted as a fuel request for administrator approval and added to Trip Records "
+              "(its fuel consumed is filled in once the actual fuel is recorded).", "success")
+    except Exception:
+        app.logger.exception("Adding the trip record of fuel request %s failed", pred_id)
+        flash("Prediction saved and submitted as a fuel request for administrator approval.", "success")
     return redirect(url_for("prediction_result", prediction_id=pred_id))
+
+
+# Fuel Consumption Prediction -> Trip Records: every fuel request adds its trip
+# (vehicle, date of travel, distance) to Trip Records right away, with the fuel
+# consumed pending. The actual fuel, recorded in Prediction History or by
+# editing the trip, is kept the same in both; a rejected request's trip did not
+# happen and is removed. A pending trip (no fuel consumed) is not used for
+# training, so the model never learns from its own predictions.
+def request_trip(prediction_id):
+    """The trip record added by fuel request `prediction_id`, or None."""
+    return next((t for t in db.records("trip_records") if t.get("prediction_id") == prediction_id), None)
+
+
+def add_request_trip(pred):
+    """Add the trip of a fuel request to Trip Records (once)."""
+    if (not pred or pred["approval_status"] == "rejected" or pred["vehicle_id"] is None
+            or not db.get("vehicles", pred["vehicle_id"]) or request_trip(pred["id"])):
+        return None
+    trip_id = db.insert("trip_records", {
+        "vehicle_id": pred["vehicle_id"], "trip_date": pred["created_at"].date(),
+        "distance_km": round(float(pred["distance_km"]), 2), "actual_fuel_consumption": pred["actual_fuel"],
+        "created_by": pred["user_id"], "prediction_id": pred["id"]})
+    db.update("predictions", pred["id"], trip_record_id=trip_id)
+    return trip_id
+
+
+def remove_request_trip(prediction_id):
+    """A rejected or deleted fuel request: its pending trip did not happen and is
+    removed; a trip whose actual fuel is already recorded stays as a trip record."""
+    t = request_trip(prediction_id)
+    if t is None:
+        return
+    if t["actual_fuel_consumption"] is None:
+        db.delete("trip_records", t["id"])
+    else:
+        db.update("trip_records", t["id"], prediction_id=None)
 
 
 @app.route("/api/prediction-options")
@@ -885,7 +931,8 @@ def prediction_result(prediction_id):
         return redirect(url_for("prediction"))
     clamped = float(pred["predicted_fuel"]) <= 0.1  # model output was at/below the 0.1 L floor
     warnings = prediction_warnings(pred, get_metrics(), raw_prediction=0 if clamped else None)
-    if pred["vehicle_id"] is not None and not db.find("trip_records", vehicle_id=pred["vehicle_id"]):
+    if pred["vehicle_id"] is not None and not any(t["actual_fuel_consumption"] is not None
+                                                  for t in db.find("trip_records", vehicle_id=pred["vehicle_id"])):
         # Scope and Limitations: only the vehicles with records in the Monthly
         # Report of Official Travel are included, so other vehicles are not validated.
         warnings.insert(0, f"{pred['plate_number']} has no trip records in the Monthly Report of Official Travel yet, "
@@ -1046,9 +1093,13 @@ def record_actual_fuel(prediction_id):
         flash("Actual fuel must be a number greater than 0 and at most 1,000 liters.", "danger")
     else:
         # Typed in by hand: never changed by the automatic matching from trips.
+        # The request's own trip in Trip Records gets the same fuel consumed.
+        own_trip = request_trip(prediction_id)
         db.update("predictions", prediction_id, actual_fuel=value,
                   actual_source="manual" if value is not None else None,
-                  trip_record_id=pred["trip_record_id"] if value is not None else None)
+                  trip_record_id=own_trip["id"] if own_trip else (pred["trip_record_id"] if value is not None else None))
+        if own_trip:
+            db.update("trip_records", own_trip["id"], actual_fuel_consumption=value)
         if value is None:
             _link_actuals_quietly()  # cleared: let it be matched to its trip again
         flash("Actual fuel consumption recorded." if value is not None else "Actual fuel consumption cleared.", "success")
@@ -1082,6 +1133,13 @@ def review_fuel_request(prediction_id):
             return back_to_list("prediction_history")
     db.update("predictions", prediction_id, approval_status=decision, approved_fuel=approved_fuel,
               reviewed_by=session["user_id"], reviewed_at=now_local(), review_note=note)
+    try:  # a rejected request's trip did not happen; approved again, it is back in Trip Records
+        if decision == "rejected":
+            remove_request_trip(prediction_id)
+        else:
+            add_request_trip(db.get("predictions", prediction_id))
+    except Exception:
+        app.logger.exception("Updating the trip record of fuel request %s failed", prediction_id)
     flash(f"Fuel request #{prediction_id} {decision}" + (f": {approved_fuel:.2f} L to release." if approved_fuel else "."), "success")
     _link_actuals_quietly()  # a rejection frees its trip for another request
     return back_to_list("prediction_history")
@@ -1093,6 +1151,7 @@ def delete_prediction(prediction_id):
     if not db.get("predictions", prediction_id):
         flash("That prediction no longer exists.", "danger")
         return back_to_list("prediction_history")
+    remove_request_trip(prediction_id)
     db.delete("predictions", prediction_id)
     flash("Prediction record deleted.", "success")
     return back_to_list("prediction_history")
@@ -1133,9 +1192,12 @@ def query_vehicles():
     _ensure_vehicle_columns()
     trips = db.records("trip_records")
     rows = sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
+    dataset = trip_dataset.summary(v["plate_number"] for v in rows)["per_plate"]  # + online-dataset trips
     for v in rows:
         mine = [t["trip_date"] for t in trips if t["vehicle_id"] == v["id"]]
-        v.update(trip_count=len(mine), last_trip_date=max(mine) if mine else None)
+        count, last = dataset.get(v["plate_number"], (0, None))
+        dates = mine + ([last] if last else [])
+        v.update(trip_count=len(mine) + count, last_trip_date=max(dates) if dates else None)
     return rows
 
 
@@ -1231,7 +1293,12 @@ def edit_vehicle(vehicle_id):
                                      "values": request.form.to_dict()})
     try:
         _ensure_vehicle_columns()
-        db.update("vehicles", vehicle_id, **_vehicle_values(request.form))
+        old_plate = db.get("vehicles", vehicle_id)["plate_number"]
+        values = _vehicle_values(request.form)
+        db.update("vehicles", vehicle_id, **values)
+        # The online-dataset trips are linked by plate number: they follow a new plate.
+        if values["plate_number"] != old_plate:
+            trip_dataset.rename_plate(old_plate, values["plate_number"])
         flash("Vehicle updated successfully.", "success")
     except Exception:
         app.logger.exception("Updating vehicle failed")
@@ -1263,6 +1330,7 @@ def delete_vehicle(vehicle_id):
                 db.update("predictions", p["id"], **fields)
         for tid in trip_ids:
             db.delete("trip_records", tid)
+        trip_dataset.delete_plate(v["plate_number"])   # its online-dataset trips too
         db.delete("vehicles", vehicle_id)
         flash(f"Vehicle {v['plate_number']} and its trip records were deleted.", "success")
     except Exception:
@@ -1284,28 +1352,57 @@ TRIP_NUMERIC_LIMITS = (
 TRIP_EFFICIENCY_WARN = (3, 60)
 
 
-def trip_record(t, num):
-    """JSON-safe trip row used by the table, the shared modals and the live API."""
-    return {
-        "id": t["id"], "num": num, "vehicle_id": t["vehicle_id"],
-        "trip_date": str(t["trip_date"]), "plate_number": t["plate_number"], "brand_model": t["brand_model"],
-        "distance_km": str(t["distance_km"]),
-        "actual_fuel_consumption": str(t["actual_fuel_consumption"]) if t["actual_fuel_consumption"] is not None else "",
-    }
+TRIPS_PER_PAGE = 50
+TRIP_ROW_FIELDS = ("id", "num", "vehicle_id", "trip_date", "plate_number", "brand_model",
+                   "distance_km", "actual_fuel_consumption", "source", "pending")
 
 
-def query_trips():
+def trip_listing():
+    """Every trip record, numbered oldest first (January to December, like the
+    Monthly Report of Official Travel): the trips saved in the system plus the
+    trips from the online datasets (trip_dataset.py: read-only, `source` set).
+    A newly added or edited trip lands in its date's place automatically."""
     _ensure_vehicle_columns()
-    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
-    rows = []
+    vehicles = db.records("vehicles")
+    vehicles_by_id = {v["id"]: v for v in vehicles}
+    own = []
     for t in sorted(db.records("trip_records"), key=lambda t: (t["trip_date"], t["id"])):
         v = vehicles_by_id.get(t["vehicle_id"])
         if v:
             t.update(plate_number=v["plate_number"], brand_model=v["brand_model"])
-            rows.append(t)
-    # Oldest first (January to December, like the Monthly Report of Official
-    # Travel); a newly added or edited trip lands in its date's place automatically.
-    return [trip_record(r, i) for i, r in enumerate(rows, 1)]
+            own.append(t)
+    return trip_dataset.listing(own, {v["plate_number"]: v for v in vehicles})
+
+
+def query_trips(q="", page=1):
+    """One page of trip records (JSON-safe rows for the table, the shared modals
+    and the live API) matching the search `q` (date, month, vehicle, km, L);
+    page "last" is the last page."""
+    rows = trip_listing()
+    total = len(rows)
+    q = (q or "").strip().lower()
+    if q:
+        rows = rows[rows["search"].str.contains(q, regex=False)]
+    pages = max(1, -(-len(rows) // TRIPS_PER_PAGE))
+    try:
+        page = int(page)
+    except (TypeError, ValueError):
+        page = pages if str(page) == "last" else 1
+    page = min(max(page, 1), pages)
+    chunk = rows.iloc[(page - 1) * TRIPS_PER_PAGE: page * TRIPS_PER_PAGE]
+    trips = [{k: r[k] for k in TRIP_ROW_FIELDS} for r in chunk.to_dict("records")]
+    for t in trips:
+        t.update(num=int(t["num"]), vehicle_id=int(t["vehicle_id"]), pending=bool(t["pending"]),
+                 id=t["id"] if isinstance(t["id"], str) else int(t["id"]))  # "d…" = online-dataset trip
+    return {"trips": trips, "total": total, "matches": int(len(rows)), "page": page, "pages": pages,
+            "per_page": TRIPS_PER_PAGE, "q": q}
+
+
+def trip_page_of(trip_id):
+    """The page of Trip Records that shows the system trip `trip_id`."""
+    rows = trip_listing()
+    hit = rows.index[rows["id"] == trip_id]
+    return int(hit[0]) // TRIPS_PER_PAGE + 1 if len(hit) else 1
 
 
 def validate_trip_form(f, trip_id=None):
@@ -1364,8 +1461,23 @@ def link_predictions_to_trips():
             db.update("predictions", p["id"], **fields)
             p.update(fields)
 
+    # 0. A request's own trip (added by the prediction): its fuel consumed is the
+    #    request's actual fuel, whichever of the two was filled in last.
+    own = {t["prediction_id"]: t for t in trips.values() if t.get("prediction_id") is not None}
     for p in preds:
-        if p["actual_source"] != "trip":
+        t = own.get(p["id"])
+        if t is None or p["approval_status"] == "rejected":
+            continue
+        if p["trip_record_id"] != t["id"]:
+            change(p, trip_record_id=t["id"])
+        fuel = t["actual_fuel_consumption"]
+        if fuel is not None and p["actual_fuel"] != fuel:
+            change(p, actual_fuel=fuel, actual_source="trip")
+        elif fuel is None and p["actual_source"] == "trip":
+            change(p, actual_fuel=None, actual_source=None)
+
+    for p in preds:
+        if p["actual_source"] != "trip" or p["id"] in own:
             continue
         t = trips.get(p["trip_record_id"])
         if t is not None and p["actual_fuel"] != t["actual_fuel_consumption"]:
@@ -1386,6 +1498,7 @@ def link_predictions_to_trips():
         lo, hi = day - timedelta(days=ACTUAL_MATCH_DAYS_BEFORE), day + timedelta(days=ACTUAL_MATCH_DAYS_AFTER)
         candidates = [t for t in trips.values()
                       if t["vehicle_id"] == p["vehicle_id"] and t["actual_fuel_consumption"] is not None
+                      and t.get("prediction_id") is None
                       and lo <= t["trip_date"] <= hi and t["id"] not in used
                       and abs(float(t["distance_km"]) - d) <= d * ACTUAL_MATCH_DISTANCE_TOLERANCE]
         if candidates:
@@ -1419,9 +1532,14 @@ def _trip_payload(f):
 
 def render_trips_page(reopen=None, status=200):
     vehicles_list = sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
+    page = request.args.get("page", 1)
+    if reopen and reopen.get("trip_id"):
+        page = trip_page_of(reopen["trip_id"])
+    elif reopen:
+        page = "last"
     return render_template(
-        "trips.html", active="trips", trips=query_trips(), vehicles=vehicles_list,
-        today=today_local().isoformat(), reopen=reopen,
+        "trips.html", active="trips", listing=query_trips(request.args.get("q", ""), page),
+        vehicles=vehicles_list, today=today_local().isoformat(), reopen=reopen,
     ), status
 
 
@@ -1434,7 +1552,7 @@ def trips():
 @app.route("/api/trips")
 @login_required
 def api_trips():
-    return {"trips": query_trips()}
+    return query_trips(request.args.get("q", ""), request.args.get("page", 1))
 
 
 # Trip records are the collected training data (Monthly Report of Official
@@ -1448,11 +1566,12 @@ def add_trip():
         flash("Could not add trip record: " + " ".join(errors), "danger")
         return render_trips_page({"modal": "addTripModal", "values": request.form.to_dict()})
     try:
-        db.insert("trip_records", dict(_trip_payload(request.form), created_by=session["user_id"]))
+        new_id = db.insert("trip_records", dict(_trip_payload(request.form), created_by=session["user_id"]))
         flash("Trip record added successfully.", "success")
         for w in warnings:
             flash(w, "warning")
         _link_actuals_quietly()
+        return redirect(url_for("trips", page=trip_page_of(new_id)))
     except Exception:
         app.logger.exception("Adding trip failed")
         flash("Could not add trip record due to a database error. Please try again.", "danger")
@@ -1478,6 +1597,7 @@ def edit_trip(trip_id):
         for w in warnings:
             flash(w, "warning")
         _link_actuals_quietly()
+        return redirect(url_for("trips", page=trip_page_of(trip_id)))
     except Exception:
         app.logger.exception("Updating trip failed")
         flash("Could not update trip record due to a database error. Please try again.", "danger")
@@ -1507,6 +1627,51 @@ def delete_trip(trip_id):
     return redirect(url_for("trips"))
 
 
+# The trips from the online datasets (ids "d" + row_id, kept in
+# data/trip_records_dataset.csv): edited and deleted the same way. No fuel
+# request is ever matched to them (they are dated before the system was used).
+@app.route("/trips/d<int:row_id>/edit", methods=["POST"])
+@admin_required
+def edit_dataset_trip(row_id):
+    key = f"d{row_id}"
+    if not trip_dataset.get(row_id):
+        flash("That trip record no longer exists.", "danger")
+        return redirect(url_for("trips"))
+    _ensure_vehicle_columns()
+    errors, warnings = validate_trip_form(request.form)
+    if errors:
+        flash("Could not update trip record: " + " ".join(errors), "danger")
+        return render_trips_page({"modal": "editTripModal", "trip_id": key, "values": request.form.to_dict()})
+    try:
+        payload = _trip_payload(request.form)
+        vehicle = db.get("vehicles", payload["vehicle_id"])
+        trip_dataset.update(row_id, payload["trip_date"], vehicle["plate_number"],
+                            payload["distance_km"], payload["actual_fuel_consumption"])
+        flash("Trip record updated successfully.", "success")
+        for w in warnings:
+            flash(w, "warning")
+        return redirect(url_for("trips", page=trip_page_of(key)))
+    except Exception:
+        app.logger.exception("Updating dataset trip failed")
+        flash("Could not update trip record. Please try again.", "danger")
+    return redirect(url_for("trips"))
+
+
+@app.route("/trips/d<int:row_id>/delete", methods=["POST"])
+@admin_required
+def delete_dataset_trip(row_id):
+    page = trip_page_of(f"d{row_id}")
+    try:
+        if trip_dataset.delete(row_id):
+            flash("Trip record deleted successfully.", "success")
+        else:
+            flash("That trip record no longer exists.", "danger")
+    except Exception:
+        app.logger.exception("Deleting dataset trip failed")
+        flash("Could not delete trip record. Please try again.", "danger")
+    return redirect(url_for("trips", page=page))
+
+
 # ------------------------------------------------------------------
 # MODEL PERFORMANCE
 # ------------------------------------------------------------------
@@ -1524,34 +1689,55 @@ def _system_trips():
     return rows
 
 
+ONLINE_TRIPS_LABEL = "trip_records_online"   # data_source of the online-dataset trips of Trip Records
+
+
 def load_system_trip_records():
-    """The trips in the system (Monthly Report of Official Travel: date,
-    plate number, distance, fuel consumed) merged with the vehicle records
-    (engine power and fuel type) using the plate number."""
+    """Every trip of the Trip Records page (Monthly Report of Official Travel:
+    date, plate number, distance, fuel consumed) merged with the vehicle
+    records (engine power and fuel type) using the plate number: the GSO's own
+    trips (data_source "system") and the online-dataset trips (`source` set,
+    data_source ONLINE_TRIPS_LABEL, `source_row` = their row in the
+    supplementary dataset)."""
     from model.preprocess import merge_trips_and_vehicles
     _ensure_vehicle_columns()
-    trips = pd.DataFrame([{"trip_date": t["trip_date"], "plate_number": v["plate_number"],
-                           "distance_km": t["distance_km"], "actual_fuel_consumption": t["actual_fuel_consumption"]}
-                          for t, v in _system_trips()])
-    if trips.empty:
-        return trips
     vehicles = pd.DataFrame([{k: v[k] for k in ("plate_number", "brand_model", "fuel_type", "engine_power_kw")}
                              for v in db.records("vehicles")])
+    gso = pd.DataFrame([{"trip_date": t["trip_date"], "plate_number": v["plate_number"],
+                         "distance_km": t["distance_km"], "actual_fuel_consumption": t["actual_fuel_consumption"]}
+                        for t, v in _system_trips()])
+    online = trip_dataset.frame()
+    if not vehicles.empty:
+        online = online[online["plate_number"].isin(vehicles["plate_number"])]
+    online = online[["trip_date", "plate_number", "distance_km", "actual_fuel_consumption", "source", "source_row"]]
+    trips = pd.concat([f for f in (gso, online) if not f.empty], ignore_index=True) if not (gso.empty and online.empty) else gso
+    if trips.empty or vehicles.empty:
+        return trips.iloc[0:0]
     df = merge_trips_and_vehicles(trips, vehicles)
+    if "source" not in df:
+        df["source"] = None
+    df["data_source"] = np.where(df["source"].notna(), ONLINE_TRIPS_LABEL, "system")
     df["trip_date"] = df["trip_date"].astype(str)
     for col in ("distance_km", "actual_fuel_consumption", "engine_power_kw"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
+def _used_supplementary_rows(trip_records):
+    """Rows of the supplementary dataset that are already trip records."""
+    if "source_row" not in trip_records:
+        return []
+    return [int(i) for i in trip_records["source_row"].dropna()]
+
 
 def load_training_frame():
-    """Local trips (historical CSV + the trips in the system) merged with the
-    supplementary dataset."""
+    """Every trip record (historical CSV + Trip Records) merged with the rest of
+    the supplementary dataset."""
     from model.preprocess import load_and_merge_datasets
+    trip_records = load_system_trip_records()
     return load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
-                                   app.config["SUPPLEMENTARY_DATA_PATH"],
-                                   extra_df=load_system_trip_records())
+                                   app.config["SUPPLEMENTARY_DATA_PATH"], extra_df=trip_records,
+                                   exclude_supplementary_rows=_used_supplementary_rows(trip_records))
 
 
 def retrain_model(log=None):
@@ -1566,7 +1752,8 @@ def retrain_model(log=None):
     info = supplementary_info(app.config["SUPPLEMENTARY_DATA_PATH"])
     extra = {"system_records": int(len(system_records)), "supplementary_kind": info["kind"]}
     df = load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
-                                 app.config["SUPPLEMENTARY_DATA_PATH"], extra_df=system_records)
+                                 app.config["SUPPLEMENTARY_DATA_PATH"], extra_df=system_records,
+                                 exclude_supplementary_rows=_used_supplementary_rows(system_records))
     return train_and_save(df, extra_metrics=extra, log=log or (lambda *a, **k: None))
 
 
@@ -1707,34 +1894,44 @@ def model_performance():
     return render_template("model_performance.html", active="model_performance", metrics=get_metrics())
 
 
-@app.route("/model-performance/dataset/<name>.csv")
-@admin_required
-def export_training_dataset(name):
+def training_dataset_csv(name):
     """The model's training data for the Google Colab notebook
     (colab/fuel_consumption_linear_regression.ipynb), as the three CSV files
-    of Chapter III (How the Project Will Work):
+    of Chapter III (How the Project Will Work); None for an unknown name:
 
     * trip_records - the Monthly Report of Official Travel: date of travel,
-      plate number, distance traveled and fuel consumed of every local trip
-      (historical CSV + the trips in the system);
+      plate number, distance traveled and fuel consumed of every trip of Trip
+      Records (historical CSV + the trips in the system); `source` is filled in
+      for the online-dataset trips and empty for the GSO's own trips;
     * vehicle_records - plate number, vehicle model, fuel type and engine power;
-    * supplementary_data - the supplementary dataset, unchanged."""
+    * supplementary_data - the supplementary dataset, without the records that
+      are already trip records (each record is used once)."""
     from model.preprocess import TRIP_COLUMNS, VEHICLE_COLUMNS
     if name == "supplementary_data":
-        with open(app.config["SUPPLEMENTARY_DATA_PATH"], "rb") as f:
-            body = f.read()
-    elif name == "trip_records":
+        used = _used_supplementary_rows(load_system_trip_records())
+        data = pd.read_csv(app.config["SUPPLEMENTARY_DATA_PATH"])
+        return data.drop(index=used).to_csv(index=False).encode("utf-8")
+    if name == "trip_records":
+        columns = TRIP_COLUMNS + ["source"]
         historical = pd.read_csv(app.config["HISTORICAL_DATA_PATH"])
         system = load_system_trip_records()
-        frames = [f.reindex(columns=TRIP_COLUMNS) for f in (historical, system) if f is not None and not f.empty]
-        data = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=TRIP_COLUMNS)
-        body = data.to_csv(index=False).encode("utf-8")
-    elif name == "vehicle_records":
+        frames = [f.reindex(columns=columns) for f in (historical, system) if f is not None and not f.empty]
+        data = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=columns)
+        return data.to_csv(index=False).encode("utf-8")
+    if name == "vehicle_records":
         _ensure_vehicle_columns()
         data = pd.DataFrame([{k: v[k] for k in VEHICLE_COLUMNS} for v in
                              sorted(db.records("vehicles"), key=lambda v: v["plate_number"])], columns=VEHICLE_COLUMNS)
-        body = data.to_csv(index=False).encode("utf-8")
-    else:
+        return data.to_csv(index=False).encode("utf-8")
+    return None
+
+
+@app.route("/model-performance/dataset/<name>.csv")
+@admin_required
+def export_training_dataset(name):
+    """Download one of the three CSV files of training_dataset_csv()."""
+    body = training_dataset_csv(name)
+    if body is None:
         flash("Unknown dataset.", "danger")
         return redirect(url_for("model_performance"))
     return Response(body, mimetype="text/csv",  # Flask adds "; charset=utf-8"
