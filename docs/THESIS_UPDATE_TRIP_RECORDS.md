@@ -42,6 +42,15 @@ follows the local trips:
 | SFA 4712, 4713, 4714 Nissan NV350 Urvan | March 5, 2019 (estimated) | Plates come after SFA 1172/1173 in the same series |
 | SEF 535 Mitsubishi L300 | before March 5, 2019 (estimated) | 51 kW is the 2.5 L non-turbo engine, sold before the 2019 Euro 4 model |
 
+**Supporting evidence from GSU's procurement records.** GSU's published Procurement Monitoring Reports
+(https://www.gsu.edu.ph/category/bac/project-monitoring-report) for FY 2020, FY 2021, FY 2022, the first semester
+of FY 2023, the second semester of FY 2024 and the second semester of FY 2025 list no purchase of a motor vehicle,
+only supplies and materials for vehicle repair and maintenance. A motor vehicle (PHP 1,554,632.40) planned in the
+revised FY 2020 Annual Procurement Plan carries the remark "due to re-alignment of funds". The Grandia's engine
+places its acquisition no earlier than March 2019, so the Grandia and the Innova (consecutive plate) were most
+likely acquired in 2019, consistent with the estimate. The reports for the second semester of FY 2023 and the
+first semester of FY 2024 are not published online.
+
 ## 2. Automatic trip recording from fuel requests
 
 Every Fuel Consumption Prediction (fuel request) adds its trip to Trip Records at once. The new trip has the
