@@ -6,11 +6,11 @@
 {% include '_theme_init.html' %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>{% block title %}Dashboard{% endblock %} | {{ org.system_short }} &middot; Fuel Consumption Prediction System</title>
-<link rel="icon" href="{{ url_for('static', filename='images/seal.svg', v=14) }}" type="image/svg+xml">
+<link rel="icon" href="{{ url_for('static', filename='images/favicon.png', v=15) }}" type="image/png">
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=76) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=77) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -18,7 +18,7 @@
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-icon"><img src="{{ url_for('static', filename='images/seal.svg', v=14) }}" alt="{{ org.system_short }} logo"></div>
+      <div class="brand-icon"><img src="{{ url_for('static', filename='images/logo.png', v=15) }}" alt="{{ org.system_short }} logo"></div>
       <div class="brand-text">
         <span class="brand-title">{{ org.system_short }}</span>
         <span class="brand-sub">Fuel Consumption Prediction System</span>

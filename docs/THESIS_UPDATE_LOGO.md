@@ -12,12 +12,11 @@ relying only on experience and past records.
 
 ## 2. Logo of the System (new paragraph, after the Project Description)
 
-The logo of GSU FleetFuel is a circular emblem with a double gold margin. The upper ring carries the system
-name, GSU FleetFuel, and the lower ring carries its full name, Fuel Consumption Prediction System. The logo
-identifies the system only and is not the official seal of Guimaras State University.
-At the center is a fuel drop, which represents the fuel consumed per trip, the value the Linear Regression model
-predicts. A road runs into the drop and represents the distance traveled, the primary predictor of the model,
-while the marks along the road represent the official trips recorded in the Monthly Report of Official Travel.
+The logo of GSU FleetFuel shows the letters "FF", for FleetFuel, above the word "Prediction". A fuel nozzle
+and its hose curve around the letters in navy and green, an orange swoosh crosses the letters, and a fuel drop
+in navy, green and orange stands beside them. The drop represents the fuel consumed per trip, the value the
+Linear Regression model predicts, and the word "Prediction" names what the system does. The logo identifies the
+system only and is not the official seal of Guimaras State University.
 
 **Vision.** A Guimaras State University fleet where every official trip begins with an accurate fuel estimate,
 built on the university's own Monthly Report of Official Travel and a validated Linear Regression model, giving
@@ -29,4 +28,5 @@ application.
 
 | File | Use |
 |---|---|
-| `static/images/seal.svg` | The logo — login, sign-up, sidebar and browser tab of every page |
+| `static/images/logo.png` | The logo — login, sign-up and sidebar of every page |
+| `static/images/favicon.png` | The logo on a white square — browser tab of every page |
