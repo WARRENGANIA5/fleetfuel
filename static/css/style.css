@@ -1151,17 +1151,16 @@ html[data-theme="light"] {
   --shadow-hover: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
   --bs-primary-rgb: 29, 111, 224;
 }
-html[data-theme="light"] body { -webkit-font-smoothing: antialiased; }
 
 /* Sidebar: white, grey icons; the open page is a soft blue row with a bar. */
 html[data-theme="light"] .sidebar { background: #ffffff; border-right: 1px solid var(--border-soft); box-shadow: none; }
 html[data-theme="light"] .brand-icon { box-shadow: none; }
-html[data-theme="light"] .brand-title { color: var(--text-dark); letter-spacing: -0.01em; }
-html[data-theme="light"] .nav-link { position: relative; color: #475467; border-radius: 8px; padding: 10px 14px; }
+html[data-theme="light"] .brand-title { color: var(--text-dark); }
+html[data-theme="light"] .nav-link { position: relative; color: #475467; border-radius: 8px; }
 html[data-theme="light"] .nav-link i { color: #98a2b3; }
 html[data-theme="light"] .nav-link:hover { background: #f9fafb; color: var(--text-dark); transform: none; }
 html[data-theme="light"] .nav-link:hover i { color: #667085; }
-html[data-theme="light"] .nav-link.active { background: var(--blue-100); color: var(--blue-600); font-weight: 600; box-shadow: none; }
+html[data-theme="light"] .nav-link.active { background: var(--blue-100); color: var(--blue-600); box-shadow: none; }
 html[data-theme="light"] .nav-link.active i { color: var(--blue-600); }
 html[data-theme="light"] .nav-link.active::before {
   content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px;
@@ -1173,7 +1172,7 @@ html[data-theme="light"] .logout-link:hover i { color: #b42318; }
 
 /* Top bar: plain white with a hairline. */
 html[data-theme="light"] .topbar { background: #ffffff; border-bottom: 1px solid var(--border-soft); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-html[data-theme="light"] .topbar-title h1 { color: var(--text-dark); font-weight: 600; letter-spacing: -0.01em; }
+html[data-theme="light"] .topbar-title h1 { color: var(--text-dark); }
 html[data-theme="light"] .icon-btn { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 html[data-theme="light"] .icon-btn:hover { background: #f9fafb; }
 html[data-theme="light"] .user-chip { border-left-color: var(--border-soft); }
@@ -1185,21 +1184,20 @@ html[data-theme="light"] .card-surface,
 html[data-theme="light"] .stat-card { border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .card-surface:hover { box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .stat-card:hover { transform: none; box-shadow: var(--shadow-hover); border-color: #d0d5dd; }
-html[data-theme="light"] .section-title { color: var(--text-dark); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+html[data-theme="light"] .section-title { color: var(--text-dark); }
 
 /* Greeting: a plain card, not a coloured banner. */
 html[data-theme="light"] .welcome-banner { background: #ffffff; border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
-html[data-theme="light"] .welcome-title { color: var(--text-dark); font-weight: 700; letter-spacing: -0.02em; }
+html[data-theme="light"] .welcome-title { color: var(--text-dark); }
 html[data-theme="light"] .welcome-date { background: #f9fafb; border: 1px solid var(--border-soft); color: #344054; }
 
-/* Stat cards: soft tinted icon, big dark number, no side stripe. */
-html[data-theme="light"] .stat-card::before { display: none; }
-html[data-theme="light"] .stat-icon { width: 46px; height: 46px; border-radius: 10px; font-size: 18px; box-shadow: none; }
+/* Stat cards: soft tinted icon, big dark number, coloured side stripe as in dark mode. */
+html[data-theme="light"] .stat-icon { box-shadow: none; }
 html[data-theme="light"] .stat-icon.blue { background: #eef4ff; color: #1d6fe0; }
 html[data-theme="light"] .stat-icon.navy { background: #ecfdff; color: #0e7090; }
 html[data-theme="light"] .stat-icon.green { background: #ecfdf3; color: #067647; }
 html[data-theme="light"] .stat-icon.amber { background: #fffaeb; color: #b54708; }
-html[data-theme="light"] .stat-value { color: var(--text-dark); font-weight: 700; letter-spacing: -0.02em; }
+html[data-theme="light"] .stat-value { color: var(--text-dark); }
 html[data-theme="light"] .stat-label { color: var(--text-muted); }
 
 /* Buttons: solid and flat. */
@@ -1212,7 +1210,7 @@ html[data-theme="light"] .btn-outline-navy:hover { background: #f9fafb; color: v
 
 /* Tables: grey header strip, hairline rows, faint hover. */
 html[data-theme="light"] .table-wrap { border: 1px solid var(--border-soft); }
-html[data-theme="light"] .table-fleet thead th { background: #f9fafb; color: #475467; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; border-bottom: 1px solid var(--border-soft); }
+html[data-theme="light"] .table-fleet thead th { background: #f9fafb; color: #475467; border-bottom: 1px solid var(--border-soft); }
 html[data-theme="light"] .table-fleet tbody td { border-bottom: 1px solid var(--border-soft); color: #344054; }
 html[data-theme="light"] .table-fleet tbody tr:last-child td { border-bottom: 0; }
 html[data-theme="light"] .table-fleet tbody tr:hover { background: #f9fafb; }
@@ -1221,21 +1219,19 @@ html[data-theme="light"] .action-btn:hover { background: #f9fafb; color: var(--b
 html[data-theme="light"] .action-btn.danger:hover { background: #fef3f2; color: #b42318; }
 @media (max-width: 575px) {
   html[data-theme="light"] .table-wrap { border: 0; }
-  html[data-theme="light"] .table-fleet thead th { text-transform: uppercase; }
   html[data-theme="light"] .table-fleet tbody tr { background: #ffffff; box-shadow: none; }
   html[data-theme="light"] .table-fleet tbody tr:hover { background: #ffffff; }
   html[data-theme="light"] .table-fleet tbody td { border-bottom: 0; }
 }
 
-/* Status badges: outlined soft pills with a dot. */
-html[data-theme="light"] .badge-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border: 1px solid transparent; }
-html[data-theme="light"] .badge-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* Status badges: outlined soft pills. */
+html[data-theme="light"] .badge-status { border: 1px solid transparent; }
 html[data-theme="light"] .badge-active { background: #ecfdf3; color: #067647; border-color: #abefc6; }
 html[data-theme="light"] .badge-maintenance { background: #fffaeb; color: #b54708; border-color: #fedf89; }
 html[data-theme="light"] .badge-inactive { background: #fef3f2; color: #b42318; border-color: #fecdca; }
 
 /* Forms: white fields, grey border, blue focus ring. */
-html[data-theme="light"] .form-label { color: #344054; font-weight: 500; }
+html[data-theme="light"] .form-label { color: #344054; }
 html[data-theme="light"] .form-control,
 html[data-theme="light"] .form-select { background-color: #ffffff; border: 1px solid #d0d5dd; color: var(--text-dark); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 html[data-theme="light"] .form-control::placeholder { color: #98a2b3; }
@@ -1418,26 +1414,18 @@ html.auth-arriving .glass-shard { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .auth-bg .streak-group { animation: none; } }
 
-/* Light mode: same streak design, in the dashboard's soft colours (light
-   cream with a faint warm and sage tint), behind a bright frosted card. */
-html[data-theme="light"] .login-page {
-  background:
-    radial-gradient(ellipse at 85% 10%, rgba(255, 250, 238, 0.95), transparent 45%),
-    radial-gradient(ellipse at 10% 15%, rgba(236, 214, 180, 0.4), transparent 50%),
-    radial-gradient(ellipse at 0% 55%, rgba(196, 208, 184, 0.3), transparent 35%),
-    radial-gradient(ellipse at 10% 100%, rgba(214, 194, 166, 0.4), transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(222, 204, 178, 0.35), transparent 50%),
-    linear-gradient(180deg, #f7f2e8 0%, #ebe0cf 100%);
-}
+/* Light mode: same streak design on the dashboard's backdrop (soft sky blue,
+   images/glass-aurora.jpg), behind a bright frosted card. */
+html[data-theme="light"] .login-page { background: #f2f7fd url("../images/glass-aurora.jpg?v=3") center / cover no-repeat; }
 html[data-theme="light"] .auth-bg { opacity: 0.45; }
 html[data-theme="light"] .auth-bg .streak-band { display: none; }
 html[data-theme="light"] .auth-bg #streakA stop:nth-child(1),
-html[data-theme="light"] .auth-bg #streakA stop:nth-child(4) { stop-color: #e2a35a; }
-html[data-theme="light"] .auth-bg #streakA stop:nth-child(2) { stop-color: #d08a3c; }
-html[data-theme="light"] .auth-bg #streakA stop:nth-child(3) { stop-color: #fff3dc; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(4) { stop-color: #8ec5f2; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(2) { stop-color: #5aa8e6; }
+html[data-theme="light"] .auth-bg #streakA stop:nth-child(3) { stop-color: #f2f9ff; }
 html[data-theme="light"] .auth-bg #streakB stop:nth-child(1),
-html[data-theme="light"] .auth-bg #streakB stop:nth-child(3) { stop-color: #f2c98e; }
-html[data-theme="light"] .auth-bg #streakB stop:nth-child(2) { stop-color: #c8792b; }
+html[data-theme="light"] .auth-bg #streakB stop:nth-child(3) { stop-color: #b9d8f5; }
+html[data-theme="light"] .auth-bg #streakB stop:nth-child(2) { stop-color: #7fb6ea; }
 html[data-theme="light"] .login-card .btn-navy,
 html[data-theme="light"] .login-card .btn-navy:hover { background: linear-gradient(180deg, #4cb4ff 0%, #1f8bff 55%, #1474e0 100%); border: 0; box-shadow: 0 8px 20px rgba(31, 139, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
 html[data-theme="light"] .login-card { background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(240, 246, 255, 0.72)); box-shadow: none; border: 0; }
@@ -1455,7 +1443,7 @@ html[data-theme="light"] .auth-switch a { color: var(--blue-600); }
 html[data-theme="light"] .card-beam .beam-a { background: linear-gradient(90deg, rgba(43, 152, 255, 0), #2b98ff); }
 
 /* ================= Light mode: glassy dashboard =================
-   A soft cream backdrop with a faint warm glow, sunlight beams and light spots (images/glass-soft.jpg) behind the app,
+   A light pastel backdrop (one colour: soft sky blue in three tones, images/glass-aurora.jpg) behind the app,
    with frosted-glass panels on top: translucent white, blurred backdrop,
    bright hairline edge. Dark pills mark the open page and the main buttons,
    soft yellow chips mark pending items. Only the signed-in pages get it
@@ -1484,7 +1472,7 @@ html[data-theme="light"]:has(.app-shell) {
 html[data-theme="light"] .app-shell { isolation: isolate; }
 html[data-theme="light"] .app-shell::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: #f1ebe1 url("../images/glass-soft.jpg") center / cover no-repeat;
+  background: #f2f7fd url("../images/glass-aurora.jpg?v=3") center / cover no-repeat;
 }
 
 /* Frosted panels */
@@ -1589,3 +1577,95 @@ html[data-theme="light"] .spinner-overlay { background: rgba(240, 228, 208, 0.55
 html[data-theme="light"]:has(.app-shell) .page-progress { background: linear-gradient(90deg, #211d18, #c8792b); box-shadow: none; }
 html[data-theme="light"]:has(.app-shell) ::-webkit-scrollbar-thumb { background: rgba(90, 68, 40, 0.3); background-clip: padding-box; }
 html[data-theme="light"] .app-shell .theme-switch-knob { background: #211d18; box-shadow: 0 2px 6px rgba(33, 29, 24, 0.35); }
+
+/* ================= Light mode: "Glassy SideBar V5" look, in light glass =================
+   Floating rounded panels (sidebar, top bar, cards) of frosted white glass
+   with a bright edge; the open page is a raised glass lens instead of a dark
+   pill. Text, sizes and menu items stay the same as in dark mode. */
+
+html[data-theme="light"]:has(.app-shell) {
+  --v5-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.36) 55%, rgba(250, 238, 220, 0.4) 100%);
+  --v5-edge: rgba(255, 255, 255, 0.85);
+  --v5-shadow: 0 18px 44px rgba(84, 60, 28, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  --v5-lens: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.55) 100%);
+  --v5-lens-shadow: 0 8px 20px rgba(84, 60, 28, 0.15), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(110, 86, 54, 0.08);
+}
+
+/* Sidebar: a floating rounded glass panel. */
+html[data-theme="light"] .sidebar {
+  top: 14px; left: 14px; bottom: 14px; width: 256px;
+  background: var(--v5-glass); border: 1px solid var(--v5-edge); border-radius: 28px;
+  box-shadow: var(--v5-shadow); overflow: hidden;
+}
+html[data-theme="light"] .sidebar-brand { border-bottom: 0; padding: 20px 20px 10px; }
+html[data-theme="light"] .sidebar-footer { border-top: 0; padding: 10px 12px 14px; }
+html[data-theme="light"] .sidebar-nav { padding: 6px 12px; }
+html[data-theme="light"] .nav-link { color: #3d342a; border: 1px solid transparent; }
+html[data-theme="light"] .nav-link:hover { background: rgba(255, 255, 255, 0.45); border-color: rgba(255, 255, 255, 0.6); transform: none; }
+html[data-theme="light"] .nav-link.active {
+  background: var(--v5-lens); color: var(--text-dark);
+  border-color: rgba(255, 255, 255, 0.95); box-shadow: var(--v5-lens-shadow);
+}
+html[data-theme="light"] .nav-link.active i { color: var(--text-dark); }
+html[data-theme="light"] .nav-badge { background: rgba(255, 255, 255, 0.7); color: #5a4300; border: 1px solid #f0cf5c; }
+html[data-theme="light"] .main-area { margin-left: 284px; }
+
+/* Top bar: a floating glass strip beside the sidebar. */
+html[data-theme="light"] .topbar {
+  top: 14px; margin: 14px 14px 0 14px; border-radius: 22px;
+  background: var(--v5-glass); border: 1px solid var(--v5-edge); box-shadow: var(--v5-shadow);
+}
+html[data-theme="light"] .icon-btn,
+html[data-theme="light"] .sidebar-toggle { border-radius: 50%; background: var(--v5-lens); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: var(--v5-lens-shadow); }
+
+/* Cards and pop-ups: the same glass, more rounded. */
+html[data-theme="light"] .card-surface,
+html[data-theme="light"] .stat-card,
+html[data-theme="light"] .welcome-banner {
+  background: var(--v5-glass); border: 1px solid var(--v5-edge); border-radius: 24px; box-shadow: var(--v5-shadow);
+}
+html[data-theme="light"] .card-surface:hover { box-shadow: var(--v5-shadow); }
+html[data-theme="light"] .stat-card:hover { background: var(--v5-lens); border-color: #fff; box-shadow: var(--v5-lens-shadow), 0 18px 44px rgba(84, 60, 28, 0.14); }
+html[data-theme="light"]:has(.app-shell) .modal-content { border: 1px solid var(--v5-edge); border-radius: 26px; box-shadow: var(--v5-shadow); }
+html[data-theme="light"] .app-shell .dropdown-menu { border: 1px solid var(--v5-edge); border-radius: 18px; box-shadow: var(--v5-shadow); }
+html[data-theme="light"] .stat-icon { background: var(--v5-lens) !important; box-shadow: var(--v5-lens-shadow); }
+
+/* Buttons, fields and small tiles: glass lens pills. */
+html[data-theme="light"]:has(.app-shell) .btn-outline-navy,
+html[data-theme="light"] .action-btn,
+html[data-theme="light"] .welcome-date { background: var(--v5-lens); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: var(--v5-lens-shadow); }
+html[data-theme="light"]:has(.app-shell) .btn-outline-navy:hover,
+html[data-theme="light"] .action-btn:hover { background: #fff; }
+html[data-theme="light"]:has(.app-shell) .btn-blue,
+html[data-theme="light"]:has(.app-shell) .btn-navy { box-shadow: 0 6px 16px rgba(33, 29, 24, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+html[data-theme="light"]:has(.app-shell) .form-control,
+html[data-theme="light"]:has(.app-shell) .form-select,
+html[data-theme="light"]:has(.app-shell) .input-group-text { border-radius: 12px; border-color: rgba(255, 255, 255, 0.95); box-shadow: inset 0 1px 2px rgba(84, 60, 28, 0.06); }
+html[data-theme="light"] .summary-item,
+html[data-theme="light"] .dist-stat,
+html[data-theme="light"] .metric-tile { border-radius: 16px; border-color: rgba(255, 255, 255, 0.9); box-shadow: inset 0 1px 0 #fff; }
+html[data-theme="light"] .table-wrap { border-radius: 18px; border-color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.18); }
+
+@media (max-width: 991px) {
+  html[data-theme="light"] .sidebar { transform: translateX(calc(-100% - 24px)); }
+  html[data-theme="light"] .sidebar.open { transform: translateX(0); box-shadow: var(--v5-shadow), 12px 0 30px rgba(84, 60, 28, 0.15); }
+  html[data-theme="light"] .main-area { margin-left: 0; }
+  html[data-theme="light"] .topbar { top: 10px; margin: 10px 10px 0; border-radius: 20px; }
+}
+html.force-phone[data-theme="light"] .sidebar { height: calc(100vh / var(--fp-zoom, 1) - 28px); }
+
+/* Light mode fields: a soft blue tint with a visible blue-grey edge, so the
+   boxes do not glare white against the sky-blue backdrop; blue focus ring. */
+html[data-theme="light"]:has(.app-shell) .form-control,
+html[data-theme="light"]:has(.app-shell) .form-select,
+html[data-theme="light"]:has(.app-shell) .input-group-text {
+  background-color: rgba(226, 236, 248, 0.6); border: 1px solid rgba(110, 145, 190, 0.28);
+  box-shadow: inset 0 1px 2px rgba(40, 70, 110, 0.06);
+}
+html[data-theme="light"]:has(.app-shell) .form-control:focus,
+html[data-theme="light"]:has(.app-shell) .form-select:focus {
+  background-color: rgba(236, 243, 252, 0.85); border-color: #7fb0e6; box-shadow: 0 0 0 4px rgba(80, 150, 230, 0.16);
+}
+html[data-theme="light"]:has(.app-shell) .form-control:disabled,
+html[data-theme="light"]:has(.app-shell) .form-select:disabled { background-color: rgba(226, 236, 248, 0.35); }
+html[data-theme="light"]:has(.app-shell) .form-control::placeholder { color: #8a9ab0; }

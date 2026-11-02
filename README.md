@@ -53,7 +53,7 @@ gov-fleets/
 │   ├── css/style.css
 │   ├── js/script.js
 │   ├── images/seal.svg         Logo and browser-tab icon
-│   ├── images/glass-soft.jpg   Login and sign-up background
+│   ├── images/glass-aurora.jpg Light-mode dashboard background
 │   └── vendor/                 Bootstrap, Chart.js, Font Awesome, Poppins (offline copies)
 ├── reports/figures/            Evaluation figures (generated)
 ├── backups/                    Firestore backups (.json); old_mysql_backups/ and old_code_snapshots/ are from before Firestore
