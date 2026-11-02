@@ -15,6 +15,10 @@
     <a class="btn btn-sm btn-outline-navy" href="{{ url_for('export_training_dataset', name='supplementary_data') }}">
       <i class="fa-solid fa-download me-1"></i> supplementary_data.csv</a>
   </div>
+  {% if serverless %}
+  <p class="text-muted small mb-0"><i class="fa-solid fa-circle-info me-1"></i> The online link cannot save files.
+    Upload the trained model on the GSO computer (http://127.0.0.1:5000), then deploy it to the online link.</p>
+  {% else %}
   <form method="POST" action="{{ url_for('upload_model') }}" enctype="multipart/form-data" class="row g-2 align-items-end" data-loading="Uploading model...">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="col-md-5">
@@ -29,6 +33,7 @@
       <button type="submit" class="btn btn-blue w-100"><i class="fa-solid fa-upload me-1"></i> Upload</button>
     </div>
   </form>
+  {% endif %}
 </div>
 {% endmacro %}
 

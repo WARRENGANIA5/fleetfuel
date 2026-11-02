@@ -848,15 +848,16 @@ def add_request_trip(pred):
     return trip_id
 
 
-def remove_request_trip(prediction_id):
-    """Remove the pending trip of a rejected/deleted request (kept if it
-    already has actual fuel)."""
+def remove_request_trip(prediction_id, deleted=False):
+    """Remove the pending trip of a rejected/deleted request. A trip that
+    already has actual fuel is kept: still linked to a rejected request (so
+    approving it again reuses it), unlinked from a deleted one."""
     t = request_trip(prediction_id)
     if t is None:
         return
     if t["actual_fuel_consumption"] is None:
         db.delete("trip_records", t["id"])
-    else:
+    elif deleted:
         db.update("trip_records", t["id"], prediction_id=None)
 
 
@@ -1099,7 +1100,7 @@ def delete_prediction(prediction_id):
     if not db.get("predictions", prediction_id):
         flash("That prediction no longer exists.", "danger")
         return back_to_list("prediction_history")
-    remove_request_trip(prediction_id)
+    remove_request_trip(prediction_id, deleted=True)
     db.delete("predictions", prediction_id)
     flash("Prediction record deleted.", "success")
     return back_to_list("prediction_history")
@@ -1398,7 +1399,11 @@ def link_predictions_to_trips():
     own = {t["prediction_id"]: t for t in trips.values() if t.get("prediction_id") is not None}
     for p in preds:
         t = own.get(p["id"])
-        if t is None or p["approval_status"] == "rejected":
+        if t is None:
+            continue
+        if p["approval_status"] == "rejected":  # no fuel released; the trip waits in case it is approved again
+            if p["actual_source"] == "trip":
+                change(p, actual_fuel=None, trip_record_id=None, actual_source=None)
             continue
         if p["trip_record_id"] != t["id"]:
             change(p, trip_record_id=t["id"])
@@ -1803,7 +1808,8 @@ def build_model_charts():
 @app.route("/model-performance")
 @admin_required
 def model_performance():
-    return render_template("model_performance.html", active="model_performance", metrics=get_metrics())
+    return render_template("model_performance.html", active="model_performance", metrics=get_metrics(),
+                           serverless=app.config["SERVERLESS"])
 
 
 def training_dataset_csv(name):
@@ -1940,6 +1946,10 @@ def upload_model():
     """Upload a model trained in Colab (Joblib + results) to replace the
     current one. Admin only, since Joblib files are unpickled."""
     from model.train_model import _replace_with_retry
+    if app.config["SERVERLESS"]:  # read-only file system
+        flash("The online link cannot save files. Upload the trained model on the GSO computer "
+              "(http://127.0.0.1:5000), then deploy it to the online link.", "warning")
+        return redirect(url_for("model_performance"))
     model_file, metrics_file = request.files.get("model_file"), request.files.get("metrics_file")
     if not (model_file and model_file.filename and metrics_file and metrics_file.filename):
         flash("Choose both files from Google Colab: linear_regression_pipeline.joblib and metrics_colab.json.", "danger")
