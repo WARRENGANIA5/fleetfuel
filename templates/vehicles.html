@@ -2,7 +2,6 @@
 {% block title %}Vehicle Management{% endblock %}
 {% block page_title %}Vehicle Management{% endblock %}
 
-{# Vehicle records: plate number, vehicle model, fuel type and engine power (kW). #}
 {% macro vehicle_fields() %}
   <div class="mb-2"><label class="form-label">Plate Number</label>
     <input class="form-control" name="plate_number" maxlength="20" pattern="[A-Za-z0-9][A-Za-z0-9 \-]*" required>
@@ -73,7 +72,7 @@
   </div>
 </div>
 
-{# One shared View and one shared Edit modal, filled from the clicked row's data-record (see script.js). #}
+{# shared view/edit modals (filled by script.js) #}
 <div class="modal fade" id="viewVehicleModal" tabindex="-1" data-record-modal>
   <div class="modal-dialog">
     <div class="modal-content">
@@ -137,7 +136,7 @@ const DELETE_URL_TEMPLATE = {{ url_for('delete_vehicle', vehicle_id=0)|tojson }}
 const CSRF_TOKEN = {{ csrf_token()|tojson }};
 const REOPEN = {{ reopen|tojson if reopen else 'null' }};
 
-// After a rejected save, open the same form again with what the user typed.
+// reopen the form after a failed save
 if (REOPEN) {
   const modalEl = document.getElementById(REOPEN.modal);
   if (modalEl) {
@@ -155,8 +154,7 @@ if (REOPEN) {
   }
 }
 
-// Deleting a vehicle also deletes its trip records (database cascade), so the
-// confirmation spells out exactly what will be lost.
+// deleting a vehicle deletes its trips too, so say so in the confirm
 document.getElementById('vehiclesBody').addEventListener('submit', function (e) {
   const form = e.target.closest('form[data-delete-vehicle]');
   if (!form) return;
@@ -170,7 +168,7 @@ document.getElementById('vehiclesBody').addEventListener('submit', function (e) 
   if (!window.confirm(msg)) e.preventDefault();
 });
 
-// ---- Real-time: refresh the table every 5s (keeps the search) ----
+// ---- refresh every 5s ----
 function vehicleRow(v) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(v);
@@ -193,12 +191,12 @@ function vehicleRow(v) {
 }
 let lastVehiclesJson = null;
 function refreshVehicles() {
-  // Don't swap rows under an open modal (it is filled from its row).
+  // skip while a modal is open
   if (document.querySelector('.modal.show')) return;
   fetch('/api/vehicles')
     .then(function (res) { return res.json(); })
     .then(function (d) {
-      if (!d || !Array.isArray(d.vehicles)) throw new Error('unexpected answer');  // keep the rows on screen
+      if (!d || !Array.isArray(d.vehicles)) throw new Error('unexpected answer');
       const badge = document.getElementById('vehLive');
       badge.className = 'live-badge'; document.getElementById('vehLiveText').textContent = 'Live';
       const json = JSON.stringify(d.vehicles);
@@ -211,7 +209,7 @@ function refreshVehicles() {
       } else {
         d.vehicles.forEach(function (v) { body.appendChild(vehicleRow(v)); });
       }
-      // Re-apply whatever is typed in the search box.
+      // re-apply search
       document.getElementById('vehicleSearch').dispatchEvent(new Event('keyup'));
     })
     .catch(function () {

@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% include '_theme_init.html' %}
 <script>
-// Opened from the Login / Sign Up link: start with the form hidden so the
-// switch animation (script.js) can bring it in.
+// hide the form when coming from Login so the animation can show it
 try {
   if (sessionStorage.getItem('fleetfuel-auth-switch')) {
     sessionStorage.removeItem('fleetfuel-auth-switch');
@@ -21,7 +20,7 @@ try {
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/style.css', v=76) }}" rel="stylesheet">
 <style>
-  /* Login <-> Sign Up: the browser cross-fades the two pages (no white flash). */
+  /* cross-fade between login and sign-up */
   @view-transition { navigation: auto; }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.25s; }
 </style>
@@ -121,8 +120,7 @@ try {
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/script.js', v=46) }}"></script>
 <script>
-// Real-time checks while typing: username/email availability come from the
-// server, the password rules and the confirmation are checked right here.
+// live checks: username/email on the server, password rules here
 (function () {
   const form = document.querySelector('form.needs-validation');
   const user = document.getElementById('username'), email = document.getElementById('email');
@@ -190,7 +188,7 @@ try {
   }
   [pw, cf, user].forEach(function (el) { el.addEventListener('input', checkPassword); });
 
-  // Do not send the form while a check is still running or failed.
+  // block submit while a check is pending or failed
   form.addEventListener('submit', function (e) {
     checkPassword();
     if ([user, email].some(function (el) { return !el.classList.contains('is-valid'); })) {

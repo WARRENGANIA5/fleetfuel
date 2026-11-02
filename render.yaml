@@ -1,5 +1,4 @@
-# Render Blueprint (render.com > New > Blueprint > this repository).
-# Builds the Dockerfile; Render sets PORT and serves the app over HTTPS.
+# Render Blueprint: builds the Dockerfile.
 services:
   - type: web
     name: fleetfuel
@@ -10,7 +9,6 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      # The Firebase key: upload firebase-key.json as a Secret File
-      # (Environment > Secret Files); Render puts it at this path.
+      # upload firebase-key.json under Environment > Secret Files
       - key: FIREBASE_CREDENTIALS
         value: /etc/secrets/firebase-key.json

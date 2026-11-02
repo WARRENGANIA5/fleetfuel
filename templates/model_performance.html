@@ -2,8 +2,7 @@
 {% block title %}Model Performance{% endblock %}
 {% block page_title %}Linear Regression Model Performance{% endblock %}
 
-{# Chapter III: the model is trained in Google Colab, saved with Joblib, and
-   integrated into the web application, which loads it without retraining. #}
+{# model is trained in Colab and uploaded here #}
 {% macro upload_card() %}
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-upload text-primary"></i> Upload Trained Model from Google Colab</div>
@@ -140,10 +139,10 @@
 {% block extra_scripts %}
 {% if not metrics %}
 <script>
-// No model yet: show the results as soon as a model is uploaded (also from another computer).
+// no model yet: reload once one is uploaded
 setInterval(function () {
   fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
-    if (!document.getElementById('noModelText')) return;  // the user moved to another page meanwhile
+    if (!document.getElementById('noModelText')) return;  // page changed
     if (st.model_version) window.location.reload();
   }).catch(function () {});
 }, 2000);
@@ -154,7 +153,7 @@ setInterval(function () {
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = window.chartTheme().text;
-Chart.defaults.animation = false;  // charts appear at once, no draw-in
+Chart.defaults.animation = false;
 const chartColors = window.chartTheme();
 const gridColor = chartColors.grid;
 const axis = function (title) {
@@ -162,7 +161,7 @@ const axis = function (title) {
            title: { display: true, text: title, color: chartColors.text } };
 };
 let avpChart = null, residualChart = null, distChart = null;
-// Tooltips describe the data points only (not the reference lines).
+// no tooltips on reference lines
 function onlyPoints(item) { return item.datasetIndex === 0; }
 function signed(v) { return (v > 0 ? '+' : '') + Number(v).toFixed(2); }
 
@@ -177,7 +176,7 @@ function strength(v) {
   const level = a >= 0.7 ? 'Strong' : a >= 0.4 ? 'Moderate' : a >= 0.2 ? 'Weak' : 'Very weak / none';
   return a < 0.2 ? level : level + (v > 0 ? ' positive' : ' negative');
 }
-// Diverging scale: blue = positive, orange = negative, card colour = no relationship.
+// blue = positive, orange = negative
 function corrColor(v) {
   const a = Math.min(Math.abs(v), 1);
   const base = chartColors.light ? [255, 255, 255] : [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
@@ -202,7 +201,7 @@ function renderHeatmap(c) {
             (i === j ? ' (same feature)' : ' (' + strength(v) + ')');
           const cls = [i === j ? 'is-diag' : '', (i === ti || j === ti) && i !== j ? 'is-target' : ''].join(' ');
           return '<td class="' + cls + '" style="background:' + (i === j ? '' : corrColor(v)) +
-            // Light mode: pale cells (weak relationships) get dark text so the number stays readable.
+            // dark text on pale cells in light mode
             (i !== j && chartColors.light && Math.abs(v) < 0.5 ? ';color:var(--text-dark)' : '') + '" title="' +
             escapeHtml(tip) + '">' + v.toFixed(2) + '</td>';
         }).join('') + '</tr>';
@@ -289,7 +288,7 @@ function drawCharts(c) {
 function renderDiagnostics(m) {
   const name = function (k) { return typeof featureName === 'function' ? featureName(k) : k; };
   const badge = function (ok, yes, no) { return '<span class="badge-status ' + (ok ? 'badge-active' : 'badge-maintenance') + '">' + (ok ? yes : no) + '</span>'; };
-  // Very small coefficients (e.g. per km of odometer) in scientific notation instead of "0".
+  // scientific notation for tiny coefficients
   const num = function (v) { const a = Math.abs(v); return (a !== 0 && a < 0.001) ? Number(v).toExponential(3) : String(v); };
   const fmtVif = function (v) { return v == null ? '—' : (v >= 1000 ? '&gt;1000' : Number(v).toFixed(2)); };
   const vifBody = document.getElementById('vifBody');
@@ -298,7 +297,7 @@ function renderDiagnostics(m) {
     const threshold = m.vif_threshold != null ? m.vif_threshold : 5;
     document.getElementById('vifThreshold').textContent = threshold;
     const coef = m.raw_coefficients || m.coefficients || {}, vif = m.vif || {};
-    // ŷ = b0 + b1(Distance) + ... with the fitted values in the original units.
+    // equation in original units
     const equation = function (b0, b, symbols) {
       return 'ŷ = ' + num(b0) + terms.map(function (t) {
         const v = Number(b[t] || 0);
@@ -319,7 +318,7 @@ function renderDiagnostics(m) {
   } else if (vifBody) {
     vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
   }
-  // Only the Durbin-Watson statistic (the VIF has its own table above).
+  // Durbin-Watson only, VIF has its own table
   const dw = ((m.diagnostics || {}).tests || []).filter(function (t) { return t.key === 'independence'; })[0];
   const diagBody = document.getElementById('diagBody');
   if (diagBody && dw) {
@@ -330,7 +329,7 @@ function renderDiagnostics(m) {
   }
 }
 
-// ---- Live auto-refresh: re-fetch every 10s; charts redraw when a new model is uploaded ----
+// ---- auto-refresh every 10s ----
 let lastChartsKey = null;
 function refreshModelPerformance() {
   return fetch('/api/model-performance-data')
@@ -357,8 +356,7 @@ function refreshModelPerformance() {
 }
 refreshModelPerformance();
 
-// ---- Real-time: poll the tiny status endpoint every 2s; pull the full data
-// only when a new model was uploaded. A 30s full refresh is a safety net. ----
+// ---- poll status every 2s, full refresh only on a new model (30s fallback) ----
 let knownVersion = {{ metrics.model_version|tojson }};
 function checkModelStatus() {
   fetch('/api/model-status')

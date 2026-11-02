@@ -8,9 +8,7 @@ import time
 from datetime import date, datetime, timedelta
 from functools import wraps
 
-# `python app.py` typed in a terminal runs the computer's own Python, which does
-# not have the system's libraries (they are installed in venv\): run this file
-# again with the project's venv Python instead of failing on the first import.
+# If started with the system Python, re-run with the venv Python.
 _VENV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
 _VENV_PYTHON = os.path.join(_VENV_DIR, "Scripts", "python.exe")
 if (__name__ == "__main__" and os.path.exists(_VENV_PYTHON)
@@ -18,7 +16,7 @@ if (__name__ == "__main__" and os.path.exists(_VENV_PYTHON)
     import subprocess
     try:
         sys.exit(subprocess.call([_VENV_PYTHON, os.path.abspath(__file__), *sys.argv[1:]]))
-    except KeyboardInterrupt:  # Ctrl+C stops the server in the venv Python too
+    except KeyboardInterrupt:
         sys.exit(0)
 if __name__ == "__main__":
     print(" * Starting FleetFuel... (loading the libraries takes a few seconds)", flush=True)
@@ -40,9 +38,7 @@ from model.preprocess import build_prediction_frame
 app = Flask(__name__)
 app.config.from_object(Config)
 if app.config["ONLINE"]:
-    # Behind the hosting provider's HTTPS proxy: take the visitor's address and
-    # scheme from its headers, so login lockouts and sign-up limits apply per
-    # visitor instead of to everyone at once.
+    # trust the proxy headers so lockouts are per visitor, not global
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
@@ -63,8 +59,7 @@ _MODEL_MTIME = None
 
 
 def get_model():
-    """Loads (and hot-reloads if the file changes) the trained Linear
-    Regression pipeline saved with Joblib. Returns None if there is no model yet."""
+    """Load the saved model, reloading it when the file changes. None if missing."""
     global _MODEL, _MODEL_MTIME
     path = app.config["MODEL_PATH"]
     if not os.path.exists(path):
@@ -82,8 +77,7 @@ def get_model():
 
 
 def _retry_io(fn, attempts=20, delay=0.05):
-    """Run a file read, retrying briefly while Windows/OneDrive has the file
-    locked (e.g. while a retrain is swapping in the new model or metrics)."""
+    """Retry a file read while Windows/OneDrive has the file locked."""
     for i in range(attempts):
         try:
             return fn()
@@ -127,15 +121,14 @@ def format_time(value):
 
 
 def password_signature(password_hash):
-    """Short fingerprint of the stored hash, kept in the session to notice password changes."""
+    """Hash fingerprint kept in the session to detect password changes."""
     import hashlib
     return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
 
 
 def session_ended(reason):
-    """Answer for a page's background request after its session ended (logged
-    out, deactivated, password changed): script.js sees the header and opens
-    the login page, which shows why. A 200 keeps the browser console clean."""
+    """Reply to background requests after the session ended; script.js sees
+    the header and redirects to the login page."""
     return {"error": reason, "session_ended": True}, 200, {"X-Session-Ended": reason, "X-Redirect": url_for("login")}
 
 
@@ -146,9 +139,7 @@ def login_required(view):
             if request.path.startswith("/api/"):
                 return session_ended("not_logged_in")
             return redirect(url_for("login"))
-        # Re-check the account on every request: a deleted
-        # account is signed out right away, and name/role/photo changes made
-        # elsewhere show up without logging in again.
+        # reload the account each request so deletes/edits apply right away
         user = db.get("users", session["user_id"])
         if not user or user["status"] != "active":
             session.clear()
@@ -156,8 +147,7 @@ def login_required(view):
             if request.path.startswith("/api/"):
                 return session_ended("account_inactive")
             return redirect(url_for("login"))
-        # A password reset or change signs out every other session of that account
-        # (sessions from before this check existed are adopted, not signed out).
+        # password changed elsewhere -> sign out this session
         sig = password_signature(user["password_hash"])
         if session.setdefault("pw_sig", sig) != sig:
             session.clear()
@@ -168,8 +158,7 @@ def login_required(view):
         session["username"], session["full_name"] = user["username"], user["full_name"]
         session["role"] = effective_role(user)
         session["position"] = user["position"] or ""
-        # Logged in with a default (published) password: only the password
-        # change itself is allowed until a new one is set.
+        # still on a default password, force a change first
         if session.get("must_change_pw") and request.endpoint not in _ALLOWED_BEFORE_PW_CHANGE:
             if request.path.startswith("/api/"):
                 return {"error": "password_change_required"}, 200, {"X-Redirect": url_for("settings")}
@@ -183,11 +172,8 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
                              "api_notifications_seen", "api_notifications_dismiss", "api_notifications_dismiss_all"}
 
 
-# The one administrator account (GSO) is the account with the role "admin": it
-# opens the administrator pages; every other account is staff and none can be
-# made an administrator. Every account changes its own username, profile and
-# password in Account Settings; User Accounts cannot change the administrator.
-# ADMIN_ACCOUNT is the username it gets when it is first created (init_db.py).
+# Only one admin account (GSO, role "admin"); everyone else is staff.
+# ADMIN_ACCOUNT is its username when init_db.py creates it.
 ADMIN_ACCOUNT = "admin1114"
 
 
@@ -196,9 +182,7 @@ def effective_role(user):
 
 
 def admin_required(view):
-    """Pages and actions for the administrator (GSO) only: approving fuel
-    requests, user accounts, vehicles and model monitoring (login is
-    checked first)."""
+    """Admin-only route (checks login first)."""
     @wraps(view)
     @login_required
     def wrapped(*args, **kwargs):
@@ -224,7 +208,7 @@ def _pending_counts():
 
 
 # ------------------------------------------------------------------
-# ORGANIZATION (the study covers the Guimaras State University fleet only)
+# ORGANIZATION
 # ------------------------------------------------------------------
 ORG = {
     "org_name": "Guimaras State University",
@@ -256,13 +240,10 @@ NOTIF_KEY_RE = re.compile(r"[a-z]+:\d+(:[a-z0-9]+)?")
 
 
 def build_notifications(limit=8):
-    """Bell notifications for the current user, minus the ones they removed.
+    """Bell notifications for the current user, minus dismissed ones.
 
-    * administrators: sign-ups and fuel requests waiting for approval (actionable);
-    * staff: approvals / rejections of their own fuel requests, counted as
-      new until they open the bell.
-    Each item has a `key`; a removed key stays hidden, but a new event gets a
-    new key (e.g. an approved request that is later rejected shows up again)."""
+    Admin: pending sign-ups and fuel requests. Staff: decisions on their own
+    requests. A dismissed key stays hidden; a new event gets a new key."""
     uid, is_admin = session.get("user_id"), session.get("role") == "admin"
     removed = {r["notif_key"] for r in db.find("notification_dismissals", user_id=uid)}
     items, count = [], 0
@@ -314,9 +295,8 @@ def build_notifications(limit=8):
     return {"count": count, "notifications": items}
 
 
-# Pages don't build the notification list themselves: the bell in the top bar
-# asks /api/notifications as soon as the page has loaded (and every 5 seconds),
-# which saves four database round trips on every click.
+# The bell fetches /api/notifications after page load (every 5 s) instead of
+# building the list on every page render.
 
 
 @app.route("/api/notifications")
@@ -336,7 +316,7 @@ def _dismiss(keys):
         doc_id = f"{uid}_{k.replace(':', '-')}"
         if not db.get("notification_dismissals", doc_id):
             db.put("notification_dismissals", doc_id, {"user_id": uid, "notif_key": k, "dismissed_at": now_local()})
-    # Keys of events long past are never shown again; keep the collection small.
+    # prune old dismissed keys
     cutoff = now_local() - timedelta(days=90)
     for r in db.find("notification_dismissals", user_id=uid):
         if r["dismissed_at"] and r["dismissed_at"] < cutoff:
@@ -378,12 +358,10 @@ def index():
     return redirect(url_for("dashboard") if session.get("user_id") else url_for("login"))
 
 
-# Default passwords of earlier installations; anyone who
-# reads the guide knows them, so users logging in with one are sent to change it.
+# Old default passwords; logging in with one forces a password change.
 DEFAULT_PASSWORDS = {"Admin@12345", "Motorpool@2026"}
 
-# Brute-force protection: 5 failed logins for the same username from the same
-# address lock that pair out for 15 minutes.
+# 5 failed logins (same username + IP) = 15 minute lockout
 _LOGIN_FAILURES = {}
 _LOGIN_LOCK = threading.Lock()
 LOGIN_MAX_FAILURES = 5
@@ -411,10 +389,9 @@ def _record_login_failure(key):
 
 
 def start_session(user):
-    """Signs the account in on this browser (after a correct password, or
-    automatically once an administrator approves a sign-up made here)."""
+    """Log the account in on this browser."""
     session.clear()
-    session.permanent = True  # honour PERMANENT_SESSION_LIFETIME (8 hours)
+    session.permanent = True  # 8-hour session
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     session["full_name"] = user["full_name"]
@@ -424,8 +401,8 @@ def start_session(user):
 
 
 def wait_for_approval(user):
-    """Remember, on this browser only, the pending account whose password was
-    just given: the waiting page then signs it in by itself once approved."""
+    """Remember the pending account on this browser so the waiting page can
+    log it in once approved."""
     session.clear()
     session.permanent = True
     session["pending_user_id"] = user["id"]
@@ -459,7 +436,7 @@ def login():
             start_session(user)
             flash(f"Welcome back, {user['full_name']}.", "success")
             if password in DEFAULT_PASSWORDS:
-                session["must_change_pw"] = True  # every other page stays locked until it is changed
+                session["must_change_pw"] = True
                 flash("You are still using the default password that is printed in the setup guide. "
                       "Change it now under Change Password to continue using the system.", "warning")
                 return redirect(url_for("settings"))
@@ -476,7 +453,7 @@ SIGNUP_LIMIT_PER_HOUR = 5
 
 
 def find_user(username):
-    """Account with this username (exact match, like the login form)."""
+    """Account with this exact username."""
     return next((u for u in db.records("users") if u["username"] == username), None)
 
 
@@ -491,7 +468,7 @@ def email_taken(email, except_id=None):
 
 
 def signup_field_problem(field, value):
-    """Live check of one sign-up field (the same rules run again on submit). None when valid."""
+    """Validate one sign-up field. None if valid."""
     value = (value or "").strip()
     if field == "username":
         if not USERNAME_RE.fullmatch(value):
@@ -510,7 +487,7 @@ def signup_field_problem(field, value):
 
 @app.route("/api/signup/check")
 def api_signup_check():
-    """Checked while the user types on the sign-up page."""
+    """Live field check for the sign-up form."""
     field = request.args.get("field", "")
     if field not in ("username", "email"):
         return {"error": "invalid_field"}, 400
@@ -520,10 +497,8 @@ def api_signup_check():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    """Self-registration for GSO and motorpool staff. New accounts are
-    created as 'pending' staff accounts; the browser that signed up waits on
-    the approval page and is signed in automatically once an administrator
-    approves the account under User Accounts."""
+    """Staff sign-up. New accounts start as pending; this browser waits on
+    the approval page and logs in once the admin approves."""
     if session.get("user_id"):
         return redirect(url_for("dashboard"))
     form = {}
@@ -557,8 +532,8 @@ def signup():
 
 
 def _pending_account():
-    """The account this browser waits on and its state: 'pending', 'approved',
-    'inactive', or 'gone' (rejected, or its password was reset meanwhile)."""
+    """Account this browser is waiting on and its state: pending, approved,
+    inactive or gone."""
     uid = session.get("pending_user_id")
     if not uid:
         return None, None
@@ -593,8 +568,7 @@ def signup_pending():
 
 @app.route("/api/signup/status")
 def api_signup_status():
-    """Polled by the waiting page every few seconds. Once the administrator
-    approves the account, this browser is signed in right away."""
+    """Polled by the waiting page; logs in once approved."""
     user, state = _pending_account()
     if state is None:
         return {"state": "none", "redirect": url_for("login")}
@@ -610,7 +584,7 @@ def api_signup_status():
 
 @app.route("/signup/cancel", methods=["POST"])
 def signup_cancel():
-    """Stop waiting on this browser (the request stays for the administrator)."""
+    """Stop waiting on this browser (the request stays pending)."""
     session.pop("pending_user_id", None)
     session.pop("pending_pw_sig", None)
     flash("You can log in once the administrator approves your account.", "info")
@@ -619,8 +593,7 @@ def signup_cancel():
 
 @app.route("/logout", methods=["GET", "POST"])
 def logout():
-    # Only a POST (with the CSRF token) logs out, so another website can't
-    # sign users out by linking to /logout.
+    # POST only (CSRF protected) so outside links can't log users out
     if request.method == "POST":
         name = session.get("full_name")
         session.clear()
@@ -633,18 +606,16 @@ def logout():
 # DASHBOARD
 # ------------------------------------------------------------------
 def build_dashboard_context():
-    """Fleet Overview for the administrator (GSO): every fuel request, the ones
-    waiting for approval and the model status. Staff (motorpool) get their own
-    dashboard: only the fuel requests they made, with their status."""
+    """Admin: all fuel requests, pending approvals and model status.
+    Staff: only their own requests."""
     is_admin = session.get("role") == "admin"
     vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
     users_by_id = {u["id"]: u for u in db.records("users")}
     trips = db.records("trip_records")
     fuel_trips = [t for t in trips if t["actual_fuel_consumption"] is not None]
     all_predictions = db.records("predictions")
-    # Scope of the fuel-request figures: everyone's for the admin, own for staff.
     scoped = all_predictions if is_admin else [p for p in all_predictions if p["user_id"] == session.get("user_id")]
-    # Plus the trip records from the online datasets (trip_dataset.py).
+    # + online-dataset trips
     dataset = trip_dataset.summary(v["plate_number"] for v in vehicles_by_id.values())
     total_vehicles, total_trips = len(vehicles_by_id), len(trips) + dataset["count"]
     total_predictions = len(scoped)
@@ -659,7 +630,7 @@ def build_dashboard_context():
         avg_fuel = None
     avg_fuel = round(float(avg_fuel), 2) if avg_fuel is not None else 0.0
 
-    # The 10 latest requests serve both the Recent list (first 5) and the chart.
+    # latest 10: recent list shows 5, chart uses all
     latest_rows = sorted(scoped, key=lambda p: (p["created_at"], p["id"]), reverse=True)[:10]
     for r in latest_rows:
         v, u = vehicles_by_id.get(r["vehicle_id"]), users_by_id.get(r["user_id"])
@@ -679,9 +650,7 @@ def build_dashboard_context():
         "full_name": r["full_name"] or "System",
     } for r in recent_predictions_rows]
 
-    # Fuel consumed per month from the trip records (Monthly Report of Official
-    # Travel): the last 6 calendar months up to the latest month with records
-    # (the reports are often encoded months later), empty months shown as 0.
+    # monthly fuel for the last 6 months up to the latest month with records
     latest = max([t["trip_date"] for t in fuel_trips] + [d for _, d in dataset["per_plate"].values()],
                  default=None) or today_local()
     months = []
@@ -699,9 +668,7 @@ def build_dashboard_context():
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
     fuel_trend_months = [f"{y:04d}-{m:02d}" for y, m in months] if has_fuel_records else []  # click -> that month's trips
 
-    # The 10 latest predictions: the predicted liters show as soon as a
-    # prediction is made, the actual liters once they are recorded in
-    # Prediction History (None = not recorded yet, drawn as a gap).
+    # predicted vs actual for the latest 10 (actual None = not recorded yet)
     avp_rows = list(reversed(latest_rows))
     avp_labels = [r["created_at"].strftime("%b %d, %I:%M %p") for r in avp_rows]
     avp_actual = [float(r["actual_fuel"]) if r["actual_fuel"] is not None else None for r in avp_rows]
@@ -709,7 +676,7 @@ def build_dashboard_context():
     avp_missing = sum(a is None for a in avp_actual)
     avp_urls = [url_for("prediction_result", prediction_id=r["id"]) for r in avp_rows]  # click a point -> that request
 
-    model_summary = get_metrics() if is_admin else None   # model monitoring is the GSO's
+    model_summary = get_metrics() if is_admin else None
 
     return {
         "stats": {"total_vehicles": total_vehicles, "total_trips": total_trips,
@@ -746,16 +713,13 @@ PREDICTION_FEATURE_LABELS = {"distance_km": ("Distance", "km"), "engine_power_kw
 
 
 def get_prediction_vehicles():
-    """Every registered vehicle with what the model needs from its record:
-    engine power (kW) and fuel type."""
+    """Registered vehicles with engine power (kW) and fuel type."""
     _ensure_vehicle_columns()
     return sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
 
 
 def validate_prediction_form(form):
-    """Server-side validation (the browser checks can be bypassed). The staff
-    select a vehicle and enter the trip distance; the vehicle's engine power and
-    fuel type come from its record. Returns (errors, vehicle)."""
+    """Server-side validation. Returns (errors, vehicle)."""
     vehicle_id = (form.get("vehicle_id") or "").strip()
     vehicle = None
     if not vehicle_id:
@@ -785,9 +749,7 @@ def validate_prediction_form(form):
 
 
 def prediction_warnings(values, metrics, raw_prediction=None):
-    """Plain-language cautions shown with a result: inputs outside what the
-    model was trained on, a fuel type it has no trips for, or a non-positive
-    raw model output."""
+    """Warnings shown with a result, e.g. inputs outside the training range."""
     warnings = []
     ranges = (metrics or {}).get("feature_ranges") or {}
     for field, (label, unit) in PREDICTION_FEATURE_LABELS.items():
@@ -797,8 +759,7 @@ def prediction_warnings(values, metrics, raw_prediction=None):
         v = float(values[field])
         if v < lo or v > hi:
             warnings.append(f"{label} ({v:g} {unit}) is outside the range the model was trained on ({lo:g}–{hi:g} {unit}).")
-    # The ranges of the trips of this fuel type: the diesel trips may cover far
-    # fewer vehicles and distances than the gasoline trips.
+    # ranges per fuel type, diesel data is much narrower
     fuel_ranges = ((metrics or {}).get("ranges_by_fuel") or {}).get(str(values.get("fuel_type") or ""))
     if fuel_ranges and not warnings:
         for field, (label, unit) in PREDICTION_FEATURE_LABELS.items():
@@ -843,8 +804,7 @@ def prediction():
     if errors:
         return render_prediction_page(request.form, errors)
 
-    # The system retrieves the engine power and fuel type of the selected vehicle
-    # from its records and passes them to the model with the trip distance.
+    # engine power and fuel type come from the vehicle record
     values = {"distance_km": float(request.form["distance_km"]),
               "engine_power_kw": float(vehicle["engine_power_kw"]), "fuel_type": vehicle["fuel_type"]}
     try:
@@ -867,12 +827,9 @@ def prediction():
     return redirect(url_for("prediction_result", prediction_id=pred_id))
 
 
-# Fuel Consumption Prediction -> Trip Records: every fuel request adds its trip
-# (vehicle, date of travel, distance) to Trip Records right away, with the fuel
-# consumed pending. The actual fuel, recorded in Prediction History or by
-# editing the trip, is kept the same in both; a rejected request's trip did not
-# happen and is removed. A pending trip (no fuel consumed) is not used for
-# training, so the model never learns from its own predictions.
+# Each fuel request adds a pending trip to Trip Records. Actual fuel is kept in
+# sync between the two, and a rejected request's trip is removed. Pending trips
+# (no fuel yet) are left out of training.
 def request_trip(prediction_id):
     """The trip record added by fuel request `prediction_id`, or None."""
     return next((t for t in db.records("trip_records") if t.get("prediction_id") == prediction_id), None)
@@ -892,8 +849,8 @@ def add_request_trip(pred):
 
 
 def remove_request_trip(prediction_id):
-    """A rejected or deleted fuel request: its pending trip did not happen and is
-    removed; a trip whose actual fuel is already recorded stays as a trip record."""
+    """Remove the pending trip of a rejected/deleted request (kept if it
+    already has actual fuel)."""
     t = request_trip(prediction_id)
     if t is None:
         return
@@ -906,8 +863,7 @@ def remove_request_trip(prediction_id):
 @app.route("/api/prediction-options")
 @login_required
 def api_prediction_options():
-    """Live data for the prediction form: vehicles and the model currently
-    used for predictions."""
+    """Vehicles and current model info for the prediction form."""
     metrics = get_metrics() or {}
     return {
         "vehicles": [{
@@ -929,12 +885,11 @@ def prediction_result(prediction_id):
     if not pred or not can_see_prediction(pred):
         flash("Prediction record not found.", "danger")
         return redirect(url_for("prediction"))
-    clamped = float(pred["predicted_fuel"]) <= 0.1  # model output was at/below the 0.1 L floor
+    clamped = float(pred["predicted_fuel"]) <= 0.1  # hit the 0.1 L floor
     warnings = prediction_warnings(pred, get_metrics(), raw_prediction=0 if clamped else None)
     if pred["vehicle_id"] is not None and not any(t["actual_fuel_consumption"] is not None
                                                   for t in db.find("trip_records", vehicle_id=pred["vehicle_id"])):
-        # Scope and Limitations: only the vehicles with records in the Monthly
-        # Report of Official Travel are included, so other vehicles are not validated.
+        # vehicles without trip records were never validated
         warnings.insert(0, f"{pred['plate_number']} has no trip records in the Monthly Report of Official Travel yet, "
                            "so this prediction for it is not validated against its own trips.")
     reviewer = db.get("users", pred["reviewed_by"])
@@ -963,8 +918,7 @@ def can_see_prediction(pred):
 
 
 def back_to_list(endpoint):
-    """Redirect back to the page the form was submitted from (keeping its
-    filters and page number), but only within this site."""
+    """Redirect back to the referring page (same site only), keeping filters."""
     ref = request.referrer or ""
     if ref.startswith(request.host_url):
         return redirect(ref)
@@ -983,16 +937,13 @@ def prediction_history_data(args):
     vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
     users_by_id = {u["id"]: u for u in db.records("users")}
     everything = sorted(db.records("predictions"), key=lambda p: (p["created_at"], p["id"]))
-    # First come, first served: requests are listed in the order they were made,
-    # and each keeps its request number (1 = the first request ever made) even
-    # when the list is filtered or paged, so "No." always names the same request.
+    # numbered in request order; numbers don't change when filtered or paged
     for i, p in enumerate(everything, 1):
         v, u, r = (vehicles_by_id.get(p["vehicle_id"]), users_by_id.get(p["user_id"]),
                    users_by_id.get(p["reviewed_by"]))
         p.update(request_no=i, plate_number=v["plate_number"] if v else None,
                  brand_model=v["brand_model"] if v else None,
                  full_name=u["full_name"] if u else None, reviewer_name=r["full_name"] if r else None)
-    # Staff see only the fuel requests they made; the administrator sees all.
     mine = args.get("mine") == "1" or session.get("role") != "admin"
     needle = q.lower()
 
@@ -1006,7 +957,7 @@ def prediction_history_data(args):
             return False
         return not mine or p["user_id"] == session.get("user_id")
     matching = [p for p in everything if keep(p)]
-    # "Predicted range" = predicted fuel ± the model's RMSE (its typical error in liters).
+    # predicted range = prediction ± RMSE
     tolerance = float((get_metrics() or {}).get("rmse") or 2.0)
 
     errors_l = [abs(float(p["predicted_fuel"]) - float(p["actual_fuel"])) for p in matching if p["actual_fuel"] is not None]
@@ -1092,8 +1043,7 @@ def record_actual_fuel(prediction_id):
     except ValueError:
         flash("Actual fuel must be a number greater than 0 and at most 1,000 liters.", "danger")
     else:
-        # Typed in by hand: never changed by the automatic matching from trips.
-        # The request's own trip in Trip Records gets the same fuel consumed.
+        # manual entry, auto-matching won't overwrite it; copy to its own trip
         own_trip = request_trip(prediction_id)
         db.update("predictions", prediction_id, actual_fuel=value,
                   actual_source="manual" if value is not None else None,
@@ -1101,7 +1051,7 @@ def record_actual_fuel(prediction_id):
         if own_trip:
             db.update("trip_records", own_trip["id"], actual_fuel_consumption=value)
         if value is None:
-            _link_actuals_quietly()  # cleared: let it be matched to its trip again
+            _link_actuals_quietly()  # cleared, allow re-matching
         flash("Actual fuel consumption recorded." if value is not None else "Actual fuel consumption cleared.", "success")
     return back_to_list("prediction_history")
 
@@ -1109,9 +1059,7 @@ def record_actual_fuel(prediction_id):
 @app.route("/prediction-history/<int:prediction_id>/review", methods=["POST"])
 @admin_required
 def review_fuel_request(prediction_id):
-    """Administrator approves or rejects a fuel request, using the predicted
-    fuel figure as the computed reference (Chapter I: administrators approve
-    fuel requests; the prediction replaces manual judgment)."""
+    """Admin approves or rejects a fuel request."""
     pred = db.get("predictions", prediction_id)
     if not pred:
         flash("That fuel request no longer exists.", "danger")
@@ -1123,7 +1071,7 @@ def review_fuel_request(prediction_id):
     note = (request.form.get("review_note") or "").strip()[:255] or None
     approved_fuel = None
     if decision == "approved":
-        # Fuel allocation: liters to release for the trip (the predicted figure is the reference).
+        # liters to release (prediction is the reference)
         try:
             approved_fuel = round(float(request.form.get("approved_fuel") or ""), 2)
             if not 0 < approved_fuel <= 1000:
@@ -1133,7 +1081,7 @@ def review_fuel_request(prediction_id):
             return back_to_list("prediction_history")
     db.update("predictions", prediction_id, approval_status=decision, approved_fuel=approved_fuel,
               reviewed_by=session["user_id"], reviewed_at=now_local(), review_note=note)
-    try:  # a rejected request's trip did not happen; approved again, it is back in Trip Records
+    try:  # rejected -> drop its trip, approved again -> add it back
         if decision == "rejected":
             remove_request_trip(prediction_id)
         else:
@@ -1141,7 +1089,7 @@ def review_fuel_request(prediction_id):
     except Exception:
         app.logger.exception("Updating the trip record of fuel request %s failed", prediction_id)
     flash(f"Fuel request #{prediction_id} {decision}" + (f": {approved_fuel:.2f} L to release." if approved_fuel else "."), "success")
-    _link_actuals_quietly()  # a rejection frees its trip for another request
+    _link_actuals_quietly()  # frees the matched trip
     return back_to_list("prediction_history")
 
 
@@ -1157,9 +1105,8 @@ def delete_prediction(prediction_id):
     return back_to_list("prediction_history")
 
 
-# Engine power (kW) from published manufacturer specifications matched to each
-# fleet vehicle's model and fuel type (Scope and Limitations). Filled in only
-# where a vehicle has none yet; corrected values are edited in Vehicle Management.
+# Engine power (kW) from manufacturer specs. Only fills vehicles that have
+# none; edits made in Vehicle Management are kept.
 PUBLISHED_ENGINE_POWER_KW = {
     "SFA 4712": 95, "SFA 4713": 95, "SFA 4714": 95,  # Nissan NV350 Urvan 2.5 diesel, 129 PS
     "SFA 1172": 130,  # Toyota HiAce GL Grandia 2.8 diesel (1GD-FTV), 174 hp
@@ -1167,16 +1114,14 @@ PUBLISHED_ENGINE_POWER_KW = {
     "SEF 535": 51,    # Mitsubishi L300 2.5 diesel (4D56), 70 hp
     "SJC 955": 62,    # Isuzu Crosswind 2.5 diesel (4JA1-L), 85 PS
     "SGF 810": 63,    # Toyota Revo 2.4 diesel (2L-II), 85 PS
-    # Hino bus: the exact model is not on record; Hino's FG midi bus (J08E-WF,
-    # 237 hp), the bus line commonly bought by Philippine universities, is assumed.
+    # Hino bus: exact model unknown, assumed FG midi bus (J08E-WF, 237 hp)
     "SFA 1741": 177,
 }
 _VEHICLE_COLUMNS_READY = {"ok": False}
 
 
 def _ensure_vehicle_columns():
-    """Once per server start: fill in the published engine power of the fleet
-    vehicles that have none yet (corrected values are kept)."""
+    """On startup, fill in engine power for vehicles that have none."""
     if _VEHICLE_COLUMNS_READY["ok"]:
         return
     for v in db.records("vehicles"):
@@ -1203,7 +1148,7 @@ def query_vehicles():
 
 
 def vehicle_record(v, num):
-    """JSON-safe row used by the table, the shared modals and the live API."""
+    """JSON-safe vehicle row for the table and API."""
     return {
         "id": v["id"], "num": num, "plate_number": v["plate_number"], "brand_model": v["brand_model"],
         "fuel_type": v["fuel_type"],
@@ -1230,7 +1175,7 @@ def validate_vehicle_form(f, vehicle_id=None):
         errors.append("Please choose a valid fuel type.")
     try:
         power = float(f.get("engine_power_kw") or "")
-        # power != power catches "nan", which passes every comparison.
+        # NaN check
         if power != power or not 0 < power <= 1000:
             raise ValueError
     except ValueError:
@@ -1245,8 +1190,7 @@ def _vehicle_values(f):
 
 
 def render_vehicles_page(reopen=None):
-    """`reopen` (after a rejected save) opens the same form again with what the
-    user typed, instead of losing it."""
+    """`reopen` re-opens the form with the submitted values after an error."""
     rows = [vehicle_record(v, i) for i, v in enumerate(query_vehicles(), 1)]
     return render_template("vehicles.html", active="vehicles", vehicles=rows, reopen=reopen)
 
@@ -1296,7 +1240,7 @@ def edit_vehicle(vehicle_id):
         old_plate = db.get("vehicles", vehicle_id)["plate_number"]
         values = _vehicle_values(request.form)
         db.update("vehicles", vehicle_id, **values)
-        # The online-dataset trips are linked by plate number: they follow a new plate.
+        # online-dataset trips are keyed by plate, rename them too
         if values["plate_number"] != old_plate:
             trip_dataset.rename_plate(old_plate, values["plate_number"])
         flash("Vehicle updated successfully.", "success")
@@ -1314,9 +1258,8 @@ def delete_vehicle(vehicle_id):
         flash("That vehicle no longer exists.", "danger")
         return redirect(url_for("vehicles"))
     try:
-        # The vehicle's trip records are deleted with it; its fuel requests stay
-        # in the prediction history (as "Vehicle deleted"), and a request whose
-        # actual fuel came from one of those trips loses it.
+        # its trips go too; fuel requests stay (as "Vehicle deleted") but lose
+        # actual fuel that came from those trips
         trip_ids = {t["id"] for t in db.find("trip_records", vehicle_id=vehicle_id)}
         for p in db.records("predictions"):
             fields = {}
@@ -1343,12 +1286,11 @@ def delete_vehicle(vehicle_id):
 # TRIP RECORDS
 # ------------------------------------------------------------------
 TRIP_NUMERIC_LIMITS = (
-    # field, label, min, max -- both are required (Monthly Report of Official Travel)
+    # field, label, min, max
     ("distance_km", "Distance traveled", 0, 1000),
     ("actual_fuel_consumption", "Fuel consumed", 0, 1000),
 )
-# A trip using less or more than this many liters per 100 km is saved, but the
-# user is asked to double-check it (likely an encoding error on the report).
+# Outside this L/100 km range a trip still saves, but with a warning.
 TRIP_EFFICIENCY_WARN = (3, 60)
 
 
@@ -1358,10 +1300,8 @@ TRIP_ROW_FIELDS = ("id", "num", "vehicle_id", "trip_date", "plate_number", "bran
 
 
 def trip_listing():
-    """Every trip record, numbered oldest first (January to December, like the
-    Monthly Report of Official Travel): the trips saved in the system plus the
-    trips from the online datasets (trip_dataset.py: read-only, `source` set).
-    A newly added or edited trip lands in its date's place automatically."""
+    """All trip records numbered oldest first: system trips plus online-dataset
+    trips (`source` set)."""
     _ensure_vehicle_columns()
     vehicles = db.records("vehicles")
     vehicles_by_id = {v["id"]: v for v in vehicles}
@@ -1375,9 +1315,7 @@ def trip_listing():
 
 
 def query_trips(q="", page=1):
-    """One page of trip records (JSON-safe rows for the table, the shared modals
-    and the live API) matching the search `q` (date, month, vehicle, km, L);
-    page "last" is the last page."""
+    """One page of trip records matching search `q`; page "last" = last page."""
     rows = trip_listing()
     total = len(rows)
     q = (q or "").strip().lower()
@@ -1406,9 +1344,7 @@ def trip_page_of(trip_id):
 
 
 def validate_trip_form(f, trip_id=None):
-    """Monthly Report of Official Travel: date of travel, vehicle, distance
-    traveled (km) and fuel consumed (L). Returns (errors, warnings). Errors
-    block saving; warnings are shown but the trip is still saved."""
+    """Validate a trip. Returns (errors, warnings); warnings don't block saving."""
     errors, warnings = [], []
     vid = (f.get("vehicle_id") or "").strip()
     if not (vid.isdigit() and db.get("vehicles", int(vid))):
@@ -1424,7 +1360,7 @@ def validate_trip_form(f, trip_id=None):
         raw = (f.get(field) or "").strip().replace(",", "")
         try:
             value = float(raw)
-            # value != value catches "nan", which passes every comparison.
+            # NaN check
             if value != value or not lo < value <= hi:
                 raise ValueError
             values[field] = value
@@ -1444,15 +1380,12 @@ ACTUAL_MATCH_DAYS_BEFORE, ACTUAL_MATCH_DAYS_AFTER = 1, 7
 
 
 def link_predictions_to_trips():
-    """Record the actual fuel of fuel requests automatically from Trip Records.
+    """Fill in actual fuel of fuel requests from Trip Records.
 
-    1. A request already filled from a trip follows that trip (its liters are
-       kept in step when the trip is edited, cleared if the trip lost them).
-    2. A request with no actual fuel yet is matched to the trip ticket of the
-       same vehicle dated from 1 day before to 7 days after the request, whose
-       distance is within ±20% of the requested distance (closest first), and
-       that is not already matched to another request.
-    Manually recorded actual fuel is never changed. Returns the request ids filled."""
+    - A request already linked to a trip follows that trip's liters.
+    - An unfilled request is matched to an unused trip of the same vehicle,
+      1 day before to 7 days after, with distance within 20% (closest first).
+    Manual entries are never changed. Returns the filled request ids."""
     trips = {t["id"]: t for t in db.records("trip_records")}
     preds = sorted(db.records("predictions"), key=lambda p: (p["created_at"], p["id"]))
 
@@ -1461,8 +1394,7 @@ def link_predictions_to_trips():
             db.update("predictions", p["id"], **fields)
             p.update(fields)
 
-    # 0. A request's own trip (added by the prediction): its fuel consumed is the
-    #    request's actual fuel, whichever of the two was filled in last.
+    # 0. request's own trip: keep both in sync, latest edit wins
     own = {t["prediction_id"]: t for t in trips.values() if t.get("prediction_id") is not None}
     for p in preds:
         t = own.get(p["id"])
@@ -1484,8 +1416,7 @@ def link_predictions_to_trips():
             change(p, actual_fuel=t["actual_fuel_consumption"])
         if p["actual_fuel"] is None:
             change(p, trip_record_id=None, actual_source=None)
-        # A rejected request released no fuel: it never takes a trip's actual fuel,
-        # and frees any trip it was matched to before it was rejected.
+        # rejected = no fuel released, unlink any matched trip
         if p["approval_status"] == "rejected":
             change(p, actual_fuel=None, trip_record_id=None, actual_source=None)
     used = {p["trip_record_id"] for p in preds if p["trip_record_id"] is not None}
@@ -1511,8 +1442,7 @@ def link_predictions_to_trips():
 
 
 def _link_actuals_quietly():
-    """Run the automatic actual-fuel matching after a trip change; a problem
-    there must never undo or block saving the trip itself."""
+    """Run the matching after a trip change without failing the save."""
     try:
         filled = link_predictions_to_trips()
         if filled:
@@ -1555,8 +1485,7 @@ def api_trips():
     return query_trips(request.args.get("q", ""), request.args.get("page", 1))
 
 
-# Trip records are the collected training data (Monthly Report of Official
-# Travel): staff only view them; the administrator adds, edits and deletes them.
+# Trip records: staff can view, only the admin can add/edit/delete.
 @app.route("/trips/add", methods=["POST"])
 @admin_required
 def add_trip():
@@ -1611,8 +1540,7 @@ def delete_trip(trip_id):
         flash("That trip record no longer exists.", "danger")
         return redirect(url_for("trips"))
     try:
-        # A fuel request whose actual fuel came from this trip loses it (and may
-        # be matched again to another trip below); manual entries are kept.
+        # requests that got actual fuel from this trip lose it (manual stays)
         for p in db.find("predictions", trip_record_id=trip_id):
             if p["actual_source"] == "trip":
                 db.update("predictions", p["id"], actual_fuel=None, trip_record_id=None, actual_source=None)
@@ -1627,9 +1555,8 @@ def delete_trip(trip_id):
     return redirect(url_for("trips"))
 
 
-# The trips from the online datasets (ids "d" + row_id, kept in
-# data/trip_records_dataset.csv): edited and deleted the same way. No fuel
-# request is ever matched to them (they are dated before the system was used).
+# Online-dataset trips (id "d" + row_id, from data/trip_records_dataset.csv).
+# Never matched to fuel requests since they predate the system.
 @app.route("/trips/d<int:row_id>/edit", methods=["POST"])
 @admin_required
 def edit_dataset_trip(row_id):
@@ -1693,12 +1620,8 @@ ONLINE_TRIPS_LABEL = "trip_records_online"   # data_source of the online-dataset
 
 
 def load_system_trip_records():
-    """Every trip of the Trip Records page (Monthly Report of Official Travel:
-    date, plate number, distance, fuel consumed) merged with the vehicle
-    records (engine power and fuel type) using the plate number: the GSO's own
-    trips (data_source "system") and the online-dataset trips (`source` set,
-    data_source ONLINE_TRIPS_LABEL, `source_row` = their row in the
-    supplementary dataset)."""
+    """All Trip Records trips joined with their vehicle (engine power, fuel
+    type) by plate number."""
     from model.preprocess import merge_trips_and_vehicles
     _ensure_vehicle_columns()
     vehicles = pd.DataFrame([{k: v[k] for k in ("plate_number", "brand_model", "fuel_type", "engine_power_kw")}
@@ -1731,8 +1654,7 @@ def _used_supplementary_rows(trip_records):
 
 
 def load_training_frame():
-    """Every trip record (historical CSV + Trip Records) merged with the rest of
-    the supplementary dataset."""
+    """All trip records plus the rest of the supplementary dataset."""
     from model.preprocess import load_and_merge_datasets
     trip_records = load_system_trip_records()
     return load_and_merge_datasets(app.config["HISTORICAL_DATA_PATH"],
@@ -1741,11 +1663,8 @@ def load_training_frame():
 
 
 def retrain_model(log=None):
-    """Train on the local trips + supplementary dataset and save model + metrics,
-    with the same steps as the Google Colab notebook. Used only by
-    `python model/train_model.py`: the web application never retrains on its
-    own (Chapter III: Flask loads the saved Joblib model without retraining);
-    a model trained in Google Colab is uploaded under Model Performance."""
+    """Train on trips + supplementary data and save the model and metrics.
+    Only used by model/train_model.py; the web app never retrains itself."""
     from model.train_model import train_and_save
     from model.preprocess import load_and_merge_datasets, supplementary_info
     system_records = load_system_trip_records()
@@ -1764,15 +1683,14 @@ def _reconnect_loop():
     while True:
         time.sleep(5)
         try:
-            if db.reconnect():  # was running from a backup while Firestore reads were blocked
+            if db.reconnect():  # was on backup data
                 print(" * Firebase Firestore can be read again (real-time sync on).")
         except Exception:
             app.logger.exception("Reconnecting to Firebase Firestore failed")
 
 
 def start_reconnect_watcher():
-    """Background thread that switches back to live Firestore data after the
-    server had to run from its newest backup (daily read quota reached)."""
+    """Switch back to live Firestore after running from a backup (quota hit)."""
     if _RECONNECT["running"]:
         return
     _RECONNECT["running"] = True
@@ -1795,8 +1713,7 @@ def _latest_backup_age_hours():
 
 
 def _backup_loop():
-    """Backs up the database every BACKUP_INTERVAL_HOURS while the server
-    runs (scripts/start_server.bat also backs up on every start)."""
+    """Back up the database every BACKUP_INTERVAL_HOURS."""
     import backup_database
     while True:
         try:
@@ -1816,9 +1733,8 @@ def start_backup_scheduler():
 
 
 def build_model_charts():
-    """Chart data for the Model Performance page, computed from the same
-    data and 80/20 split (random_state=42) the current model was trained
-    on. Cached per model version, so it refreshes after a new model is uploaded."""
+    """Chart data for Model Performance, same 80/20 split as training.
+    Cached per model version."""
     from sklearn.model_selection import train_test_split
     from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, clean_data
 
@@ -1839,14 +1755,12 @@ def build_model_charts():
     residuals = np.asarray(actual) - np.asarray(predicted)
     lo, hi = min(actual + predicted), max(actual + predicted)
 
-    # Residual histogram (normality check) on "nice" fixed-width bins centred on 0.
-    # The bins span 99% of the residuals; the few larger ones are counted in the
-    # first and last bins, so a handful of extreme trips cannot squeeze the
-    # whole distribution into one or two bars.
+    # residual histogram: bins centred on 0 cover 99% of residuals,
+    # outliers go into the end bins
     abs_resid = np.abs(residuals)
     spread = float(np.percentile(abs_resid, 99)) or float(abs_resid.max()) or 1.0
     width = next((w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * spread / w <= 24),
-                 float(np.ceil(spread / 12)))  # very large errors (e.g. a mis-encoded trip): about 24 bins
+                 float(np.ceil(spread / 12)))  # ~24 bins
     half = np.ceil(spread / width) * width
     edges = np.linspace(-half, half, int(round(2 * half / width)) + 1)
     counts, edges = np.histogram(np.clip(residuals, edges[0], edges[-1]), bins=edges)
@@ -1857,9 +1771,7 @@ def build_model_charts():
     if residuals.max() > edges[-1]:
         labels[-1] = f"{fmt(round(edges[-2], 2))} or more"
 
-    # Correlation heatmap of the equation's terms and the fuel consumed. A term
-    # with the same value in every record has no defined correlation; it is
-    # left out instead of showing a misleading 0.00.
+    # correlation heatmap; constant columns are skipped
     terms = pipeline.named_steps["encoder"].transform(df[FEATURE_COLUMNS]).assign(**{TARGET_COLUMN: df[TARGET_COLUMN].astype(float)})
     corr_cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
     corr = terms[corr_cols].corr().round(2).fillna(0)
@@ -1895,17 +1807,8 @@ def model_performance():
 
 
 def training_dataset_csv(name):
-    """The model's training data for the Google Colab notebook
-    (colab/fuel_consumption_linear_regression.ipynb), as the three CSV files
-    of Chapter III (How the Project Will Work); None for an unknown name:
-
-    * trip_records - the Monthly Report of Official Travel: date of travel,
-      plate number, distance traveled and fuel consumed of every trip of Trip
-      Records (historical CSV + the trips in the system); `source` is filled in
-      for the online-dataset trips and empty for the GSO's own trips;
-    * vehicle_records - plate number, vehicle model, fuel type and engine power;
-    * supplementary_data - the supplementary dataset, without the records that
-      are already trip records (each record is used once)."""
+    """Training CSV for the Colab notebook: trip_records, vehicle_records or
+    supplementary_data (minus rows already in trip records). None if unknown."""
     from model.preprocess import TRIP_COLUMNS, VEHICLE_COLUMNS
     if name == "supplementary_data":
         used = _used_supplementary_rows(load_system_trip_records())
@@ -1941,12 +1844,11 @@ def export_training_dataset(name):
 @app.route("/api/model-status")
 @login_required
 def api_model_status():
-    """Tiny, cheap endpoint the pages poll every couple of seconds; they only
-    fetch the full chart data when the model version changes."""
+    """Polled by pages; full chart data is fetched only when the version changes."""
     metrics = get_metrics() or {}
     return {
         "model_version": metrics.get("model_version"),
-        # "backup" while Firestore reads are blocked and the server runs from its newest backup
+        # "backup" while running from backup data
         "database": "backup" if db.offline_backup() else "live",
     }
 
@@ -1957,8 +1859,7 @@ def api_model_performance_data():
     return {"metrics": get_metrics(), "charts": build_model_charts()}
 
 
-# The results the Colab notebook saves with the model (metrics_colab.json) and
-# the Model Performance page shows.
+# Results file the Colab notebook saves with the model.
 UPLOAD_METRICS_KEYS = ("r2_score", "mae", "rmse", "cv_folds", "cv_mean_r2", "cv_std_r2", "cv_mean_mae",
                        "cv_std_mae", "cv_mean_rmse", "cv_std_rmse", "train_size", "test_size", "total_records",
                        "equation_terms", "intercept", "coefficients", "centering", "raw_intercept",
@@ -1966,10 +1867,8 @@ UPLOAD_METRICS_KEYS = ("r2_score", "mae", "rmse", "cv_folds", "cv_mean_r2", "cv_
 
 
 def check_uploaded_model(pipeline, metrics):
-    """Problems with an uploaded model + results pair (empty when usable): it
-    must be the Linear Regression pipeline of the notebook, and its predictions
-    must follow the equation in the uploaded results (so the two files belong
-    together)."""
+    """Problems with an uploaded model/results pair (empty if OK). The model
+    must be the notebook's pipeline and match the results equation."""
     from sklearn.linear_model import LinearRegression
     from sklearn.pipeline import Pipeline
     from model.preprocess import MODEL_TERMS, TermEncoder, build_prediction_frame
@@ -2003,16 +1902,13 @@ def check_uploaded_model(pipeline, metrics):
 
 
 def complete_uploaded_metrics(metrics):
-    """The notebook saves the scores; add what the system also shows with a
-    model (input ranges for the extrapolation warnings, record counts by
-    source), taken from the same cleaned training data in the system."""
+    """Add input ranges and record counts to the notebook's metrics."""
     from model.diagnostics import VIF_THRESHOLD
     from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, clean_data
     df = clean_data(load_training_frame())
     X = df[FEATURE_COLUMNS]
     stamp = now_local()
-    # The notebook saves the fitted values unrounded; show them like a model
-    # trained by model/train_model.py (6 significant digits).
+    # round like train_model.py (6 significant digits)
     sig = lambda v: float(f"{float(v):.6g}")
     extra = {
         "intercept": sig(metrics["intercept"]),
@@ -2041,11 +1937,8 @@ def complete_uploaded_metrics(metrics):
 @app.route("/model-performance/upload", methods=["POST"])
 @admin_required
 def upload_model():
-    """Model Performance > Upload Trained Model: the Linear Regression model
-    trained in Google Colab (Joblib file) and its results replace the model the
-    system predicts with (Chapter III: the trained model is saved and
-    integrated into the web application). Administrator only: a Joblib file
-    is loaded with pickle, so only files from the notebook belong here."""
+    """Upload a model trained in Colab (Joblib + results) to replace the
+    current one. Admin only, since Joblib files are unpickled."""
     from model.train_model import _replace_with_retry
     model_file, metrics_file = request.files.get("model_file"), request.files.get("metrics_file")
     if not (model_file and model_file.filename and metrics_file and metrics_file.filename):
@@ -2074,8 +1967,7 @@ def upload_model():
         flash("Model not uploaded: " + " ".join(problems), "danger")
         return redirect(url_for("model_performance"))
     metrics = complete_uploaded_metrics(metrics)
-    # Saved again with this server's libraries and swapped in, so a page
-    # reading at the same moment never sees half a file.
+    # re-save with local libraries, then swap the file in atomically
     joblib.dump(pipeline, app.config["MODEL_PATH"] + ".tmp")
     _replace_with_retry(app.config["MODEL_PATH"] + ".tmp", app.config["MODEL_PATH"])
     with open(app.config["METRICS_PATH"] + ".tmp", "w") as f:
@@ -2107,8 +1999,7 @@ def settings():
 @app.route("/api/me")
 @login_required
 def api_me():
-    """Current account details, polled by every page so the name in the
-    top bar (and the settings form) stay in sync across tabs."""
+    """Current account info, polled so the top bar stays in sync across tabs."""
     user = db.get("users", session["user_id"])
     return {
         "username": user["username"], "full_name": user["full_name"], "email": user["email"] or "",
@@ -2122,7 +2013,7 @@ def update_profile():
     full_name = " ".join((request.form.get("full_name") or "").split())
     position = " ".join((request.form.get("position") or "").split())
     if position == session["role"].capitalize():
-        position = ""  # same as the account's own role: nothing custom to keep
+        position = ""
     email = (request.form.get("email") or "").strip()
     username = (request.form.get("username") or "").strip()
     errors = []
@@ -2170,7 +2061,7 @@ def change_password():
     else:
         new_hash = generate_password_hash(new_password)
         db.update("users", session["user_id"], password_hash=new_hash)
-        session["pw_sig"] = password_signature(new_hash)  # stay logged in here; other sessions are signed out
+        session["pw_sig"] = password_signature(new_hash)  # keep this session, sign out the others
         session.pop("must_change_pw", None)
         flash("Password updated successfully. You were signed out on your other devices.", "success")
     return redirect(url_for("settings"))
@@ -2179,12 +2070,12 @@ def change_password():
 # ------------------------------------------------------------------
 # USER ACCOUNTS (admin only)
 # ------------------------------------------------------------------
-USER_ROLES = ["staff"]  # the only administrator is the account created by init_db.py
+USER_ROLES = ["staff"]  # the admin is only created by init_db.py
 USERNAME_RE = re.compile(r"[A-Za-z0-9_.-]{3,50}")
 
 
 def password_problem(password, username=""):
-    """Shared password policy (Settings and User Accounts). None when valid."""
+    """Password rules. None if valid."""
     if not 8 <= len(password) <= 128:
         return "Password must be 8 to 128 characters long."
     if password in DEFAULT_PASSWORDS:
@@ -2375,7 +2266,7 @@ def handle_not_found(e):
 @app.errorhandler(500)
 def handle_server_error(e):
     app.logger.exception("Unhandled server error")
-    # Firebase Firestore cannot be reached (no internet, missing key): say so plainly.
+    # Firestore unreachable (no internet or missing key)
     original = getattr(e, "original_exception", None)
     if isinstance(original, db.DatabaseUnavailable):
         if _wants_json():
@@ -2393,9 +2284,7 @@ def handle_server_error(e):
 
 
 def _already_running(port):
-    """True when a server (e.g. the one scripts\\start_server.bat started) already
-    answers on this port: on Windows a second one could share the port and leave
-    the browser talking to either of them."""
+    """True if a server already runs on this port (Windows lets two share it)."""
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(1)
@@ -2409,10 +2298,8 @@ if __name__ == "__main__":
         print(f"   Open it in the browser: http://127.0.0.1:{_port}")
         print("   To run it from this terminal instead: scripts\\stop_server.bat, then python app.py again.")
         sys.exit(0)
-    # Serve with Waitress: on this Windows setup the Werkzeug development
-    # server intermittently cut larger pages short (stalling ~19 s and
-    # dropping the end of the HTML, including the page's JavaScript).
-    # Set USE_DEV_SERVER=1 to use Flask's auto-reloading debug server instead.
+    # Waitress, because the Werkzeug dev server cut large pages short here.
+    # USE_DEV_SERVER=1 switches back to the dev server.
     if os.environ.get("USE_DEV_SERVER") == "1":
         if os.environ.get("WERKZEUG_RUN_MAIN") == "true":  # reloader child only
             with app.app_context():
@@ -2433,6 +2320,6 @@ if __name__ == "__main__":
                 print(f" * WARNING: Firebase Firestore is not reachable yet: {e}")
         start_reconnect_watcher()
         start_backup_scheduler()
-        port = int(os.environ.get("PORT", 5000))  # hosting providers choose the port
+        port = int(os.environ.get("PORT", 5000))  # set by the host
         print(f" * Serving on http://127.0.0.1:{port} (Waitress)")
         serve(app, host="0.0.0.0", port=port, threads=8)

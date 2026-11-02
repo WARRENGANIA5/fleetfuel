@@ -1,28 +1,17 @@
-"""Firebase Firestore data layer (Chapter III: Firebase Firestore stores the
-vehicle records and the prediction history of the web application).
+"""Firestore data layer.
 
-Collections (one document per record):
-    users, vehicles, trip_records, predictions, notification_dismissals,
-    trip_dataset_changes (changes to the online-dataset trips, see trip_dataset.py)
+Collections: users, vehicles, trip_records, predictions,
+notification_dismissals, trip_dataset_changes.
 
-Records keep whole-number IDs (1, 2, 3 ...), like the record numbers the pages
-and links use. A new record takes the next number above the highest one in use
-and is saved with Firestore's create(), which refuses a number that is already
-taken (two users saving at the same moment), so the next one is tried.
+IDs are integers (1, 2, 3...). New records take the next free ID using
+create(), which fails if the ID is already taken, so we just try the next one.
 
-Real-time sync: while the server runs, a Firestore snapshot listener per
-collection keeps an up-to-date copy of the records in memory. Pages read that
-copy (instant, and the pages that refresh every few seconds cost no Firestore
-reads); every change, from this server or another one, arrives within a moment.
-Writes go to Firestore first and are applied to the copy right away.
+The server keeps an in-memory copy of each collection, updated by snapshot
+listeners, so page polling doesn't cost Firestore reads. Without listeners
+(Vercel, scripts) each write bumps `_counters/_changes` and requests reload
+only when that counter changed.
 
-Without listeners (serverless hosting, short scripts) every write also adds 1
-to a change counter (`_counters/_changes`); a request reads that one document
-and loads the records again only when it changed, so the pages that refresh
-every few seconds cost 1 read each instead of reading every record.
-
-Values: dates of travel are stored as "YYYY-MM-DD" text and returned as dates;
-times are stored as Firestore timestamps and returned in Philippine time.
+Dates of travel are stored as "YYYY-MM-DD"; timestamps come back in PH time.
 """
 import copy
 import json
@@ -36,13 +25,12 @@ from timeutil import LOCAL_TZ, now_local
 COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification_dismissals",
                "trip_dataset_changes")
 COUNTERS = "_counters"
-CHANGES = "_changes"   # document in COUNTERS: how many writes so far (see module doc)
+CHANGES = "_changes"   # write counter doc
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
 RECONNECT_SECONDS = 60
 DATE_FIELDS = {"trip_date"}
 
-# Every field of each record, with its default, so a page never meets a
-# missing key (Firestore documents have no fixed columns).
+# Default value for every field so rows never miss a key.
 FIELDS = {
     "users": {"username": None, "password_hash": None, "full_name": None, "position": None,
               "email": None, "role": "staff", "status": "active", "notif_seen_at": None, "created_at": None},
@@ -50,14 +38,13 @@ FIELDS = {
                  "created_at": None, "updated_at": None},
     "trip_records": {"vehicle_id": None, "trip_date": None, "distance_km": None,
                      "actual_fuel_consumption": None, "remarks": None, "created_by": None, "created_at": None,
-                     "prediction_id": None},   # the fuel request (prediction) that added the trip
+                     "prediction_id": None},   # fuel request that added this trip
     "predictions": {"user_id": None, "vehicle_id": None, "distance_km": None, "engine_power_kw": None,
                     "fuel_type": None, "predicted_fuel": None, "actual_fuel": None, "trip_record_id": None,
                     "actual_source": None, "created_at": None, "approval_status": "pending",
                     "approved_fuel": None, "reviewed_by": None, "reviewed_at": None, "review_note": None},
     "notification_dismissals": {"user_id": None, "notif_key": None, "dismissed_at": None},
-    # Changes to the online-dataset trips of Trip Records (see trip_dataset.py):
-    # kind = edit / delete (row_id) or rename_plate / delete_plate (plate numbers).
+    # edits to online-dataset trips: edit/delete (row_id), rename_plate/delete_plate
     "trip_dataset_changes": {"kind": None, "row_id": None, "trip_date": None, "plate_number": None,
                              "old_plate": None, "distance_km": None, "actual_fuel_consumption": None,
                              "created_at": None},
@@ -72,8 +59,7 @@ class DatabaseUnavailable(Exception):
 # value conversion
 # ------------------------------------------------------------------
 def _plain_datetime(v):
-    """A plain datetime: Firestore hands back its own datetime subclass, which
-    the library cannot write again once it has been copied or changed."""
+    """Convert Firestore's datetime subclass to a plain datetime so it can be written back."""
     return datetime(v.year, v.month, v.day, v.hour, v.minute, v.second, v.microsecond, v.tzinfo)
 
 
@@ -146,10 +132,8 @@ class FirestoreBackend:
         self.client.collection(coll).document(str(doc_id)).delete()
 
     def create(self, coll, after, data):
-        """Save a new record under the next free ID above `after` (the highest ID
-        in the copy). Firestore's create() refuses an ID that is taken (another
-        computer saved first), so the next one is tried. Needs no read, so new
-        records can be saved even when the daily read quota is used up."""
+        """Save under the next free ID above `after`. No reads needed, so this
+        still works when the read quota is used up."""
         from google.api_core.exceptions import AlreadyExists, Conflict
         new = int(after) + 1
         for _ in range(200):
@@ -177,7 +161,7 @@ class FirestoreBackend:
 
 
 class MemoryBackend:
-    """Same interface, kept in memory: for automated tests only (DB_BACKEND=memory)."""
+    """In-memory store for tests (DB_BACKEND=memory)."""
 
     def __init__(self, config=None):
         self.data = {c: {} for c in COLLECTIONS}
@@ -217,17 +201,17 @@ class MemoryBackend:
 
 
 # ------------------------------------------------------------------
-# in-memory copy kept in sync with Firestore
+# in-memory cache
 # ------------------------------------------------------------------
 class Store:
     def __init__(self, backend, live):
         self.backend = backend
-        self.live = live          # keep listeners open (long-running server)
+        self.live = live          # use listeners (long-running server)
         self.rows = {}            # coll -> {id: decoded row}
         self.loaded = {}          # coll -> threading.Event
         self.watches = {}
-        self.mark = None          # change counter when the copy was last loaded (no listeners)
-        self.offline = None       # backup file the copy came from while Firestore reads are blocked
+        self.mark = None          # counter value at last load
+        self.offline = None       # backup file in use while Firestore is unreadable
         self.last_try = 0.0
         self.lock = threading.RLock()
 
@@ -263,7 +247,7 @@ class Store:
                 self.watches[coll] = self.backend.watch(
                     coll, lambda kind, doc_id, data: self._apply(coll, kind, doc_id, data))
             except Exception:
-                pass  # no listener: the copy is still updated by this server's own writes
+                pass
 
     def table(self, coll):
         self.ensure(coll)
@@ -289,8 +273,7 @@ def _store(refresh=True):
                         raise
                     except Exception as e:
                         raise DatabaseUnavailable(str(e)) from e
-                    # Listeners are opened by the running server (warm_up); a
-                    # short script reads fresh data instead and exits cleanly.
+                    # scripts read once; only the server opens listeners
                     live = False
                 _STORE["store"] = Store(backend, live)
     store = _STORE["store"]
@@ -300,10 +283,8 @@ def _store(refresh=True):
 
 
 def _refresh_per_request(store):
-    """Without listeners (serverless hosting, short scripts): once per request,
-    read the change counter (1 read) and load the records again only when a
-    write happened since the copy was loaded. (Edits typed straight into the
-    Firebase console, which skip the counter, show after the next app write.)"""
+    """No listeners: reload only if the change counter moved (1 read).
+    Edits made in the Firebase console show after the next app write."""
     try:
         from flask import g, has_app_context
         if not has_app_context() or isinstance(store.backend, MemoryBackend):
@@ -329,7 +310,7 @@ def _refresh_per_request(store):
 # public API used by the app
 # ------------------------------------------------------------------
 def records(coll):
-    """Every record of a collection (copies, safe to change)."""
+    """All records of a collection (copies)."""
     store = _store()
     with store.lock:
         return [dict(r) for r in store.table(coll).values()]
@@ -382,7 +363,7 @@ def insert(coll, data):
 
 
 def put(coll, doc_id, data):
-    """Create or replace a record under a chosen ID (e.g. notification dismissals)."""
+    """Create or replace a record under a given ID."""
     store = _store()
     store.ensure(coll)
     record = dict(FIELDS.get(coll, {}))
@@ -428,19 +409,17 @@ def delete(coll, doc_id):
 
 
 def _changed(store):
-    """Tell servers without listeners that the records changed (1 small write)."""
+    """Bump the change counter for servers without listeners."""
     try:
         store.backend.bump()
     except Exception:
-        pass  # the record itself is saved; other servers notice at their next change
+        pass
 
 
 def warm_up():
-    """Server start: load every collection and open its real-time listener.
-    If Firestore cannot be read (e.g. the free daily read quota is used up),
-    start from the newest backup in backups/ instead; saving still goes to
-    Firestore, and reconnect() switches back once it can be read again."""
-    store = _store(refresh=False)  # the server keeps its copy current with listeners instead
+    """Load every collection and start listeners. If Firestore can't be read
+    (e.g. quota used up), load the newest backup instead until reconnect()."""
+    store = _store(refresh=False)  # listeners keep it fresh
     if not isinstance(store.backend, MemoryBackend):
         store.live = True
     try:
@@ -498,15 +477,13 @@ def _load_backup(store, path):
 
 
 def offline_backup():
-    """The backup file the server is running from, or None when Firestore is read normally."""
+    """Backup file in use, or None."""
     store = _STORE["store"]
     return store.offline if store else None
 
 
 def reconnect():
-    """Called by the server's background loop: while running from a backup, try
-    Firestore again (once a minute); when it answers, load the real records and
-    open the listeners. Returns True when it switched back."""
+    """Try Firestore again while running from a backup. True if it switched back."""
     store = _STORE["store"]
     if not store or not store.offline or time.time() - store.last_try < RECONNECT_SECONDS:
         return False

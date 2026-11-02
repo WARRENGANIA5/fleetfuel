@@ -1,5 +1,4 @@
-{# Light / dark mode chosen in Settings > Appearance (saved in this browser).
-   Runs before the page is drawn, so a light-mode page never flashes dark. #}
+{# apply the saved theme before paint to avoid a flash #}
 <script>
 try {
   if (localStorage.getItem('fleetfuel-theme') === 'light') {

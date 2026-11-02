@@ -1,28 +1,18 @@
-"""Build trip_records_dataset.csv: the supplementary online records shown as
-trip records (Trip Records page) of the fleet vehicles.
+"""Build trip_records_dataset.csv: online records assigned to the fleet
+vehicles so they show up as trips on the Trip Records page.
 
-Distance traveled (km) and fuel consumed (L) of every record come unchanged
-(rounded to 0.01) from supplementary_data.csv - Fan & Song (2022) on Mendeley
-Data and the European Environment Agency (2025), both found through Google
-Dataset Search; see SUPPLEMENTARY_DATASET_SOURCE.md. The date of travel and
-the vehicle are assigned:
+Distance and fuel come from supplementary_data.csv as-is (see
+SUPPLEMENTARY_DATASET_SOURCE.md). Dates and vehicles are assigned:
 
-* from 2019-03-05 (the fleet's earliest acquisition date, ACQUIRED) to
-  2026-10-29, each vehicle GSU already had travels at most once a day, as often
-  as the GSO's own trips show for that day of the week (scaled down for the
-  less-used vehicles, FLEET_SHARE);
-* no trips on Philippine regular holidays;
-* each trip takes an unused diesel record (EEA vans, fixed random seed 42) with
-  an engine power close to the vehicle's (VEHICLE_KW), so its fuel use fits the
-  vehicle, and a distance drawn like the GSO trips' distances (30-400 km). The
-  records left over are not used.
+* 2019-03-05 to 2026-10-29, at most one trip per vehicle per day, following
+  the GSO's weekday pattern, scaled by FLEET_SHARE
+* no trips on regular holidays
+* each trip uses an unused EEA diesel record with engine power close to the
+  vehicle's (VEHICLE_KW), distance drawn like the GSO trips (seed 42)
 
-`source`, `source_vehicle` and `source_row` (its row in supplementary_data.csv)
-keep where each record came from. The
-administrator can edit and delete these trips on the Trip Records page; that
-changes this file, so running this script again undoes those changes. The model is
-still trained on supplementary_data.csv itself (with each record's own engine
-power and fuel type), not on this file.
+`source`, `source_vehicle` and `source_row` point back to the original row.
+Re-running this resets any edits made on the Trip Records page. Training
+still uses supplementary_data.csv, not this file.
 
 Run:  python data/build_trip_records_dataset.py
 """
@@ -36,17 +26,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE = os.path.join(HERE, "supplementary_data.csv")
 OUTPUT = os.path.join(HERE, "trip_records_dataset.csv")
 
-# The fleet vehicles of Vehicle Management (plate numbers) and the share of the
-# trips each one gets: the vans and the Innova travel most, the bus least, so
-# the vehicles do not all have the same number of trips.
+# relative trip share per vehicle (vans/Innova most, bus least)
 FLEET_SHARE = {"SFA 4714": 16, "SFA 1173": 15, "SFA 4713": 14, "SFA 1172": 13, "SFA 4712": 12,
                "SGF 810": 10, "SJC 955": 9, "SEF 535": 7, "SFA 1741": 4}
 SEED = 42
 
-# When GSU got each vehicle: it has no trips before this date. Published dates
-# where GSU posted them; otherwise ESTIMATED as the earliest date the vehicle
-# could be GSU's, from its model (engine power in Vehicle Management) and its
-# plate number. Replace an estimate with the GSO property record's "date acquired".
+# Date GSU got each vehicle (no trips before it). ESTIMATED ones should be
+# replaced with the "date acquired" from the GSO property records.
 ACQUIRED = {
     # ESTIMATED - Toyota Hiace GL Grandia, 130 kW: only the new 2.8 1GD Hiace has
     # this power; it went on sale in the Philippines on March 5, 2019.
@@ -71,31 +57,23 @@ ACQUIRED = {
     # (https://www.gsu.edu.ph/2025/05/07/gsu-welcomes-new-university-bus-with-blessing-ceremony-to-boost-campus-mobility/)
     "SFA 1741": date(2025, 5, 7),
 }
-# The trips run from the day the fleet above was complete to yesterday;
-# SFA 4714's trips from 2026 are the GSO's own Monthly Reports of Official
-# Travel, so its dataset trips stop before 2026.
+# SFA 4714 stops at 2025 since its 2026 trips are the real GSO records
 FIRST_DAY, LAST_DAY = min(ACQUIRED.values()), date(2026, 10, 29)
 LAST_TRIP = {"SFA 4714": date(2025, 12, 31)}
 
-# How the fleet travels, from the GSO's own trips (data/gso_monthly_travel_SFA4714_2026.csv,
-# SFA 4714, Jan-Jun 2026): at most one trip a day, on about half of the days,
-# mostly Monday to Thursday; 32-372 km a trip (176 km on average).
+# Travel pattern from the real GSO trips (SFA 4714, Jan-Jun 2026): about every
+# other day, mostly Mon-Thu, 32-372 km (avg 176 km).
 GSO_TRIPS = os.path.join(HERE, "gso_monthly_travel_SFA4714_2026.csv")
-DISTANCE_BINS = [30, 80, 130, 180, 230, 280, 330, 400]   # km; the records are drawn to match the GSO trips
+DISTANCE_BINS = [30, 80, 130, 180, 230, 280, 330, 400]   # km
 
-# Engine power (kW) of each vehicle in Vehicle Management. All 9 are diesel, so
-# a vehicle's trips are diesel records (EEA vans) whose engine power is within
-# KW_WINDOW of its own: their fuel use then fits the vehicle's size.
+# Engine power (kW) per vehicle; trips use EEA vans within KW_WINDOW of it.
 VEHICLE_KW = {"SEF 535": 51, "SFA 1172": 130, "SFA 1173": 128, "SFA 1741": 177, "SFA 4712": 95,
               "SFA 4713": 95, "SFA 4714": 95, "SGF 810": 63, "SJC 955": 62}
 KW_WINDOW = 10
 
 
 def holidays(year):
-    """Philippine regular holidays (offices closed, no official travel):
-    New Year, Maundy Thursday, Good Friday, Araw ng Kagitingan, Labor Day,
-    Independence Day, National Heroes Day (last Monday of August), Bonifacio
-    Day, Christmas and Rizal Day."""
+    """Philippine regular holidays (no official travel)."""
     from dateutil.easter import easter
     e = easter(year)
     heroes = max(date(year, 8, d) for d in range(25, 32) if date(year, 8, d).weekday() == 0)
@@ -105,8 +83,7 @@ def holidays(year):
 
 
 def gso_pattern():
-    """From the GSO trips: the chance of a trip on each day of the week
-    (Monday = 0) and the share of trips in each distance bin."""
+    """Trip chance per weekday (Mon = 0) and distance bin shares from the GSO trips."""
     gso = pd.read_csv(GSO_TRIPS, parse_dates=["date"])
     span = pd.date_range(gso["date"].min(), gso["date"].max())
     per_weekday = gso["date"].dt.dayofweek.value_counts()
@@ -119,10 +96,10 @@ def main():
     weekday_chance, bin_share = gso_pattern()
     rng = np.random.default_rng(SEED)
     src = pd.read_csv(SOURCE)
-    src["source_row"] = src.index   # row of supplementary_data.csv: training leaves it out there (no double count)
+    src["source_row"] = src.index   # so training can skip it (no double count)
     src = src[src["distance_km"].between(DISTANCE_BINS[0], DISTANCE_BINS[-1]) & (src["fuel_type"] == "Diesel")]
     src = src.sample(frac=1, random_state=SEED).reset_index(drop=True)
-    # For each vehicle and distance bin: the unused records it may take.
+    # unused records per vehicle and distance bin
     by_bin = {p: [list(src.index[(src["distance_km"] > lo) & (src["distance_km"] <= hi)
                                  & ((src["engine_power_kw"] - kw).abs() <= KW_WINDOW)])
                   for lo, hi in zip(DISTANCE_BINS, DISTANCE_BINS[1:])]
@@ -139,10 +116,8 @@ def main():
                 used.add(cand[0])
                 return cand.pop(0)
         return None
-    # Each day, each vehicle GSU had travels once or not at all: the busiest
-    # vehicle (SFA 4714, share 16) as often as in the GSO reports for that day
-    # of the week, the others less (FLEET_SHARE). Its trip is the next unused
-    # online record of a distance drawn like the GSO trips' distances.
+    # each day a vehicle makes 0 or 1 trip; SFA 4714 follows the GSO rate,
+    # the rest are scaled down by FLEET_SHARE
     busiest = max(FLEET_SHARE.values())
     rows, day, closed = [], FIRST_DAY, set()
     for y in range(FIRST_DAY.year, LAST_DAY.year + 1):
@@ -161,7 +136,7 @@ def main():
         day += timedelta(days=1)
     pick = src.loc[[i for _, _, i in rows]].reset_index(drop=True)
     out = pd.DataFrame({
-        "row_id": np.arange(1, len(rows) + 1),   # permanent key: edits and deletes on the Trip Records page use it
+        "row_id": np.arange(1, len(rows) + 1),   # stable key for edits/deletes
         "trip_date": [d for d, _, _ in rows],
         "plate_number": [p for _, p, _ in rows],
         "distance_km": pick["distance_km"].round(2),

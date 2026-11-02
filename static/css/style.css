@@ -1,6 +1,5 @@
 :root {
-  /* Palette matched to the Flutter Responsive Admin Dashboard reference
-     (primaryColor / secondaryColor / bgColor), adapted to a web dark theme. */
+  /* dark theme palette */
   --navy-950: #171927;
   --navy-900: #2a2d3e;
   --navy-800: #323548;
@@ -34,12 +33,10 @@
 
 * { box-sizing: border-box; }
 
-/* ---------------- Page changes ----------------
-   No animation: the next page shows the moment it arrives. The page's own
-   colour sits behind everything, so a click never flashes white. */
+/* ---------------- Page changes ---------------- */
 html { background: var(--bg-page); }
 
-/* Thin bar along the top while the next page loads. */
+/* top loading bar */
 .page-progress {
   position: fixed; top: 0; left: 0; z-index: 3000;
   height: 3px; width: 0; opacity: 0;
@@ -50,8 +47,7 @@ html { background: var(--bg-page); }
 }
 .page-progress.is-loading { opacity: 1; width: 70%; transition: width 6s cubic-bezier(0.1, 0.6, 0.2, 1), opacity 0.1s; }
 
-/* Pages switch in place (script.js). If the next page is not ready within a
-   moment, the old content is cleared and a small spinner holds its place. */
+/* spinner while the next page loads */
 .content-area.is-switching { position: relative; min-height: 60vh; }
 .content-area.is-switching > * { visibility: hidden; }
 .content-area.is-switching::after {
@@ -308,13 +304,13 @@ a { text-decoration: none; color: inherit; }
 .stat-card:has(.stat-icon.amber)::before { background: var(--warning); }
 
 .stat-value { font-size: 24px; font-weight: 800; color: var(--text-dark); line-height: 1.1; }
-/* one line only, so every stat card keeps the same height; the full wording is in the title tooltip */
+/* single line so all stat cards are the same height */
 .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-card > div:last-child { min-width: 0; }
 @media (max-width: 575px) {
   .stat-card { padding: 14px; gap: 10px; }
   .stat-value { font-size: 20px; }
-  /* smaller icon leaves room for labels like "Pending Fuel Requests" on two-column phones */
+  /* smaller icon so long labels fit on phones */
   .stat-icon { width: 40px; height: 40px; font-size: 16px; border-radius: 12px; }
   .stat-label { font-size: 11.5px; line-height: 1.3; }
 }
@@ -372,9 +368,7 @@ a { text-decoration: none; color: inherit; }
 
 /* ---------------- Tables ---------------- */
 .table-wrap { overflow-x: auto; border-radius: var(--radius-md); -webkit-overflow-scrolling: touch; }
-/* Phones and tablets: one compact line per row (dates no longer wrap to two
-   lines), and an edge shadow while more columns are hidden to the left/right,
-   so people know the table can be swiped sideways. */
+/* mobile: no wrapping, edge shadow when the table scrolls sideways */
 @media (max-width: 991px) {
   .table-fleet tbody td { white-space: nowrap; padding: 10px 12px; font-size: 13px; }
   .table-fleet thead th { padding: 10px 12px; }
@@ -423,7 +417,7 @@ a { text-decoration: none; color: inherit; }
 .badge-active { background: rgba(38, 229, 197, 0.15); color: var(--success); }
 .badge-maintenance { background: rgba(255, 207, 38, 0.15); color: var(--warning); }
 .badge-inactive { background: rgba(238, 39, 39, 0.15); color: var(--danger); }
-/* Prediction form: a field the current model does not use. */
+/* field not used by the current model */
 .badge-recorded {
   display: inline-block;
   margin-left: 4px;
@@ -576,7 +570,7 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-size: 22px; color: var(--blue-500); background: var(--blue-100);
 }
-/* Floating inputs and the Login button share one height (Bootstrap input default is 58px). */
+/* same height for inputs and the Login button */
 .login-card .form-floating > .form-control {
   height: 46px;
   min-height: 46px;
@@ -605,9 +599,7 @@ a { text-decoration: none; color: inherit; }
   box-shadow: 0 0 0 1000px rgba(58, 62, 84, 0.95) inset;
   transition: background-color 9999s ease-in-out 0s;
 }
-/* Hide native browser password-reveal buttons (Edge/IE ::-ms-reveal, Chrome/Safari
-   credentials auto-fill button) on every password field (login, sign-up, Account
-   Settings, User Accounts) so they don't stack on top of our own eye icon. */
+/* hide the browser's own password reveal buttons (we have our own) */
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
@@ -622,10 +614,10 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
   right: 0;
 }
 
-/* Eye icon floats inside the password field itself (no separate box/seam). */
+/* eye icon inside the password field */
 .password-field-wrap { position: relative; }
 .password-field-wrap .form-control { padding-right: 44px; }
-/* The show/hide eye sits where Bootstrap draws its valid/invalid icon: keep only the eye. */
+/* hide Bootstrap's validation icon behind the eye */
 .password-field-wrap .form-control.is-valid,
 .password-field-wrap .form-control.is-invalid,
 .was-validated .password-field-wrap .form-control:valid,
@@ -650,7 +642,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 }
 .login-footer-note { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 22px; }
 
-/* Sign up: real-time checks while typing */
+/* sign-up live checks */
 .auth-note { font-size: 12.5px; color: var(--text-muted); background: var(--blue-100); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 18px; line-height: 1.5; }
 .field-hint { font-size: 12px; margin-top: 5px; color: var(--text-muted); }
 .field-hint:empty { display: none; }
@@ -664,7 +656,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 .pw-rules li.bad::before { content: "\2717"; }
 @media (max-width: 400px) { .pw-rules { grid-template-columns: 1fr; } }
 
-/* Waiting for approval (after sign up) */
+/* waiting for approval */
 .pending-spinner { font-size: 34px; color: var(--warning); margin: 4px 0 14px; animation: pending-flip 2.4s ease-in-out infinite; }
 @keyframes pending-flip { 0%, 40% { transform: rotate(0); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
 .pending-status { font-size: 12.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
@@ -715,7 +707,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 
 .chart-card img { width: 100%; border-radius: 10px; background: #fff; padding: 8px; }
 
-/* Legend rows (Model Performance correlation list) */
+/* correlation legend */
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .legend-label { flex: 1; font-size: 13px; color: var(--text-dark); font-weight: 500; }
 .legend-value { font-size: 13px; font-weight: 700; color: var(--text-dark); }
@@ -737,8 +729,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
   .search-box { flex: 1 1 100%; }
 }
 
-/* ---------------- Tables on phones: one card per row ----------------
-   script.js copies each column name into its cells' data-label. */
+/* ---------------- Tables on phones: one card per row ---------------- */
 @media (max-width: 575px) {
   .table-wrap { overflow: visible; background: none; }
   .table-fleet { min-width: 0; }
@@ -865,7 +856,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 .model-info-line { font-size: 12.5px; color: var(--text-muted); margin-bottom: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .model-info-line strong { color: var(--text-dark); font-weight: 600; }
 
-/* ---------------- Table action icons: always one straight row ---------------- */
+/* ---------------- Table action icons ---------------- */
 .table-fleet td:has(> .action-btn),
 .table-fleet td.actions-cell {
   white-space: nowrap;
@@ -882,7 +873,7 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 .diag-note { font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; }
 .diag-table td, .diag-table th { font-size: 12.5px; padding-top: 8px; padding-bottom: 8px; }
 
-/* ---------------- Small phones: keep the top bar on one tidy line ---------------- */
+/* ---------------- Small phones: top bar ---------------- */
 @media (max-width: 575px) {
   .topbar { gap: 10px; }
   .topbar-title h1 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -895,21 +886,21 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
 .auth-switch a { color: var(--blue-500); font-weight: 700; text-decoration: none; }
 .auth-switch a:hover { text-decoration: underline; }
 
-/* ---------------- Sidebar badge: sign-ups waiting for approval ---------------- */
+/* ---------------- Sidebar badge ---------------- */
 .nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
   background: #ffb547; color: #1b1d2a; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .nav-badge[hidden] { display: none; }
 
-/* Status badges never wrap (e.g. "Pending approval") */
+/* status badges don't wrap */
 .badge-status { white-space: nowrap; }
 
-/* Prediction result: predicted range under the big number */
+/* predicted range */
 .result-range { margin-top: 10px; font-size: 13px; opacity: 0.95; }
 
-/* "Live" labels hidden on every page (the pages still refresh automatically in the background) */
+/* hide "Live" labels */
 .live-badge { display: none !important; }
 
-/* ---------------- Notifications bell: clickable items, new-item marker ---------------- */
+/* ---------------- Notifications bell ---------------- */
 a.notif-item { text-decoration: none; color: inherit; }
 a.notif-item:hover { background: rgba(255,255,255,0.04); }
 .notif-item.is-new { box-shadow: inset 3px 0 0 var(--blue-500); }
@@ -918,7 +909,7 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
 .notif-info .notif-item-icon { color: var(--blue-500); }
 .notif-panel-footer a { color: var(--blue-500); text-decoration: none; font-size: 12.5px; }
 
-/* ================= Print: black text on white paper ================= */
+/* ================= Print ================= */
 .print-header { display: none; }
 @media print {
   @page { margin: 12mm; }
@@ -952,12 +943,12 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
   .print-meta { font-size: 11px; color: #444444; }
 }
 
-/* Clickable table rows (e.g. recent predictions open their result page) */
+/* clickable rows */
 .row-link { cursor: pointer; }
 .row-link:hover td { background: rgba(38, 151, 255, 0.06); }
 .row-link td a { color: inherit; text-decoration: none; }
 
-/* ---------------- Notifications: remove one (x) or Clear all ---------------- */
+/* ---------------- Notifications: dismiss ---------------- */
 .notif-row { position: relative; border-bottom: 1px solid var(--border-soft); transition: opacity .15s, transform .15s; }
 .notif-row:last-child { border-bottom: none; }
 .notif-row .notif-item { border-bottom: none; padding-right: 40px; }
@@ -972,20 +963,20 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
 .notif-remove:hover { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
 .notif-clear { border: none; background: transparent; color: var(--blue-500); font-size: 12px; font-weight: 600; padding: 0; cursor: pointer; }
 .notif-clear:hover { text-decoration: underline; }
-@media (hover: none) { .notif-remove { opacity: 1; } }  /* phones: always visible */
+@media (hover: none) { .notif-remove { opacity: 1; } }
 
-/* Stat cards that open a filtered list (e.g. fuel requests waiting for approval) */
+/* clickable stat cards */
 a.stat-card-link { text-decoration: none; color: inherit; cursor: pointer; }
 a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
-/* Dashboard Model Status figures: the whole block opens Model Performance. */
+/* model status block links to Model Performance */
 .model-summary-link { cursor: pointer; border-radius: 8px; margin: -6px; padding: 6px; transition: background 0.15s ease; }
 .model-summary-link:hover { background: rgba(255,255,255,0.05); }
 .model-summary-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
 
-/* Error message under a password box that has the show/hide eye */
+/* error text under password fields */
 .was-validated .password-field-wrap:has(.form-control:invalid) ~ .invalid-feedback { display: block; }
 
-/* Phone browser in "Desktop site" mode: one-line hint at the top */
+/* "Desktop site" hint */
 .desktop-site-hint {
   position: sticky; top: 0; z-index: 3000;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -995,16 +986,13 @@ a.stat-card-link:focus-visible { outline: 2px solid var(--blue-500); outline-off
 .desktop-site-hint i { margin-right: 8px; }
 .desktop-site-hint button { border: 0; background: none; font-size: 40px; line-height: 1; color: inherit; padding: 0 6px; }
 
-/* Phone layout forced on a "Desktop site" phone (script.js scales the page by
-   --fp-zoom), so full-screen heights are divided by the same factor. */
+/* forced phone layout: divide full heights by --fp-zoom */
 html.force-phone .app-shell,
 html.force-phone .login-page { min-height: calc(100vh / var(--fp-zoom, 1)); }
 html.force-phone .sidebar { height: calc(100vh / var(--fp-zoom, 1)); bottom: auto; }
 
-/* ================= Light mode (switch in the top bar) =================
-   Dark stays the default. html[data-theme="light"] swaps the palette for a
-   clean white-and-slate one; the rules below only fix the spots that were
-   drawn with fixed dark-theme colours. */
+/* ================= Light mode =================
+   Dark is the default. These fix spots with hard-coded dark colours. */
 html[data-theme="light"] {
   --navy-950: #1c2540;
   --navy-900: #24304f;
@@ -1032,12 +1020,12 @@ html[data-theme="light"] {
   --bs-secondary-color: #667085;
   --bs-emphasis-color: #0f172a;
 }
-/* Colours fade over when the mode is switched (script.js adds the class briefly). */
+/* fade colours on theme switch */
 html.theme-switching, html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
   transition: background-color .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Sidebar: white panel, slate text, blue pill for the open page. */
+/* sidebar */
 html[data-theme="light"] .sidebar {
   background: #ffffff;
   color: var(--text-dark);
@@ -1056,7 +1044,7 @@ html[data-theme="light"] .topbar { box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02); }
 html[data-theme="light"] .icon-btn { background: #ffffff; }
 html[data-theme="light"] .icon-btn:hover { background: var(--card-bg-alt); }
 
-/* Bootstrap pop-ups sit on white cards, not on the grey page. */
+/* modals and dropdowns */
 html[data-theme="light"] .modal-content { --bs-modal-bg: var(--card-bg); --bs-modal-border-color: var(--border-soft); box-shadow: var(--shadow-hover); }
 html[data-theme="light"] .dropdown-menu { --bs-dropdown-bg: var(--card-bg); --bs-dropdown-border-color: var(--border-soft); box-shadow: var(--shadow-hover); }
 html[data-theme="light"] .modal-backdrop { --bs-backdrop-opacity: 0.35; }
@@ -1068,7 +1056,7 @@ html[data-theme="light"] .btn-outline-navy { border-color: #d5dbe6; }
 html[data-theme="light"] .btn-outline-navy:hover { background: var(--blue-100); color: var(--blue-600); border-color: var(--blue-600); }
 html[data-theme="light"] .action-btn { background: #ffffff; }
 
-/* Forms: soft grey fields with a visible edge. */
+/* forms */
 html[data-theme="light"] .form-control,
 html[data-theme="light"] .form-select,
 html[data-theme="light"] .input-group-text { border-color: #d9dfe9; }
@@ -1076,7 +1064,7 @@ html[data-theme="light"] .form-control:focus,
 html[data-theme="light"] .form-select:focus { background-color: #ffffff; }
 html[data-theme="light"] .form-check-input { border-color: #c3cad8; }
 
-/* Tables: swipe-hint edges fade to white. */
+/* tables */
 @media (max-width: 991px) {
   html[data-theme="light"] .table-wrap {
     background:
@@ -1089,7 +1077,7 @@ html[data-theme="light"] .form-check-input { border-color: #c3cad8; }
 @media (max-width: 575px) { html[data-theme="light"] .table-wrap { background: none; } }
 html[data-theme="light"] .table-fleet thead th { color: #5b6478; }
 
-/* Small tinted surfaces */
+/* small surfaces */
 html[data-theme="light"] .welcome-banner { background: linear-gradient(120deg, rgba(31, 122, 224, 0.1), rgba(14, 159, 135, 0.06)); }
 html[data-theme="light"] .welcome-date { background: #ffffff; border: 1px solid var(--border-soft); }
 html[data-theme="light"] .dist-stat { background: var(--card-bg-alt); }
@@ -1102,14 +1090,13 @@ html[data-theme="light"] .badge-recorded { background: #eef1f6; }
 html[data-theme="light"] .result-hero { background: linear-gradient(135deg, #1f6fd6 0%, #2b8cf5 60%, #22b5d8 100%); }
 html[data-theme="light"] .spinner-overlay { background: rgba(244, 246, 251, 0.7); }
 
-/* Model Performance heatmap: "no relationship" is white instead of the dark card. */
+/* heatmap: zero = white */
 html[data-theme="light"] .corr-heatmap td.is-diag { background: var(--card-bg-alt); }
 html[data-theme="light"] .corr-heatmap td.is-target { box-shadow: inset 0 0 0 1px rgba(14, 159, 135, 0.6); }
 html[data-theme="light"] .corr-legend-bar { background: linear-gradient(90deg, rgb(255,138,76), #ffffff 50%, rgb(38,151,255)); }
 
 
-/* ---------------- Top bar: dark / light switch (beside the bell) ----------------
-   A black pill with a sun and a moon; the blue knob slides under the mode in use. */
+/* ---------------- Theme toggle ---------------- */
 .theme-switch {
   position: relative; display: inline-flex; align-items: center;
   width: 62px; height: 32px; padding: 0; border: 0; border-radius: 999px; flex-shrink: 0;
@@ -1133,10 +1120,7 @@ html[data-theme="light"] .theme-switch { background: #e4e7ec; box-shadow: inset 
 html[data-theme="light"] .theme-switch i { color: #667085; }
 html[data-theme="light"] .theme-switch .fa-sun { color: #ffffff; }
 
-/* ---------------- Light mode: clean professional finish ----------------
-   Calm, research-dashboard look: neutral greys, one blue accent, hairline
-   borders, almost no shadow and no decorative gradients. Layered on top of
-   the light palette above. */
+/* ---------------- Light mode: base ---------------- */
 html[data-theme="light"] {
   --bg-page: #f7f8fa;
   --card-bg: #ffffff;
@@ -1152,7 +1136,7 @@ html[data-theme="light"] {
   --bs-primary-rgb: 29, 111, 224;
 }
 
-/* Sidebar: white, grey icons; the open page is a soft blue row with a bar. */
+/* sidebar */
 html[data-theme="light"] .sidebar { background: #ffffff; border-right: 1px solid var(--border-soft); box-shadow: none; }
 html[data-theme="light"] .brand-icon { box-shadow: none; }
 html[data-theme="light"] .brand-title { color: var(--text-dark); }
@@ -1170,7 +1154,7 @@ html[data-theme="light"] .nav-badge { background: #fef0c7; color: #93370d; }
 html[data-theme="light"] .logout-link:hover { background: #fef3f2; color: #b42318; }
 html[data-theme="light"] .logout-link:hover i { color: #b42318; }
 
-/* Top bar: plain white with a hairline. */
+/* top bar */
 html[data-theme="light"] .topbar { background: #ffffff; border-bottom: 1px solid var(--border-soft); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 html[data-theme="light"] .topbar-title h1 { color: var(--text-dark); }
 html[data-theme="light"] .icon-btn { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
@@ -1179,19 +1163,19 @@ html[data-theme="light"] .user-chip { border-left-color: var(--border-soft); }
 html[data-theme="light"] .user-avatar { background: var(--blue-100); color: var(--blue-600); box-shadow: none; }
 html[data-theme="light"] .sidebar-toggle { background: #ffffff; border: 1px solid #d0d5dd; }
 
-/* Cards: white, hairline border, faint shadow, no lift. */
+/* cards */
 html[data-theme="light"] .card-surface,
 html[data-theme="light"] .stat-card { border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .card-surface:hover { box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .stat-card:hover { transform: none; box-shadow: var(--shadow-hover); border-color: #d0d5dd; }
 html[data-theme="light"] .section-title { color: var(--text-dark); }
 
-/* Greeting: a plain card, not a coloured banner. */
+/* greeting */
 html[data-theme="light"] .welcome-banner { background: #ffffff; border: 1px solid var(--border-soft); box-shadow: var(--shadow-soft); }
 html[data-theme="light"] .welcome-title { color: var(--text-dark); }
 html[data-theme="light"] .welcome-date { background: #f9fafb; border: 1px solid var(--border-soft); color: #344054; }
 
-/* Stat cards: soft tinted icon, big dark number, coloured side stripe as in dark mode. */
+/* stat cards */
 html[data-theme="light"] .stat-icon { box-shadow: none; }
 html[data-theme="light"] .stat-icon.blue { background: #eef4ff; color: #1d6fe0; }
 html[data-theme="light"] .stat-icon.navy { background: #ecfdff; color: #0e7090; }
@@ -1200,7 +1184,7 @@ html[data-theme="light"] .stat-icon.amber { background: #fffaeb; color: #b54708;
 html[data-theme="light"] .stat-value { color: var(--text-dark); }
 html[data-theme="light"] .stat-label { color: var(--text-muted); }
 
-/* Buttons: solid and flat. */
+/* buttons */
 html[data-theme="light"] .btn-blue { background: var(--blue-600); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 html[data-theme="light"] .btn-blue:hover { background: #175cd3; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); transform: none; }
 html[data-theme="light"] .btn-navy { background: #101828; border-color: #101828; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
@@ -1208,7 +1192,7 @@ html[data-theme="light"] .btn-navy:hover { background: #1d2939; transform: none;
 html[data-theme="light"] .btn-outline-navy { background: #ffffff; border: 1px solid #d0d5dd; color: #344054; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 html[data-theme="light"] .btn-outline-navy:hover { background: #f9fafb; color: var(--text-dark); border-color: #d0d5dd; }
 
-/* Tables: grey header strip, hairline rows, faint hover. */
+/* tables */
 html[data-theme="light"] .table-wrap { border: 1px solid var(--border-soft); }
 html[data-theme="light"] .table-fleet thead th { background: #f9fafb; color: #475467; border-bottom: 1px solid var(--border-soft); }
 html[data-theme="light"] .table-fleet tbody td { border-bottom: 1px solid var(--border-soft); color: #344054; }
@@ -1224,13 +1208,13 @@ html[data-theme="light"] .action-btn.danger:hover { background: #fef3f2; color: 
   html[data-theme="light"] .table-fleet tbody td { border-bottom: 0; }
 }
 
-/* Status badges: outlined soft pills. */
+/* status badges */
 html[data-theme="light"] .badge-status { border: 1px solid transparent; }
 html[data-theme="light"] .badge-active { background: #ecfdf3; color: #067647; border-color: #abefc6; }
 html[data-theme="light"] .badge-maintenance { background: #fffaeb; color: #b54708; border-color: #fedf89; }
 html[data-theme="light"] .badge-inactive { background: #fef3f2; color: #b42318; border-color: #fecdca; }
 
-/* Forms: white fields, grey border, blue focus ring. */
+/* forms */
 html[data-theme="light"] .form-label { color: #344054; }
 html[data-theme="light"] .form-control,
 html[data-theme="light"] .form-select { background-color: #ffffff; border: 1px solid #d0d5dd; color: var(--text-dark); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
@@ -1254,16 +1238,14 @@ html[data-theme="light"] .result-hero { background: var(--blue-600); box-shadow:
 html[data-theme="light"] .chart-card img { border: 1px solid var(--border-soft); }
 
 
-/* Thin, quiet scrollbars. */
+/* scrollbars */
 html[data-theme="light"] { scrollbar-color: #d0d5dd transparent; }
 html[data-theme="light"] ::-webkit-scrollbar { width: 10px; height: 10px; }
 html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
 
-/* ================= Login, sign-up and waiting pages: glassy look =================
-   Dark backdrop with flowing blue light streaks (_auth_bg.html), a frosted
-   card with cut corners and glass shards at two corners. Overrides the older
-   login rules above. */
+/* ================= Login / sign-up / waiting pages =================
+   Overrides the older login rules above. */
 .login-page { background: radial-gradient(ellipse at 30% 20%, #0c1626 0%, #05080f 60%, #020306 100%); }
 .login-page::before, .login-page::after { display: none; }
 .auth-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
@@ -1285,7 +1267,7 @@ html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
   clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
   animation: none;
 }
-/* Hairline edge, brighter at the top, plus the two diagonal edges. */
+/* card edge */
 .login-card::before, .login-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .login-card::before {
   padding: 1px;
@@ -1300,10 +1282,8 @@ html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
     linear-gradient(135deg, transparent calc(50% - 1px), rgba(74, 169, 255, 0.45) 50%, transparent calc(50% + 1px)) bottom right / var(--cut) var(--cut) no-repeat,
     radial-gradient(ellipse at 20% 0%, rgba(120, 180, 255, 0.12), transparent 55%);
 }
-/* The outer span moves and glows; the inner <i> carries the rounded shape (a
-   mask would cut the glow off if both were on one element).
-   --s: shard size, --o: offset outside the corner, --in: spot inside the cut
-   corner, --n: how far each half leans toward the other in the middle. */
+/* Shards: outer span glows, inner <i> has the shape (a mask would clip the glow).
+   --s size, --o offset, --in inside position, --n lean when joined */
 .glass-shard {
   --s: 58px; --o: -16px; --in: 12px; --n: 6px;
   position: absolute; z-index: 2; pointer-events: none;
@@ -1321,14 +1301,13 @@ html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
   mask: var(--shape) center / 100% 100% no-repeat;
   transition: background 0.35s ease;
 }
-/* Each shard sits just outside a cut corner, its long edge parallel to the cut. */
+/* shard positions */
 .shard-tl { top: var(--o); left: var(--o); }
 .shard-br { bottom: var(--o); right: var(--o); }
 .shard-tl > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='7,7 65,7 7,65' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .shard-br > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='93,35 93,93 35,93' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 
-/* Two lights running around the card's edge, cut corners included
-   (script.js draws the outline to the card's size). */
+/* edge lights (path set by script.js) */
 .card-beam { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .card-beam .beam {
   position: absolute; left: 0; top: 0; width: 130px; height: 2px; border-radius: 2px;
@@ -1340,11 +1319,7 @@ html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
 html.auth-arriving .card-beam { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .card-beam { display: none; } }
 
-/* Switching between Login and Sign Up (script.js runs the steps):
-   1. the form fades out and both shards light up and slip into the cut corners,
-   2. they glide to the middle and join as one mark,
-   3. the other page opens on that mark while the card takes its new size,
-   4. the halves split back to the corners and the form comes in row by row. */
+/* Login <-> Sign Up transition (steps driven by script.js) */
 .login-card > * { transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 .auth-frame.is-leaving .login-card > *,
 html.auth-arriving .login-card > * { opacity: 0; transform: translateY(8px); }
@@ -1361,7 +1336,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 .auth-frame.no-anim .glass-shard,
 .auth-frame.no-anim .glass-shard > i { transition: none; }
 
-/* Heading: logo beside the system name, left-aligned. */
+/* heading */
 .auth-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .auth-brand .login-logo { width: 52px; height: 52px; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(38, 151, 255, 0.35); }
 .auth-brand .login-title { text-align: left; font-size: 24px; font-weight: 700; margin: 0; line-height: 1.15; }
@@ -1369,7 +1344,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 .login-card.text-center .auth-brand { justify-content: center; text-align: left; }
 
 
-/* Labels above the boxes; icon inside on the left. */
+/* labels and input icons */
 .auth-label { display: block; font-size: 12.5px; font-weight: 500; color: #c3cad8; margin-bottom: 6px; }
 .auth-input { position: relative; }
 .auth-input > .field-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #7d8799; font-size: 14px; pointer-events: none; z-index: 4; }
@@ -1414,8 +1389,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .auth-bg .streak-group { animation: none; } }
 
-/* Light mode: same streak design on the dashboard's backdrop (soft sky blue,
-   images/glass-aurora.jpg), behind a bright frosted card. */
+/* light mode auth pages */
 html[data-theme="light"] .login-page { background: #f2f7fd url("../images/glass-aurora.jpg?v=3") center / cover no-repeat; }
 html[data-theme="light"] .auth-bg { opacity: 0.45; }
 html[data-theme="light"] .auth-bg .streak-band { display: none; }
@@ -1442,12 +1416,8 @@ html[data-theme="light"] .auth-brand .login-logo { box-shadow: 0 6px 16px rgba(3
 html[data-theme="light"] .auth-switch a { color: var(--blue-600); }
 html[data-theme="light"] .card-beam .beam-a { background: linear-gradient(90deg, rgba(43, 152, 255, 0), #2b98ff); }
 
-/* ================= Light mode: glassy dashboard =================
-   A light pastel backdrop (one colour: soft sky blue in three tones, images/glass-aurora.jpg) behind the app,
-   with frosted-glass panels on top: translucent white, blurred backdrop,
-   bright hairline edge. Dark pills mark the open page and the main buttons,
-   soft yellow chips mark pending items. Only the signed-in pages get it
-   (:has(.app-shell)); the login pages keep their own look. */
+/* ================= Light mode: glass dashboard =================
+   Signed-in pages only (:has(.app-shell)). */
 html[data-theme="light"]:has(.app-shell) {
   --bg-page: #f1ebe1;
   --card-bg: rgba(255, 255, 255, 0.42);
@@ -1468,14 +1438,14 @@ html[data-theme="light"]:has(.app-shell) {
   --bs-border-color: var(--glass-line);
   scrollbar-color: rgba(90, 68, 40, 0.3) transparent;
 }
-/* isolation keeps the picture above the body's own background. */
+/* keep the backdrop above the body background */
 html[data-theme="light"] .app-shell { isolation: isolate; }
 html[data-theme="light"] .app-shell::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: #f2f7fd url("../images/glass-aurora.jpg?v=3") center / cover no-repeat;
 }
 
-/* Frosted panels */
+/* glass panels */
 html[data-theme="light"] .sidebar,
 html[data-theme="light"] .topbar,
 html[data-theme="light"] .card-surface,
@@ -1501,7 +1471,7 @@ html[data-theme="light"] .app-shell .dropdown-menu { background: rgba(255, 255, 
 html[data-theme="light"] .notif-panel-header { background: transparent; }
 html[data-theme="light"]:has(.app-shell) .modal-backdrop { --bs-backdrop-bg: #3a2c1a; --bs-backdrop-opacity: 0.25; }
 
-/* Sidebar: dark pill for the open page. */
+/* sidebar */
 html[data-theme="light"] .sidebar-brand,
 html[data-theme="light"] .sidebar-footer { border-color: var(--glass-line); }
 html[data-theme="light"] .nav-link { color: #4a4034; border-radius: 999px; }
@@ -1522,7 +1492,7 @@ html[data-theme="light"] .user-chip { border-left-color: var(--glass-line); }
 html[data-theme="light"] .user-avatar { background: #211d18; color: #fff; }
 html[data-theme="light"] .app-shell .theme-switch { background: rgba(255, 255, 255, 0.5); box-shadow: inset 0 1px 3px rgba(84, 60, 28, 0.15); }
 
-/* Greeting and stat cards */
+/* greeting, stat cards */
 html[data-theme="light"] .welcome-date { background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.7); color: #3d342a; border-radius: 999px; }
 html[data-theme="light"] .stat-icon { border-radius: 50%; background: rgba(255, 255, 255, 0.6) !important; box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(84, 60, 28, 0.08); }
 html[data-theme="light"] .stat-icon.blue { color: #2f6db5; }
@@ -1530,7 +1500,7 @@ html[data-theme="light"] .stat-icon.navy { color: #26211a; }
 html[data-theme="light"] .stat-icon.green { color: #2f7d4f; }
 html[data-theme="light"] .stat-icon.amber { color: #b0661c; }
 
-/* Buttons: dark pill for the main action, glass pill for the rest. */
+/* buttons */
 html[data-theme="light"]:has(.app-shell) .btn-blue,
 html[data-theme="light"]:has(.app-shell) .btn-navy { background: #211d18; border: 1px solid #211d18; color: #fff; border-radius: 999px; box-shadow: 0 6px 16px rgba(33, 29, 24, 0.2); }
 html[data-theme="light"]:has(.app-shell) .btn-blue:hover,
@@ -1541,7 +1511,7 @@ html[data-theme="light"] .btn-blue .badge.text-bg-light { background: #f5d76e !i
 html[data-theme="light"] .action-btn { background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.75); color: #4a4034; }
 html[data-theme="light"] .action-btn:hover { background: rgba(255, 255, 255, 0.85); color: var(--text-dark); }
 
-/* Tables sit straight on the glass. */
+/* tables */
 html[data-theme="light"] .table-wrap { background: transparent; border: 1px solid var(--glass-line); border-radius: 14px; }
 html[data-theme="light"] .table-fleet thead th { background: rgba(255, 255, 255, 0.35); color: #5a4e40; border-bottom: 1px solid var(--glass-line); }
 html[data-theme="light"] .table-fleet tbody td { border-bottom: 1px solid var(--glass-line); color: #3d342a; }
@@ -1552,13 +1522,13 @@ html[data-theme="light"] .table-fleet tbody tr:hover { background: rgba(255, 255
   html[data-theme="light"] .table-fleet tbody tr:hover { background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.7); }
 }
 
-/* Status chips: yellow for pending, as in the reference look. */
+/* status chips */
 html[data-theme="light"] .badge-active { background: rgba(214, 245, 224, 0.8); color: #1f6b3e; border-color: rgba(140, 210, 165, 0.8); }
 html[data-theme="light"] .badge-maintenance { background: #f8e08a; color: #5a4300; border-color: #f0cf5c; }
 html[data-theme="light"] .badge-inactive { background: rgba(255, 226, 222, 0.85); color: #a3291b; border-color: rgba(245, 180, 170, 0.9); }
 html[data-theme="light"] .badge-recorded { background: rgba(255, 255, 255, 0.6); }
 
-/* Forms and small surfaces */
+/* forms, small surfaces */
 html[data-theme="light"]:has(.app-shell) .form-control,
 html[data-theme="light"]:has(.app-shell) .form-select,
 html[data-theme="light"]:has(.app-shell) .input-group-text { background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.8); color: var(--text-dark); box-shadow: none; }
@@ -1578,10 +1548,7 @@ html[data-theme="light"]:has(.app-shell) .page-progress { background: linear-gra
 html[data-theme="light"]:has(.app-shell) ::-webkit-scrollbar-thumb { background: rgba(90, 68, 40, 0.3); background-clip: padding-box; }
 html[data-theme="light"] .app-shell .theme-switch-knob { background: #211d18; box-shadow: 0 2px 6px rgba(33, 29, 24, 0.35); }
 
-/* ================= Light mode: "Glassy SideBar V5" look, in light glass =================
-   Floating rounded panels (sidebar, top bar, cards) of frosted white glass
-   with a bright edge; the open page is a raised glass lens instead of a dark
-   pill. Text, sizes and menu items stay the same as in dark mode. */
+/* ================= Light mode: V5 glass ================= */
 
 html[data-theme="light"]:has(.app-shell) {
   --v5-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.36) 55%, rgba(250, 238, 220, 0.4) 100%);
@@ -1591,7 +1558,7 @@ html[data-theme="light"]:has(.app-shell) {
   --v5-lens-shadow: 0 8px 20px rgba(84, 60, 28, 0.15), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(110, 86, 54, 0.08);
 }
 
-/* Sidebar: a floating rounded glass panel. */
+/* sidebar */
 html[data-theme="light"] .sidebar {
   top: 14px; left: 14px; bottom: 14px; width: 256px;
   background: var(--v5-glass); border: 1px solid var(--v5-edge); border-radius: 28px;
@@ -1610,7 +1577,7 @@ html[data-theme="light"] .nav-link.active i { color: var(--text-dark); }
 html[data-theme="light"] .nav-badge { background: rgba(255, 255, 255, 0.7); color: #5a4300; border: 1px solid #f0cf5c; }
 html[data-theme="light"] .main-area { margin-left: 284px; }
 
-/* Top bar: a floating glass strip beside the sidebar. */
+/* top bar */
 html[data-theme="light"] .topbar {
   top: 14px; margin: 14px 14px 0 14px; border-radius: 22px;
   background: var(--v5-glass); border: 1px solid var(--v5-edge); box-shadow: var(--v5-shadow);
@@ -1618,7 +1585,7 @@ html[data-theme="light"] .topbar {
 html[data-theme="light"] .icon-btn,
 html[data-theme="light"] .sidebar-toggle { border-radius: 50%; background: var(--v5-lens); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: var(--v5-lens-shadow); }
 
-/* Cards and pop-ups: the same glass, more rounded. */
+/* cards, modals */
 html[data-theme="light"] .card-surface,
 html[data-theme="light"] .stat-card,
 html[data-theme="light"] .welcome-banner {
@@ -1630,7 +1597,7 @@ html[data-theme="light"]:has(.app-shell) .modal-content { border: 1px solid var(
 html[data-theme="light"] .app-shell .dropdown-menu { border: 1px solid var(--v5-edge); border-radius: 18px; box-shadow: var(--v5-shadow); }
 html[data-theme="light"] .stat-icon { background: var(--v5-lens) !important; box-shadow: var(--v5-lens-shadow); }
 
-/* Buttons, fields and small tiles: glass lens pills. */
+/* buttons, fields, tiles */
 html[data-theme="light"]:has(.app-shell) .btn-outline-navy,
 html[data-theme="light"] .action-btn,
 html[data-theme="light"] .welcome-date { background: var(--v5-lens); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: var(--v5-lens-shadow); }
@@ -1654,8 +1621,7 @@ html[data-theme="light"] .table-wrap { border-radius: 18px; border-color: rgba(2
 }
 html.force-phone[data-theme="light"] .sidebar { height: calc(100vh / var(--fp-zoom, 1) - 28px); }
 
-/* Light mode fields: a soft blue tint with a visible blue-grey edge, so the
-   boxes do not glare white against the sky-blue backdrop; blue focus ring. */
+/* fields: light blue tint so they don't glare on the backdrop */
 html[data-theme="light"]:has(.app-shell) .form-control,
 html[data-theme="light"]:has(.app-shell) .form-select,
 html[data-theme="light"]:has(.app-shell) .input-group-text {

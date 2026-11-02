@@ -1,19 +1,17 @@
 #!/bin/sh
-# Container start-up for the online deployment.
+# Container startup
 set -e
 cd /app
 
-# Keep the database backups on the persistent disk, so they survive redeploys:
-# Railway sets RAILWAY_VOLUME_MOUNT_PATH when a volume is attached; on Render
-# (paid plans only) set PERSIST_DIR to the disk's mount path. Without either,
-# backups and an uploaded model last until the next restart or redeploy.
+# Store backups and the uploaded model on the persistent volume
+# (RAILWAY_VOLUME_MOUNT_PATH on Railway, PERSIST_DIR on Render).
+# Without one, they're lost on redeploy.
 PERSIST_DIR="${PERSIST_DIR:-$RAILWAY_VOLUME_MOUNT_PATH}"
 if [ -n "$PERSIST_DIR" ]; then
     mkdir -p "$PERSIST_DIR/backups"
     rm -rf backups
     ln -s "$PERSIST_DIR/backups" backups
-    # The model also lives on the disk: start from the one in the image,
-    # then keep whatever is uploaded from Google Colab.
+    # copy the bundled model on first run, keep uploads after that
     mkdir -p "$PERSIST_DIR/model"
     for f in linear_regression_pipeline.joblib metrics.json; do
         [ -f "$PERSIST_DIR/model/$f" ] || cp "model/$f" "$PERSIST_DIR/model/$f"
@@ -21,7 +19,7 @@ if [ -n "$PERSIST_DIR" ]; then
     export MODEL_STORE="$PERSIST_DIR/model"
 fi
 
-# The database service can take a few seconds longer to start than this one.
+# give the database a few seconds to come up
 tries=0
 until python init_db.py; do
     tries=$((tries + 1))

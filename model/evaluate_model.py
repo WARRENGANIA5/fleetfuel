@@ -1,14 +1,12 @@
 """
-Generates the evaluation figures for the paper (Chapter IV) with
-Matplotlib/Seaborn, from exactly the data, predictors and 80/20 split the
-current model was trained on:
+Generate evaluation figures (Matplotlib/Seaborn) using the same data and
+80/20 split as the current model:
 
   actual_vs_predicted.png   residual_plot.png       residual_histogram.png
   residual_qq_plot.png      correlation_heatmap.png vif.png
   cv_r2_scores.png
 
-Saved to reports/figures/. The web app draws the same charts live; these
-PNGs are the print-ready versions.
+Saved to reports/figures/.
 
 Run:  python model/evaluate_model.py   (after train_model.py)
 """
@@ -43,8 +41,7 @@ BLUE, NAVY, TEAL = "#1d6fd6", "#0b2545", "#1aa38c"
 
 
 def load_training_frame():
-    """Same data the model trains on: the web app's loader (CSV + system trip
-    records from Firebase Firestore), or the CSV files alone if the database is offline."""
+    """Training data from the app's loader, or CSV only if the database is offline."""
     try:
         from app import app, load_training_frame as app_loader
         with app.app_context():
@@ -102,8 +99,7 @@ def main():
     fig.axes[0].set_title("Normal Q-Q Plot of Residuals")
     save(fig, "residual_qq_plot.png")
 
-    # 4. Histogram of residuals (normality check), like the web app: bins over
-    # 99% of the residuals, the few larger ones counted in the end bins.
+    # 4. Histogram of residuals (outliers go into the end bins)
     resid = np.asarray(residuals, dtype=float)
     half = max(float(np.ceil(np.percentile(np.abs(resid), 99))), 1.0)
     width = next(w for w in (0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 25, 50) if 2 * half / w <= 24)
@@ -119,7 +115,7 @@ def main():
                 transform=ax.transAxes, ha="right", va="top", fontsize=8, color=NAVY)
     save(fig, "residual_histogram.png")
 
-    # 5. Correlation heatmap of the equation's terms and the fuel consumed
+    # 5. Correlation heatmap
     terms = pipeline.named_steps["encoder"].transform(X).assign(**{TARGET_COLUMN: y.astype(float)})
     cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
     corr = terms[cols].corr().rename(index=LABELS, columns=LABELS)
@@ -129,7 +125,7 @@ def main():
     ax.set_title("Feature Correlation Heatmap")
     save(fig, "correlation_heatmap.png")
 
-    # 6. Variance Inflation Factor of each term (above 5 = high collinearity)
+    # 6. VIF (above 5 = high collinearity)
     vif = {k: v for k, v in (metrics.get("vif") or {}).items() if v is not None}
     if vif:
         names = list(vif)

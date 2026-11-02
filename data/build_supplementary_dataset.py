@@ -5,10 +5,8 @@
   component analysis (Version 2) [Dataset]. Mendeley Data.
   https://doi.org/10.17632/jzjxcdn6k4.2  (license CC BY 4.0)
 
-385,158 real-world trips of 395 gasoline passenger vehicles (15 models) in Beijing.
-Each trip is reduced to the study's variables and units. Variables the online
-dataset does not have (odometer, trip type, load, route, road type, terrain) are
-left out, so the web application drops them during merging (Scope and Limitations).
+385,158 trips of 395 gasoline cars (15 models) in Beijing, reduced to
+distance, engine power, fuel type and fuel consumed.
 
 Usage: python build_supplementary.py <Vehicle fuel consumption.csv> <output.csv>
 """
@@ -17,21 +15,15 @@ import sys
 import pandas as pd
 
 SRC, OUT = sys.argv[1], sys.argv[2]
-# Trips are sampled per vehicle model AND per distance band, so the training data
-# covers short city trips as well as the long inter-campus / provincial trips the
-# fleet makes (a plain random sample is almost all short city trips).
+# Sample per model and distance band, otherwise it's almost all short city trips.
 DISTANCE_BANDS = [(1, 10), (10, 30), (30, 100), (100, 1000)]   # km
-# Trips to take in all. With the 49,390 EEA diesel vans (add_eea_diesel_vans.py) the
-# supplementary dataset has 99,898 records; with the 93 local trips and 9 fleet
-# vehicles the study has 100,000 records.
+# 50,508 + 49,390 EEA vans = 99,898; + 93 trips + 9 vehicles = 100,000
 TOTAL_TRIPS = 50_508
 SEED = 42
 
 
 def balanced_quotas(sizes, total):
-    """Split `total` as evenly as possible over the groups: every group gets the same
-    number, and a group with fewer trips than that gives all of them (the rest is
-    shared by the larger groups)."""
+    """Split `total` evenly across groups; small groups give all they have."""
     quotas, left, open_groups = {}, total, sorted(sizes, key=sizes.get)
     while open_groups:
         share = left // len(open_groups)
@@ -46,16 +38,15 @@ def balanced_quotas(sizes, total):
             break
     return quotas
 
-# Vehicle model -> the web application's vehicle types (body style of each model).
+# model -> vehicle type
 VEHICLE_TYPES = {
     "Audi-A6L": "Sedan", "Honda-Accord": "Sedan", "Nissan-Teana": "Sedan", "Nissan-Tiida": "Sedan",
     "Volkswagen-Magotan": "Sedan", "Volkswagen-Passat": "Sedan",
     "Chevrolet-Captiva": "SUV", "Hyundai-Beijingix35": "SUV",
     "Buick-GL8": "Van", "Honda-Odyssey": "Van",
 }
-# Engine power (Max Power, kW) of every engine code, from the dataset's own
-# "Vehicle information.xlsx" (same Mendeley record, SHA-256 3d5b80eb...7339293).
-# The study's predictors are distance traveled, engine power and fuel type.
+# Engine power (kW) per engine code, from the dataset's "Vehicle information.xlsx"
+# (SHA-256 3d5b80eb...7339293).
 ENGINE_POWER_KW = {
     "0230320": 132,  # Audi A6L 2.0T (2014)
     "0B2020W": 123,  # Buick GL8 2.4L (2014)
@@ -73,8 +64,7 @@ ENGINE_POWER_KW = {
     "0X2072S": 118,  # Volkswagen Passat 1.8T (2015)
     "0X2072T": 118,  # Volkswagen Passat 1.8T (2015)
 }
-# Spellings used in the dataset's English Model column -> the model's proper name
-# (as listed in the dataset's Vehicle information.xlsx).
+# dataset spelling -> proper model name
 NAME_FIXES = {"Chevrolet-Capaci": "Chevrolet-Captiva", "Volkswagen-Maotan": "Volkswagen-Magotan"}
 
 
@@ -118,7 +108,7 @@ df["avg_speed_kmh"] = df["distance_km"] / (df["duration_minutes"] / 60.0)
 df["departure_time"] = df["start"].dt.strftime("%H:%M")
 df["departure_period"] = df["start"].dt.hour.map(departure_period)
 
-# Complete, physically plausible trips only (the app's cleaning step then removes outliers).
+# drop incomplete / impossible trips (outliers are removed later)
 ok = (df[["year_model", "engine_displacement", "start"]].notna().all(axis=1)
       & df["distance_km"].between(1, 1000) & df["duration_minutes"].between(1, 1440)
       & df["avg_speed_kmh"].between(5, 130) & (df["actual_fuel_consumption"] > 0))
@@ -127,8 +117,7 @@ l_per_100 = df["actual_fuel_consumption"] / df["distance_km"] * 100
 df = df[l_per_100.between(3, 40)]
 print(f"complete, plausible trips: {len(df):,}")
 
-# Same number of trips from every vehicle model in every distance band, or all of them when
-# fewer (fixed seed, reproducible).
+# equal count per model and band (or all if fewer), seed fixed
 df["band"] = pd.cut(df["distance_km"], [b[0] for b in DISTANCE_BANDS] + [DISTANCE_BANDS[-1][1]],
                     labels=[f"{a}-{b} km" for a, b in DISTANCE_BANDS], include_lowest=True)
 groups = df.dropna(subset=["band"]).groupby(["model_key", "band"], observed=True)
@@ -137,8 +126,7 @@ sample = pd.concat([g.sample(quotas[key], random_state=SEED) for key, g in group
 print("trips per distance band:", sample.groupby("band", observed=True).size().to_dict())
 sample = sample.sort_values(["model_key", "start"]).reset_index(drop=True)
 
-# The study's shared variables (distance, engine power, fuel type, fuel consumed),
-# plus the vehicle model and engine code so every row can be traced to its source.
+# shared columns + model and engine code for traceability
 columns = ["brand_model", "engine_code", "distance_km", "engine_power_kw", "fuel_type", "actual_fuel_consumption"]
 out = sample[columns].copy()
 out["engine_power_kw"] = out["engine_power_kw"].astype(int)

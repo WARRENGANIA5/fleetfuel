@@ -1,4 +1,4 @@
-# Online deployment image (Railway or any Docker host).
+# Image for Railway / any Docker host
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,6 +17,5 @@ RUN pip install --no-cache-dir -r requirements-train.txt
 
 COPY . .
 
-# Uses the trained model in model/ (replace it online with Model Performance >
-# Upload Trained Model; on Railway the upload is kept on the volume).
+# Ships the model in model/; uploads go to the volume on Railway.
 CMD ["sh", "deploy/start.sh"]

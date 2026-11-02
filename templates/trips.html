@@ -2,7 +2,6 @@
 {% block title %}Trip Records{% endblock %}
 {% block page_title %}Trip Records{% endblock %}
 
-{# Monthly Report of Official Travel: date of travel, vehicle, distance traveled and fuel consumed. #}
 {% macro trip_fields() %}
   <div class="row g-2">
     <div class="col-md-6">
@@ -70,7 +69,7 @@
     </table>
   </div>
 
-  {# About 100,000 records: shown 50 per page, searched on the server. #}
+  {# paged server-side, 50 per page #}
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" id="tripPager">
     <div class="small text-muted" id="tripCount"></div>
     <div class="d-flex align-items-center gap-1">
@@ -83,9 +82,7 @@
   </div>
 </div>
 
-{# Trip records are the collected training data: only the administrator adds,
-   edits or deletes them (they are exported for training in Google Colab). One shared Edit
-   modal, filled from the clicked row's data-record (see script.js). #}
+{# admin-only edit modal (filled by script.js) #}
 {% if is_admin %}
 <div class="modal fade" id="editTripModal" tabindex="-1" data-record-modal>
   <div class="modal-dialog">
@@ -129,7 +126,7 @@ const EDIT_TRIP_URL = {{ url_for('edit_trip', trip_id=0)|tojson }};
 const TRIP_CSRF = {{ csrf_token()|tojson }};
 const REOPEN = {{ reopen|tojson if reopen else 'null' }};
 
-// After a rejected save, reopen the same form with what the user typed.
+// reopen the form after a failed save
 if (REOPEN && IS_ADMIN) {
   const modalEl = document.getElementById(REOPEN.modal);
   const form = modalEl.querySelector('form');
@@ -144,12 +141,12 @@ if (REOPEN && IS_ADMIN) {
   });
   bootstrap.Modal.getOrCreateInstance(modalEl).show();
 } else if (IS_ADMIN && new URLSearchParams(window.location.search).get('add') === '1') {
-  // Dashboard "Add Trip Record" opens the form straight away.
+  // opened from the dashboard shortcut
   history.replaceState(null, '', window.location.pathname);
   bootstrap.Modal.getOrCreateInstance(document.getElementById('addTripModal')).show();
 }
 
-// ---- Real-time: refresh the shown page every 5s (keeps the page and search term) ----
+// ---- refresh every 5s ----
 let listing = {{ listing|tojson }};
 function tripRow(t) {
   const tr = document.createElement('tr');
@@ -197,15 +194,14 @@ function showTrips(d) {
 }
 let lastTripsJson = JSON.stringify(listing);
 let tripRequest = 0;
-function fadeTrips(dim) {  // a gentle fade while the next page loads
+function fadeTrips(dim) {
   const body = document.getElementById('tripsBody');
   body.style.transition = 'opacity .2s ease';
   body.style.opacity = dim ? '0.35' : '1';
 }
-// The page and search last asked for (ahead of `listing` while it loads), so quick
-// clicks and the 5s refresh build on it instead of undoing a page change.
+// latest requested page/search, so fast clicks don't get undone by the refresh
 let wanted = { page: listing.page, q: listing.q };
-// moved: 'push' = a new Back/Forward step (page buttons), 'replace' = same step (search).
+// moved: 'push' for page buttons, 'replace' for search
 function loadTrips(page, q, moved) {
   const ticket = ++tripRequest;
   wanted = { page: page, q: q };
@@ -216,13 +212,13 @@ function loadTrips(page, q, moved) {
   return fetch('/api/trips?' + params.toString())
     .then(function (res) { return res.json(); })
     .then(function (d) {
-      if (!d || !Array.isArray(d.trips)) throw new Error('unexpected answer');  // keep the rows on screen
-      if (ticket !== tripRequest) return;  // a newer page or search was asked for meanwhile
+      if (!d || !Array.isArray(d.trips)) throw new Error('unexpected answer');
+      if (ticket !== tripRequest) return;  // stale
       document.getElementById('tripLive').className = 'live-badge';
       document.getElementById('tripLiveText').textContent = 'Live';
       listing = d;
       showPager(d);
-      if (moved) {  // keep the page and search in the address, for Back and reload
+      if (moved) {  // update the URL
         const url = new URLSearchParams();
         if (d.q) url.set('q', d.q);
         if (d.page > 1) url.set('page', d.page);
@@ -234,8 +230,7 @@ function loadTrips(page, q, moved) {
       const json = JSON.stringify(d);
       if (json === lastTripsJson) return;
       lastTripsJson = json;
-      // Keep the pager at the same spot on screen, so it stays under the mouse
-      // when a page has fewer or more rows (e.g. the last page).
+      // keep the pager under the mouse
       const pager = document.getElementById('tripPager');
       const top = pager.getBoundingClientRect().top;
       showTrips(d);
@@ -269,12 +264,11 @@ document.getElementById('tripSearch').addEventListener('input', function () {
 });
 
 setInterval(function () {
-  if (document.querySelector('.modal.show')) return;  // don't swap rows under an open form
+  if (document.querySelector('.modal.show')) return;
   loadTrips(wanted.page, wanted.q, false);
 }, 5000);
 
-// Browser Back/Forward between pages of this list: show that page in place,
-// at the same scroll position (script.js asks first through "pagestate").
+// back/forward between pages without a reload
 const tripPager = document.getElementById('tripPager');
 document.addEventListener('pagestate', function onPageState(e) {
   if (!document.body.contains(tripPager)) { document.removeEventListener('pagestate', onPageState); return; }

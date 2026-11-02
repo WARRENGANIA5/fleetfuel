@@ -1,18 +1,9 @@
-"""Trip records from the online datasets (data/trip_records_dataset.csv, built
-by data/build_trip_records_dataset.py), shown on the Trip Records page next to
-the trips saved in Firestore.
+"""Online-dataset trips (data/trip_records_dataset.csv) shown on the Trip
+Records page alongside the Firestore trips.
 
-The trips themselves are kept in the file (read-only), not in Firestore, to
-save the free plan's daily reads and writes. What the administrator changes -
-editing or deleting a trip, changing a vehicle's plate number, deleting a
-vehicle - is saved in Firestore (collection CHANGES, one small record per
-change) and applied on top of the file, so the changes last and show the same
-everywhere: on the office computer and online (Vercel's files are read-only,
-and Render's are lost on every restart). Their ids on the page are "d" + row_id.
-
-Each record is linked to its vehicle by the plate number, like the local trips
-and the vehicle records are merged for training. Rebuilding the file starts
-over from the online data, so the change records must then be cleared.
+The CSV stays read-only to save Firestore quota. Admin edits/deletes and plate
+changes are stored in Firestore (CHANGES) and applied on top of the file.
+Page ids are "d" + row_id. If the CSV is rebuilt, clear the change records.
 """
 import os
 import threading
@@ -35,7 +26,7 @@ def _num(v):
 
 
 def _base():
-    """The file as built (cached until it changes on disk)."""
+    """The CSV, cached until it changes on disk."""
     try:
         mtime = os.path.getmtime(PATH)
     except OSError:
@@ -54,7 +45,7 @@ def _base():
 
 
 def _changes():
-    """The administrator's changes, oldest first (none outside a request or script)."""
+    """Admin changes, oldest first."""
     try:
         return sorted(db.records(CHANGES), key=lambda c: c["id"])
     except RuntimeError:   # no application context
@@ -89,10 +80,8 @@ def frame():
 
 
 def listing(own_trips, vehicles_by_plate):
-    """Every trip record of the Trip Records page, oldest first, numbered:
-    `own_trips` (the Firestore trips, already joined to their vehicle, as
-    dicts) plus the dataset trips of the vehicles that exist. Returns a
-    DataFrame with the columns of the page's rows plus `search` text."""
+    """`own_trips` plus dataset trips of existing vehicles, oldest first and
+    numbered, as a DataFrame with a `search` column."""
     ds = frame()
     key = (_cache["key"], tuple(sorted((k, v["id"], v["brand_model"]) for k, v in vehicles_by_plate.items())),
            tuple((t["id"], str(t["trip_date"]), t["plate_number"], t["distance_km"], t["actual_fuel_consumption"],
@@ -134,8 +123,7 @@ def listing(own_trips, vehicles_by_plate):
 
 
 def summary(plates):
-    """Totals of the dataset trips of the vehicles that exist (`plates`):
-    count, liters, liters per month ("YYYY-MM") and per plate (count, last date)."""
+    """Dataset trip totals for `plates`: count, liters, per month and per plate."""
     plates = tuple(sorted(plates))
     ds = frame()
     with _lock:
@@ -155,14 +143,14 @@ def summary(plates):
 
 
 def get(row_id):
-    """One dataset trip as a dict, or None."""
+    """One dataset trip, or None."""
     ds = frame()
     hit = ds[ds["row_id"] == row_id]
     return hit.iloc[0].to_dict() if len(hit) else None
 
 
 def update(row_id, trip_date, plate_number, distance_km, actual_fuel_consumption):
-    """Change one dataset trip (Edit on the Trip Records page). False if it no longer exists."""
+    """Edit a dataset trip. False if it no longer exists."""
     if get(row_id) is None:
         return False
     db.insert(CHANGES, {"kind": "edit", "row_id": int(row_id), "trip_date": trip_date, "plate_number": plate_number,
@@ -171,7 +159,7 @@ def update(row_id, trip_date, plate_number, distance_km, actual_fuel_consumption
 
 
 def delete(row_id):
-    """Remove one dataset trip (Delete on the Trip Records page). False if it no longer exists."""
+    """Delete a dataset trip. False if it no longer exists."""
     if get(row_id) is None:
         return False
     db.insert(CHANGES, {"kind": "delete", "row_id": int(row_id)})
@@ -179,12 +167,12 @@ def delete(row_id):
 
 
 def rename_plate(old, new):
-    """A vehicle's plate number was changed: its dataset trips follow it."""
+    """Move dataset trips to a vehicle's new plate number."""
     if (frame()["plate_number"] == old).any():
         db.insert(CHANGES, {"kind": "rename_plate", "old_plate": old, "plate_number": new})
 
 
 def delete_plate(plate):
-    """A vehicle was deleted: its dataset trips are deleted with it."""
+    """Delete the dataset trips of a deleted vehicle."""
     if (frame()["plate_number"] == plate).any():
         db.insert(CHANGES, {"kind": "delete_plate", "plate_number": plate})

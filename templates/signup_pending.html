@@ -44,7 +44,7 @@
 </div>
 
 <script>
-// Ask the server every 3 seconds; it signs this browser in once the account is approved.
+// poll every 3s until approved
 (function () {
   const checked = document.getElementById('pendingChecked');
   let busy = false;

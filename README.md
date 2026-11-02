@@ -103,8 +103,8 @@ pip install -r requirements-train.txt
 3. **Project settings (gear) > Service accounts > Generate new private key**. Save the downloaded
    file in this folder as **`firebase-key.json`**. Keep it secret: it is ignored by git.
 
-Firestore needs no tables. The collections `users`, `vehicles`, `trip_records`, `predictions` and
-`notification_dismissals` appear with their first record; `_counters/_changes` counts the saves (see `db.py`).
+Firestore needs no tables. The collections `users`, `vehicles`, `trip_records`, `predictions`,
+`notification_dismissals` and `trip_dataset_changes` appear with their first record; `_counters/_changes` counts the saves (see `db.py`).
 
 ### 4.4 Configure environment variables
 Copy `.env.example` to `.env` and set a long random `SECRET_KEY`. The key file is found automatically
@@ -116,7 +116,7 @@ python model/train_model.py
 python model/evaluate_model.py
 ```
 This creates `model/linear_regression_pipeline.joblib`, `model/metrics.json`, and the figures in
-`reports/figures/`. (The running app also trains the model by itself.) **Predictions will not work until this step is done** — the
+`reports/figures/`. **Predictions will not work until this step is done** — the
 Prediction page will show "Model unavailable" until a trained model file exists.
 
 ### 4.6 Create the administrator account

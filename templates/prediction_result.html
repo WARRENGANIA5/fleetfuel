@@ -83,24 +83,23 @@
 
 {% block extra_scripts %}
 <script>
-// ---- Real-time: when the request is approved / rejected / updated elsewhere, show it here ----
+// ---- live status updates ----
 (function () {
   const url = {{ url_for('api_prediction_status', prediction_id=pred.id)|tojson }};
   const reviewForm = document.querySelector('form[action*="/review"]');
   let known = null;
-  function busy() {  // don't reload while an administrator is typing in the review form
+  function busy() {  // admin is typing
     return reviewForm && (reviewForm.contains(document.activeElement) ||
       [].some.call(reviewForm.elements, function (el) { return el.value !== el.defaultValue; }));
   }
-  // Pages switch in place, so an answer can arrive after the user moved on:
-  // only act while this request is still the page on screen.
+  // ignore responses after the user navigated away
   const here = location.pathname;
   function stillHere() { return location.pathname === here && document.getElementById('resLive'); }
   function setLive(cls, text) { if (!stillHere()) return; document.getElementById('resLive').className = 'live-badge no-print' + cls; document.getElementById('resLiveText').textContent = text; }
   function check() {
     fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { return r.json(); }).then(function (d) {
       if (!stillHere()) return;
-      // Only a clear "does not exist" means deleted; any other unexpected answer is a connection problem.
+      // only treat an explicit not-found as deleted
       if (!d || (d.exists !== false && !d.signature)) throw new Error('unexpected answer');
       setLive('', 'Live');
       if (d.exists === false) { setLive(' is-offline', 'Deleted'); if (typeof showToast === 'function') showToast('This fuel request was deleted.', 'danger');

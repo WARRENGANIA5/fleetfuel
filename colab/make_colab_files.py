@@ -1,9 +1,5 @@
-"""Refresh the Google Colab files in this folder from the web application's data:
-
-* trip_records.csv, vehicle_records.csv, supplementary_data.csv - the same three
-  files as Model Performance > Upload Trained Model (app.training_dataset_csv);
-* fuel_consumption_linear_regression_AUTO.ipynb - the three files built in;
-* both notebooks - the code of model/preprocess.py and model/diagnostics.py.
+"""Regenerate the Colab files from the app's data: the three training CSVs,
+the AUTO notebook (with the CSVs embedded) and the shared code in both notebooks.
 
 Run:  python colab/make_colab_files.py
 """
@@ -22,9 +18,7 @@ UPLOAD = os.path.join(HERE, "fuel_consumption_linear_regression.ipynb")
 MERGE_CELL = '''trips = pd.read_csv(TRIPS_PATH)
 vehicles = pd.read_csv(VEHICLES_PATH)
 local = merge_trips_and_vehicles(trips, vehicles)
-# The GSO's own trips are the local trips ("system"); the online-dataset trips of
-# Trip Records have their source filled in. The supplementary file holds the other
-# online records, so no record is counted twice.
+# supplementary file excludes rows already in trip records
 online = local["source"].notna() if "source" in local else False
 local["data_source"] = np.where(online, "trip_records_online", "system")
 supplementary = pd.read_csv(SUPPLEMENTARY_PATH).assign(data_source="supplementary")
@@ -32,7 +26,7 @@ raw = pd.concat([f for f in (local, supplementary) if not f.empty], ignore_index
 df = clean_data(raw)
 print(f"Records before cleaning: {len(raw)}  after cleaning: {len(df)}")
 print(df["data_source"].value_counts().to_string())
-df.to_csv("cleaned_merged_dataset.csv", index=False)  # the cleaned and merged dataset (Pandas output)
+df.to_csv("cleaned_merged_dataset.csv", index=False)
 print("Saved cleaned_merged_dataset.csv")
 df.head()'''
 

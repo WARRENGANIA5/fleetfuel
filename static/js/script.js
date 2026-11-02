@@ -1,8 +1,6 @@
-// ---- Session guard for background requests ----
-// When the session ends (logged out, account deactivated, password changed) or
-// the user loses access, the server answers a page's polling request with an
-// X-Redirect header instead of an HTTP error. Go there once, and hold back the
-// response so no page script tries to draw the "error" payload.
+// ---- Session guard ----
+// Expired session: the server sends X-Redirect on polling requests.
+// Follow it once and swallow the response.
 (function () {
   const nativeFetch = window.fetch.bind(window);
   let leaving = false;
@@ -17,10 +15,8 @@
 })();
 
 // ---- Page timers ----
-// Pages switch without a reload (see "In-app page switching" below), so every
-// repeating timer a page starts (its 5-second live refresh) is remembered and
-// stopped when the user moves to another page. The shell's own timers (bell,
-// clock, account sync) use shellInterval and keep running.
+// Page timers are cleared on in-app navigation. Use shellInterval for timers
+// that should keep running (bell, clock, account sync).
 const shellInterval = window.setInterval.bind(window);
 const pageIntervals = new Set();
 window.setInterval = function () {
@@ -33,9 +29,8 @@ function stopPageTimers() {
   pageIntervals.clear();
 }
 
-// ---- Light / dark mode (switch in the top bar) ----
-// Saved in this browser; templates/_theme_init.html applies it before the page
-// is drawn. Charts read their axis colours from chartTheme() when created.
+// ---- Light / dark mode ----
+// Saved in localStorage; _theme_init.html applies it before first paint.
 function currentTheme() {
   return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 }
@@ -54,14 +49,14 @@ window.chartTheme = function () {
     light: light,
     text: light ? '#667085' : '#9698a9',
     grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)',
-    // Line colours: charcoal and amber on the light glass, blue and teal on dark.
+    // line colours per theme
     line: light ? '#2b251d' : '#2697ff',
     lineFill: light ? 'rgba(43, 37, 29, 0.08)' : 'rgba(38,151,255,0.12)',
     line2: light ? '#c8792b' : '#26e5c5',
     line2Fill: light ? 'rgba(200, 121, 43, 0.12)' : 'rgba(38,229,197,0.12)'
   };
 };
-// The top-bar switch: knob under the moon = dark, under the sun = light.
+// theme toggle
 function labelThemeToggle() {
   const btn = document.querySelector('[data-theme-toggle]');
   if (!btn) return;
@@ -75,21 +70,18 @@ document.addEventListener('click', function (e) {
   labelThemeToggle();
 });
 
-// ---- Everything inside the page area that needs wiring up. Runs on the first
-// load and again after every in-app page switch (on the new content). ----
+// ---- Page setup, runs on load and after every in-app page switch ----
 function initPage() {
   labelThemeToggle();
 
-  // Tables on phones: each cell carries its column name (data-label), so
-  // style.css can show every row as a card. Rows redrawn by the live refresh
-  // are labelled again as they arrive.
+  // add data-label to cells for the mobile card layout
   document.querySelectorAll('table.table-fleet').forEach(function (table) {
     const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
     const label = function () {
       table.querySelectorAll('tbody tr').forEach(function (tr) {
         Array.from(tr.children).forEach(function (td, i) {
           if (!td.hasAttribute('colspan') && labels[i] && td.dataset.label !== labels[i]) td.dataset.label = labels[i];
-          // A cell with nothing in it (e.g. no actions for this user) is left out of the phone card.
+          // hide empty cells on mobile
           td.classList.toggle('cell-empty', !td.hasAttribute('colspan') && !td.children.length && !td.textContent.trim());
         });
       });
@@ -100,9 +92,7 @@ function initPage() {
     });
   });
 
-  // Shared record modals (Trip / Fuel Records): each page has ONE view/edit
-  // modal; when it opens, fill it from the clicked row's data-record JSON and
-  // point the form at that record.
+  // shared view/edit modal, filled from the row's data-record JSON
   document.querySelectorAll('.modal[data-record-modal]').forEach(function (modal) {
     modal.addEventListener('show.bs.modal', function (e) {
       const row = e.relatedTarget && e.relatedTarget.closest('[data-record]');
@@ -124,17 +114,17 @@ function initPage() {
     });
   });
 
-  // Flash messages -> Bootstrap toasts
+  // flash messages -> toasts
   const flashData = document.getElementById('flashData');
   if (flashData) {
     try {
       const messages = JSON.parse(flashData.dataset.messages);
       messages.forEach(([category, text]) => showToast(text, category));
     } catch (err) { /* no-op */ }
-    flashData.remove();  // shown once
+    flashData.remove();
   }
 
-  // Password show/hide toggles
+  // password show/hide
   document.querySelectorAll('.password-toggle').forEach(function (icon) {
     const targetId = icon.getAttribute('data-target');
     const input = document.getElementById(targetId);
@@ -152,7 +142,7 @@ function initPage() {
       }
     });
 
-    // Only show the reveal icon once the field actually has typed content.
+    // only show the eye icon when there's text
     const syncVisibility = function () {
       icon.classList.toggle('d-none', input.value.length === 0);
     };
@@ -160,7 +150,7 @@ function initPage() {
     input.addEventListener('input', syncVisibility);
   });
 
-  // Global loading overlay on form submit (data-loading attr)
+  // loading overlay on submit (data-loading)
   document.querySelectorAll('form[data-loading]').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       if (form.checkValidity && !form.checkValidity()) return;
@@ -168,7 +158,7 @@ function initPage() {
     });
   });
 
-  // Bootstrap client-side validation
+  // Bootstrap validation
   document.querySelectorAll('form.needs-validation').forEach(function (form) {
     form.addEventListener('submit', function (event) {
       if (!form.checkValidity()) {
@@ -180,7 +170,7 @@ function initPage() {
     }, false);
   });
 
-  // Generic table search filter (data-search-input + data-search-table)
+  // table search (data-search-input + data-search-table)
   document.querySelectorAll('[data-search-input]').forEach(function (input) {
     const tableId = input.getAttribute('data-search-input');
     const table = document.getElementById(tableId);
@@ -191,14 +181,13 @@ function initPage() {
         row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none';
       });
     };
-    input.addEventListener('input', apply);  // typing, pasting and autofill
+    input.addEventListener('input', apply);
     input.addEventListener('keyup', apply);
     input.addEventListener('search', apply);
-    if (input.value) apply();  // opened with a search already filled in (e.g. a month from the dashboard)
+    if (input.value) apply();  // prefilled search
   });
 
-  // Date pickers whose latest allowed day is "today" move on at midnight, since
-  // the pages stay open and refresh by themselves.
+  // move max=today date limits forward at midnight
   const loadedToday = phToday();
   const pickers = Array.prototype.filter.call(document.querySelectorAll('input[type="date"][max]'),
     function (el) { return el.max === loadedToday; });
@@ -210,19 +199,16 @@ function initPage() {
   }
 }
 
-// ---- Phone showing the desktop layout ("Desktop site" is on in the browser) ----
-// A phone browser in desktop mode pretends to be a ~980 px wide screen, so the
-// screen-size rules pick the desktop layout. On a touch phone in that mode,
-// every width rule (ours and Bootstrap's) is re-checked against the phone's
-// real width and the page is scaled to fit, so the phone layout is used
-// anyway. If a stylesheet cannot be read, a one-line hint is shown instead.
+// ---- "Desktop site" mode on phones ----
+// The browser reports ~980px, so re-check the media queries against the real
+// screen width and scale the page to force the phone layout.
 function usePhoneLayoutOnDesktopSite() {
   const touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   const realWidth = window.screen.width;
   if (!touch || Math.min(window.screen.width, window.screen.height) > 600) return;
   const root = document.documentElement;
-  if (!root.classList.contains('force-phone') && window.innerWidth < 900) return;  // normal phone layout already
-  const fits = function (text) {  // would this width rule apply at the phone's real width?
+  if (!root.classList.contains('force-phone') && window.innerWidth < 900) return;
+  const fits = function (text) {
     let ok = true;
     text.replace(/\((min|max)-width:\s*([\d.]+)px\)/g, function (_, kind, px) {
       if (kind === 'min' && realWidth < +px) ok = false;
@@ -249,7 +235,7 @@ function usePhoneLayoutOnDesktopSite() {
   root.classList.add('force-phone');
   const zoom = window.innerWidth / realWidth;
   root.style.zoom = zoom;
-  root.style.setProperty('--fp-zoom', zoom);  // full-height layouts divide by it (style.css)
+  root.style.setProperty('--fp-zoom', zoom);
 }
 function showDesktopSiteHint() {
   let dismissed = false;
@@ -270,14 +256,14 @@ document.addEventListener('DOMContentLoaded', usePhoneLayoutOnDesktopSite);
 window.addEventListener('orientationchange', function () { setTimeout(usePhoneLayoutOnDesktopSite, 300); });
 
 document.addEventListener('DOMContentLoaded', function () {
-  // ---- Loading bar for page changes ----
+  // ---- Loading bar ----
   const progress = document.getElementById('pageProgress');
   let navTimer = null;
   const startNav = function () {
     if (!progress) return;
     progress.classList.add('is-loading');
     clearTimeout(navTimer);
-    navTimer = setTimeout(endNav, 10000);  // safety net: never leave it running
+    navTimer = setTimeout(endNav, 10000);  // failsafe
   };
   const endNav = function () {
     clearTimeout(navTimer);
@@ -286,15 +272,12 @@ document.addEventListener('DOMContentLoaded', function () {
   document.addEventListener('submit', function (e) {
     if (!e.defaultPrevented) startNav();
   });
-  // Back/forward restores a page from cache: hide the bar again.
+  // bfcache restore
   window.addEventListener('pageshow', endNav);
 
-  // ---- In-app page switching (like a single-page app) ----
-  // A click on a link inside the system swaps only the page area: the sidebar,
-  // top bar, bell and clock stay as they are, the chosen menu item lights up
-  // at once, and pages are fetched ahead while the pointer rests on a link.
-  // Anything unusual (file downloads, the login page, errors) falls back to a
-  // normal page load.
+  // ---- In-app navigation ----
+  // Swap only <main> on internal links and prefetch on hover. Downloads,
+  // login and errors fall back to a full page load.
   const main = document.querySelector('main.content-area');
   const pageScripts = document.getElementById('pageScripts');
   if (main && pageScripts && window.DOMParser && history.pushState) {
@@ -308,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const href = a.getAttribute('href');
       if (!href || href.startsWith('#') || href.startsWith('javascript:')) return null;
       if (a.origin !== location.origin) return null;
-      if (/export|\.csv$|^\/(static|api)\/|^\/logout/i.test(a.pathname)) return null;  // files and actions, not pages
+      if (/export|\.csv$|^\/(static|api)\/|^\/logout/i.test(a.pathname)) return null;
       if (a.pathname === location.pathname && a.search === location.search && a.hash) return null;
       return a.href.split('#')[0];
     };
@@ -338,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const swapPage = function (doc, newMain, finalUrl, push) {
-      // Leave the old page: stop its timers, charts and any open dialog.
+      // tear down the old page
       stopPageTimers();
       window.refreshBeforePrint = undefined;
       if (window.Chart && Chart.instances) Object.values(Chart.instances).forEach(function (c) { c.destroy(); });
@@ -359,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (h1 && newH1) h1.textContent = newH1.textContent;
       const nav = document.querySelector('.sidebar-nav');
       const newNav = doc.querySelector('.sidebar-nav');
-      if (nav && newNav) nav.innerHTML = newNav.innerHTML;  // active item and badges
+      if (nav && newNav) nav.innerHTML = newNav.innerHTML;
 
       const newScripts = Array.from(newMain.querySelectorAll('script'));
       const extra = doc.getElementById('pageScripts');
@@ -369,8 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
       pageScripts.innerHTML = '';
       window.scrollTo(0, 0);
 
-      // Run the new page's scripts in their own scope (so a page can be opened
-      // again without "already declared" errors), after any library it needs.
+      // run page scripts in their own scope to avoid redeclare errors
       const externals = newScripts.filter(function (s) { return s.src; });
       const inline = newScripts.filter(function (s) { return !s.src && (!s.type || /javascript/.test(s.type)); })
         .map(function (s) { return s.textContent; }).join('\n;\n');
@@ -389,16 +371,16 @@ document.addEventListener('DOMContentLoaded', function () {
       const token = ++navToken;
       startNav();
       const slow = setTimeout(function () { if (token === navToken) main.classList.add('is-switching'); }, 150);
-      // Safety net: if the page has not arrived in 8 seconds, load it the normal way.
+      // fall back to a normal load after 8s
       const stuck = setTimeout(function () { if (token === navToken) { pageCache.delete(url); window.location.href = url; } }, 8000);
       fetchPage(url)
         .then(function (r) {
-          pageCache.delete(url);  // used once: the next visit gets fresh data
+          pageCache.delete(url);
           if (token !== navToken) return;
           if (!/text\/html/i.test(r.type)) { window.location.href = url; return; }
           const doc = new DOMParser().parseFromString(r.html, 'text/html');
           const newMain = doc.querySelector('main.content-area');
-          if (!newMain || !doc.getElementById('pageScripts')) { window.location.href = r.url; return; }  // e.g. the login page
+          if (!newMain || !doc.getElementById('pageScripts')) { window.location.href = r.url; return; }
           return swapPage(doc, newMain, r.url, push);
         })
         .catch(function () { if (token === navToken) window.location.href = url; })
@@ -409,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     window.navigateTo = function (url) { navigate(new URL(url, location.href).href, true); };
 
-    // Light up the chosen menu item and show its name in the top bar at once.
+    // highlight the menu item right away
     const markNav = function (navLink) {
       if (!navLink) return;
       document.querySelectorAll('.sidebar-nav .nav-link.active').forEach(function (l) { l.classList.remove('active'); });
@@ -426,8 +408,8 @@ document.addEventListener('DOMContentLoaded', function () {
       e.preventDefault();
       markNav(a.closest('.sidebar-nav .nav-link'));
       const sb = document.getElementById('sidebar');
-      if (sb) sb.classList.remove('open');  // phones: close the menu right away
-      // Close any open dropdown (e.g. the bell) so it doesn't stay over the new page.
+      if (sb) sb.classList.remove('open');
+      // close open dropdowns
       document.querySelectorAll('[data-bs-toggle="dropdown"].show').forEach(function (t) {
         const dd = window.bootstrap && bootstrap.Dropdown.getInstance(t);
         if (dd) dd.hide();
@@ -435,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function () {
       navigate(url, true);
     });
 
-    // Fetch a page ahead while the pointer rests on its link (or a finger touches it).
+    // prefetch on hover/touch
     let hoverTimer = null;
     const prefetch = function (e) {
       const a = e.target.closest && e.target.closest('a[href]');
@@ -448,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('touchstart', prefetch, { passive: true });
     document.addEventListener('mouseout', function () { clearTimeout(hoverTimer); });
 
-    // Back / Forward: show that page in place (a change of #hash alone is ignored).
+    // back/forward (ignore hash-only changes)
     let shownPage = location.pathname + location.search;
     const origPushState = history.pushState.bind(history);
     const origReplaceState = history.replaceState.bind(history);
@@ -458,14 +440,13 @@ document.addEventListener('DOMContentLoaded', function () {
       if (location.pathname + location.search === shownPage) return;
       const samePath = location.pathname === shownPage.split('?')[0];
       shownPage = location.pathname + location.search;
-      // Same page, other ?page= or ?q= (e.g. Trip Records): the page may show it in
-      // place, without a reload or a jump to the top.
+      // same page, different ?page= or ?q=: let the page handle it
       if (samePath && !document.dispatchEvent(new Event('pagestate', { cancelable: true }))) return;
       markNav(Array.from(document.querySelectorAll('.sidebar-nav .nav-link')).find(function (l) { return l.pathname === location.pathname; }));
       navigate(location.href, false);
     });
   } else {
-    // No in-app switching (older browser): still show the loading bar on clicks.
+    // older browsers: just show the loading bar
     document.addEventListener('click', function (e) {
       const a = e.target.closest('a[href]');
       if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey ||
@@ -475,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // ---- Sidebar toggle (mobile) ----
+  // ---- Sidebar toggle ----
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebarToggle');
   if (toggleBtn) {
@@ -491,13 +472,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // ---- Notifications bell (real time): badge refreshes every 5s; staff get a
-  // toast when a fuel request is approved/rejected, admins when a new request arrives.
+  // ---- Notifications bell (polls every 5s) ----
   const notifBtn = document.getElementById('notifBtn');
   const notifList = document.getElementById('notifList');
   if (notifBtn && notifList) {
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    let knownKeys = null;  // items already seen by this page (no toast for them)
+    let knownKeys = null;  // no toast for these
     function setDot(count) {
       let dot = document.getElementById('notifDot');
       if (count > 0) {
@@ -520,8 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<i class="fa-solid fa-xmark"></i></button></div>';
       }).join('');
     }
-    // Remove one notification (x) or all of them; saved on the server, so it stays
-    // removed after a reload and disappears from this user's other tabs/devices too.
+    // dismiss one or all (saved server-side)
     function applyNotifData(data) {
       if (!data) return;
       setDot(data.count);
@@ -559,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!data) return;
           setDot(data.count);
           renderList(data.notifications);
-          // Sidebar counters (admin): pending fuel requests and pending sign-ups, on every page.
+          // sidebar badges (admin)
           [['pendingReqBadge', data.pending_requests], ['pendingBadge', data.pending_accounts]].forEach(function (b) {
             const el = document.getElementById(b[0]);
             if (el && b[1] !== undefined) { el.textContent = b[1]; el.hidden = !b[1]; }
@@ -582,17 +561,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('visibilitychange', function () { if (!document.hidden) pollNotifications(true); });
     notifBtn.addEventListener('shown.bs.dropdown', function () {
       pollNotifications(false).then(function () {
-        // Opening the bell marks approvals/rejections as read.
+        // mark as read
         fetch('/api/notifications/seen', { method: 'POST', headers: { 'X-CSRFToken': csrfMeta ? csrfMeta.content : '' } })
           .then(function () { return pollNotifications(false); });
       });
     });
   }
 
-  // ---- Print buttons (data-print): always print the latest data ----
-  // Pages with live data define window.refreshBeforePrint(); the button waits
-  // for it, then prints. Other pages reload with ?print=1 (fresh from the
-  // server) and print as soon as they have loaded.
+  // ---- Print buttons (data-print) ----
+  // Uses window.refreshBeforePrint() if the page has one, else reloads with ?print=1.
   function stampPrintTime() {
     const el = document.getElementById('printTime');
     if (el) el.textContent = new Date().toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' });
@@ -606,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function () {
       btn.disabled = true;
       const timeout = new Promise(function (resolve) { setTimeout(resolve, 6000); });
       Promise.race([Promise.resolve(window.refreshBeforePrint()).catch(function () {}), timeout])
-        .then(function () { return new Promise(function (r) { setTimeout(r, 300); }); })  // let the DOM paint
+        .then(function () { return new Promise(function (r) { setTimeout(r, 300); }); })
         .then(function () { btn.disabled = false; stampPrintTime(); window.print(); });
     } else {
       const url = new URL(window.location.href);
@@ -623,14 +600,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // ---- Real-time account sync (every page) ----
-  // Keeps the top-bar name/role — and the Settings form when it has
-  // no unsaved edits — in step with changes made in other tabs or devices,
-  // and signs the user out if the account is deactivated.
+  // ---- Account sync across tabs ----
   function syncField(id, value) {
     const el = document.getElementById(id);
     if (!el || document.activeElement === el) return;
-    // Only overwrite fields the user hasn't edited.
+    // skip fields the user is editing
     if (el.dataset.original === undefined || el.value === el.dataset.original) {
       el.value = value;
       el.dataset.original = value;
@@ -716,16 +690,14 @@ function confirmDelete(message) {
 }
 
 // ---------------------------------------------------------------------------
-// Dates and times: always Philippine time (Asia/Manila), whatever time zone the
-// viewer's device uses, matching the server and database.
+// Dates: always Asia/Manila regardless of the device time zone
 // ---------------------------------------------------------------------------
 const PH_TZ = 'Asia/Manila';
 function phToday() {   // YYYY-MM-DD
   return new Intl.DateTimeFormat('en-CA', { timeZone: PH_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
-// "Add" forms start with today's date already filled in (still editable);
-// edit forms keep the record's own values.
+// prefill today's date on add forms
 document.addEventListener('show.bs.modal', function (e) {
   const modal = e.target;
   if (!modal.id || !/^add/i.test(modal.id)) return;
@@ -733,12 +705,7 @@ document.addEventListener('show.bs.modal', function (e) {
 });
 
 // ---------------------------------------------------------------------------
-// Login <-> Sign Up switch. Leaving: the form fades out, the two glass shards
-// light up, slip into the cut corners and glide to the middle, where they join
-// as one mark. Arriving: the other page opens on that mark (its head hides the
-// form first with auth-arriving), the card grows or shrinks from the old
-// page's size to its own, then the halves split back to the corners and the
-// form comes in row by row.
+// Login <-> Sign Up transition animation
 // ---------------------------------------------------------------------------
 (function () {
   const frame = document.querySelector('.auth-frame');
@@ -749,10 +716,7 @@ document.addEventListener('show.bs.modal', function (e) {
   const SIZE_KEY = 'fleetfuel-auth-size';
   const later = function (ms, fn) { setTimeout(fn, ms); };
 
-  // Two lights running around the card's edge, cut corners included. They are
-  // moved with transform-only keyframes (head on the outline, tail turned along
-  // it), so the browser never redraws the card for them. Rebuilt when the card
-  // changes size, keeping each light where it was.
+  // two lights running around the card edge (transform-only keyframes)
   const beamLights = Array.from(frame.querySelectorAll('.card-beam .beam'));
   let beamRuns = [], beamTimer = null;
   function runBeams() {
@@ -760,8 +724,7 @@ document.addEventListener('show.bs.modal', function (e) {
     const w = card.offsetWidth, h = card.offsetHeight, e = 0.5;
     const c = parseFloat(getComputedStyle(card).getPropertyValue('--cut')) || 30;
     const pts = [[c, e], [w - e, e], [w - e, h - c], [w - c, h - e], [e, h - e], [e, c], [c, e]];
-    // Keep the lights on the edge: right after a corner a tail would otherwise
-    // stick out past it. The clip is the card's shape grown by o px.
+    // clip so tails don't stick out at the corners
     const o = 3, d = o * 0.414;
     beamLights[0].parentNode.style.clipPath = 'polygon(' + [[c - d, -o], [w + o, -o], [w + o, h - c + d], [w - c + d, h + o], [-o, h + o], [-o, c - d]]
       .map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
@@ -770,7 +733,7 @@ document.addEventListener('show.bs.modal', function (e) {
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
       let angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
-      if (last !== null) while (angle - last < -180) angle += 360;  // keep turning the same way round
+      if (last !== null) while (angle - last < -180) angle += 360;
       segs.push({ a: a, b: b, len: len, at: total, angle: angle });
       total += len;
       last = angle;
@@ -783,8 +746,7 @@ document.addEventListener('show.bs.modal', function (e) {
       const key = function (offset, p, angle) {
         frames.push({ offset: offset / total, transform: 'translate(' + (p[0] - bw).toFixed(1) + 'px,' + (p[1] - 1).toFixed(1) + 'px) rotate(' + angle.toFixed(1) + 'deg)' });
       };
-      // Along each side the light keeps that side's angle; it turns only in
-      // the first few px after a corner.
+      // only rotate near the corners
       segs.forEach(function (sg, i) {
         const turn = Math.min(8, sg.len / 3);
         key(sg.at, sg.a, i === 0 ? sg.angle : segs[i - 1].angle);
@@ -814,7 +776,7 @@ document.addEventListener('show.bs.modal', function (e) {
     later(1000, function () { location.href = href; });
   }
 
-  // Card size: start at the previous page's size and ease into this one's.
+  // animate card size from the previous page
   function morphFromPrevious() {
     let old = null;
     try { old = JSON.parse(sessionStorage.getItem(SIZE_KEY) || 'null'); sessionStorage.removeItem(SIZE_KEY); } catch (e) {}
@@ -837,12 +799,12 @@ document.addEventListener('show.bs.modal', function (e) {
     frame.classList.add('no-anim', 'shards-lit', 'shards-in', 'shards-center', 'is-leaving');
     beamSpeed(3);
     later(1000, function () { beamSpeed(1); });
-    void frame.offsetWidth;  // the mark is already in the middle; no slide in
+    void frame.offsetWidth;
     frame.classList.remove('no-anim');
     root.classList.remove('auth-arriving');
     morphFromPrevious();
-    later(560, function () { frame.classList.remove('shards-center'); });            // split to the cut corners
-    later(980, function () { frame.classList.remove('shards-in', 'shards-lit'); });  // back outside, plain glass
+    later(560, function () { frame.classList.remove('shards-center'); });
+    later(980, function () { frame.classList.remove('shards-in', 'shards-lit'); });
     later(900, function () {
       rows.forEach(function (el, i) { el.style.transitionDelay = (i * 60) + 'ms'; });
       frame.classList.remove('is-leaving');
@@ -854,11 +816,11 @@ document.addEventListener('show.bs.modal', function (e) {
     const a = e.target.closest('.auth-switch a[href]');
     if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
     e.preventDefault();
-    if (frame.classList.contains('is-leaving')) return;  // already switching
+    if (frame.classList.contains('is-leaving')) return;
     leave(a.href);
   });
 
-  // Back button after a switch: show the form again instead of the empty card.
+  // back button: show the form again
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) frame.classList.remove('is-leaving', 'shards-lit', 'shards-in', 'shards-center', 'shards-pulse');
   });

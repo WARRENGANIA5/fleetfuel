@@ -1,7 +1,4 @@
-"""The system's clock: Philippine time (DB_TIME_ZONE, default +08:00) whatever
-time zone the computer or hosting server runs in, so the dates and times the
-app shows, checks and stores always agree with the database (which uses the
-same offset for NOW() and CURRENT_TIMESTAMP)."""
+"""Philippine time (DB_TIME_ZONE, default +08:00) regardless of the server's time zone."""
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -16,10 +13,10 @@ LOCAL_TZ = _offset(os.environ.get("DB_TIME_ZONE", "+08:00"))
 
 
 def now_local():
-    """Current local (Philippine) date and time, as a naive datetime like the database's."""
+    """Current PH time as a naive datetime."""
     return datetime.now(LOCAL_TZ).replace(tzinfo=None)
 
 
 def today_local():
-    """Current local (Philippine) date."""
+    """Current PH date."""
     return now_local().date()

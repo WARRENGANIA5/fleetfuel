@@ -1,18 +1,13 @@
 """
-Regression diagnostics (Chapter II, Theoretical Background; Chapter III, How
-the Project Will Work), computed with statsmodels:
+Regression diagnostics with statsmodels:
 
-* Variance Inflation Factor (VIF) of each predictor - a value above 5
-  indicates high collinearity (reported; the equation's four terms are kept).
-* LINE conditions on the residuals of an OLS fit of the same equation:
-    Linearity        - Ramsey RESET test
-    Independence     - Durbin-Watson statistic on the residuals of the LOCAL
-                       trips arranged by the date of travel
-    Normality        - Jarque-Bera test (with the residual histogram)
-    Equal variance   - Breusch-Pagan test
-* Coefficient standard errors and p-values use heteroskedasticity-robust
-  (HC3) standard errors, which stay valid when the equal-variance condition
-  is not met (larger errors on longer trips).
+* VIF per predictor (above 5 = high collinearity)
+* LINE checks on OLS residuals:
+    Linearity        - Ramsey RESET
+    Independence     - Durbin-Watson (local trips by date)
+    Normality        - Jarque-Bera
+    Equal variance   - Breusch-Pagan
+* p-values use HC3 robust standard errors
 """
 import math
 import warnings
@@ -25,12 +20,11 @@ from statsmodels.stats.stattools import durbin_watson, jarque_bera
 
 VIF_THRESHOLD = 5.0
 ALPHA = 0.05
-VIF_CAP = 1000.0  # perfect collinearity gives an infinite VIF; stored as ">1000"
+VIF_CAP = 1000.0  # infinite VIF is stored as ">1000"
 
 
 def compute_vif(frame):
-    """VIF_j = 1 / (1 - R_j^2) for every column of `frame`, with an intercept.
-    A column with the same value in every record has no VIF (None)."""
+    """VIF_j = 1 / (1 - R_j^2) per column. None for constant columns."""
     usable = [c for c in frame.columns if frame[c].astype(float).std() > 0]
     out = {c: None for c in frame.columns if c not in usable}
     if len(usable) < 2:
@@ -52,10 +46,8 @@ def _p(value):
 
 
 def regression_diagnostics(terms_train, y_train, vif, local_residuals_by_date=None):
-    """Fit OLS on the training split with the model's terms and test the LINE
-    conditions. `local_residuals_by_date` are the residuals of the local trips
-    in date order (for the Durbin-Watson test); without local trips the test
-    falls back to the training residuals."""
+    """Fit OLS on the training split and run the LINE checks.
+    `local_residuals_by_date` is used for Durbin-Watson if given."""
     usable = [c for c in terms_train.columns if terms_train[c].astype(float).std() > 0]
     design = sm.add_constant(terms_train[usable].astype(float), has_constant="add")
     y = np.asarray(y_train, dtype=float)
@@ -97,7 +89,7 @@ def regression_diagnostics(terms_train, y_train, vif, local_residuals_by_date=No
          "meaning": "Predictors do not carry the same information (an interaction term usually shares "
                     "information with the predictors it is built from)."},
     ]
-    # Same coefficients; HC3 robust standard errors for the significance tests.
+    # HC3 robust standard errors
     robust = sm.OLS(y, design).fit(cov_type="HC3")
     coefficients = []
     for name in ["const"] + usable:

@@ -1,11 +1,8 @@
-"""Back up the Firebase Firestore database to backups/ (one .json file per run).
+"""Back up Firestore to backups/ as a .json file. Keeps the newest KEEP files.
 
-Runs automatically from scripts/start_server.bat every time the system is started
-(and every 24 hours while the server runs), and can be run by hand:
+Runs on server start and every 24 hours. Manual use:
     venv\\Scripts\\python.exe backup_database.py
-Keeps the newest KEEP backups and deletes older ones.
-
-To restore a backup (this REPLACES the records with the same IDs):
+Restore (overwrites records with the same IDs):
     venv\\Scripts\\python.exe backup_database.py --restore backups\\<file>.json
 """
 import json

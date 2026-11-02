@@ -1,10 +1,6 @@
 @echo off
-REM FleetFuel - start the web application for the office / motorpool network.
-REM The database is Firebase Firestore (online): this computer needs internet, but no XAMPP/MySQL.
-REM 1. Backs up the Firestore database to backups\ (keeps the newest 30; the app also backs up every 24 hours).
-REM 2. Starts the app with Waitress on port 5000 (reachable from other PCs on the same network).
-REM 3. If the app ever stops unexpectedly, it is started again automatically.
-REM Run install_autostart.bat once to start all of this automatically when Windows starts.
+REM Start FleetFuel on port 5000 (needs internet for Firestore).
+REM Backs up the database first, and restarts the app if it crashes.
 cd /d "%~dp0.."
 title FleetFuel Server
 
@@ -25,8 +21,7 @@ echo  installed by install_autostart.bat starts the system again within a few se
 echo.
 
 :run
-REM Another FleetFuel window already serves port 5000: leave it to that one
-REM (on Windows two servers can share the port, and the older one keeps answering).
+REM Already running on port 5000, don't start a second one.
 netstat -ano | find ":5000 " | find "LISTENING" >nul
 if not errorlevel 1 (
     echo [%date% %time%] FleetFuel is already running in another window. This window will close.

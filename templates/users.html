@@ -133,7 +133,7 @@ const APPROVE_URL = {{ url_for('approve_user', user_id=0)|tojson }};
 const REJECT_URL = {{ url_for('reject_user', user_id=0)|tojson }};
 const USERS_CSRF = {{ csrf_token()|tojson }};
 
-// The reset-password form must start empty (the shared modal would otherwise try to fill it).
+// keep the reset form empty
 const resetPw = document.getElementById('resetPw'), resetPwConfirm = document.getElementById('resetPwConfirm');
 function checkResetMatch() {
   resetPwConfirm.setCustomValidity(resetPwConfirm.value && resetPwConfirm.value !== resetPw.value ? 'Passwords do not match.' : '');
@@ -149,7 +149,7 @@ document.getElementById('resetPwShow').addEventListener('click', function () {
   const show = resetPw.type === 'password';
   [resetPw, resetPwConfirm].forEach(function (i) { i.type = show ? 'text' : 'password'; });
 });
-// Generate: 12 random characters without look-alikes (0/O, 1/l/I), always with letters and digits.
+// 12 chars, no look-alikes (0/O, 1/l/I)
 document.getElementById('resetPwGen').addEventListener('click', function () {
   const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ', digits = '23456789', all = letters + digits;
   const rnd = function (set) { const a = new Uint32Array(1); crypto.getRandomValues(a); return set[a[0] % set.length]; };
@@ -164,10 +164,10 @@ document.getElementById('resetPwCopy').addEventListener('click', function () {
   if (!resetPw.value) return;
   const done = function () { btn.innerHTML = '<i class="fa-solid fa-check"></i>'; setTimeout(function () { btn.innerHTML = '<i class="fa-solid fa-copy"></i>'; }, 1500); };
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(resetPw.value).then(done, function () {});
-  else { resetPw.type = 'text'; resetPw.select(); document.execCommand('copy'); done(); }  // LAN (http) fallback
+  else { resetPw.type = 'text'; resetPw.select(); document.execCommand('copy'); done(); }  // fallback for http
 });
 
-// ---- Real-time: refresh the account list every 5s ----
+// ---- refresh every 5s ----
 function userRow(u) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(u);
@@ -188,12 +188,12 @@ let lastUsersJson = JSON.stringify([...document.querySelectorAll('#usersBody tr[
 setInterval(function () {
   if (document.querySelector('.modal.show')) return;
   fetch('/api/users').then(function (r) {
-    if (!document.getElementById('usersBody')) return null;  // the user moved to another page meanwhile
+    if (!document.getElementById('usersBody')) return null;
     if (r.status === 403) { window.location.href = '/dashboard'; return null; }
     return r.json();
   }).then(function (d) {
     if (!d) return;
-    if (!Array.isArray(d.users)) throw new Error('unexpected answer');  // keep the rows on screen
+    if (!Array.isArray(d.users)) throw new Error('unexpected answer');
     document.getElementById('userLive').className = 'live-badge';
     document.getElementById('userLiveText').textContent = 'Live';
     const badge = document.getElementById('pendingBadge');

@@ -1,4 +1,4 @@
-# Vercel entry point: the Flask app serves every page, API call and static file.
+# Vercel entry point
 import os
 import sys
 

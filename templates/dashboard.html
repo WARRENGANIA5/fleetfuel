@@ -180,9 +180,7 @@
 
 {% block extra_scripts %}
 <script>
-// Declared before the Chart.js CDN tag so live auto-refresh (stats, model
-// status, recent predictions) keeps working even if the chart library is
-// slow to load; charts are (re)created as soon as Chart is available.
+// defined before Chart.js loads so the refresh works even if the CDN is slow
 const IS_ADMIN = {{ is_admin|tojson }};
 const chartColors = window.chartTheme();
 const gridColor = chartColors.grid;
@@ -195,7 +193,7 @@ let lastDashboardData = {{ {
 const lastSeen = {};
 
 function show(id, visible) { const el = document.getElementById(id); if (el) el.hidden = !visible; }
-// Only touch a widget when its data actually changed (no 5-second flicker).
+// only redraw when the data changed
 function changed(key, value) {
   const json = JSON.stringify(value);
   if (lastSeen[key] === json) return false;
@@ -204,7 +202,7 @@ function changed(key, value) {
 }
 
 function renderFuelTrend(d) {
-  if (!document.getElementById('fuelTrendWrap')) return;  // staff dashboards show no fleet trend
+  if (!document.getElementById('fuelTrendWrap')) return;
   const has = d.fuel_trend_labels.length > 0;
   show('fuelTrendWrap', has); show('fuelTrendEmpty', !has);
   if (!has || !window.Chart) return;
@@ -214,7 +212,7 @@ function renderFuelTrend(d) {
       data: { labels: [], datasets: [{ label: 'Liters Consumed', data: [], borderColor: chartColors.line,
         backgroundColor: chartColors.lineFill, fill: true, tension: 0.35, pointRadius: 3 }] },
       options: {
-        // Click anywhere in a month's column to open that month's trip records.
+        // click a month -> its trip records
         interaction: { mode: 'index', intersect: false },
         onClick: function (evt, items) {
           const month = items.length && (lastDashboardData.fuel_trend_months || [])[items[0].index];
@@ -240,8 +238,7 @@ function renderFuelTrend(d) {
 }
 
 function renderAvp(d) {
-  // Shown as soon as there is a prediction; the Actual line fills in (gaps
-  // until then) as actual fuel is recorded in Prediction History.
+  // actual line has gaps until fuel is recorded
   const has = d.avp_predicted.length > 0;
   show('avpWrap', has); show('avpEmpty', !has);
   show('avpMissing', has && d.avp_missing > 0);
@@ -256,7 +253,7 @@ function renderAvp(d) {
       ] },
       options: {
         interaction: { mode: 'index', intersect: false },
-        // Click a request's column to open that fuel request.
+        // click -> fuel request
         onClick: function (evt, items) {
           const url = items.length && (lastDashboardData.avp_urls || [])[items[0].index];
           if (!url) return;
@@ -266,7 +263,7 @@ function renderAvp(d) {
         plugins: { legend: { display: true },
           tooltip: { callbacks: {
             label: function (item) { return ' ' + item.dataset.label + ': ' + Number(item.raw).toFixed(2); },
-            // Chart.js leaves a missing (null) actual out of the tooltip, so say it here.
+            // Chart.js skips nulls in tooltips
             footer: function (items) {
               const i = items.length ? items[0].dataIndex : -1;
               const noActual = i >= 0 && (lastDashboardData.avp_actual || [])[i] == null;
@@ -290,7 +287,7 @@ function renderCharts(d, force) {
   if (force || changed('avp', [d.avp_labels, d.avp_actual, d.avp_predicted, d.avp_missing, d.avp_urls])) renderAvp(d);
 }
 
-// ---- Live auto-refresh: re-fetch dashboard data every 5s and update in place ----
+// ---- auto-refresh every 5s ----
 function refreshDashboard() {
   return fetch('/api/dashboard-data')
     .then(function (res) { return res.json(); })
@@ -308,7 +305,7 @@ function refreshDashboard() {
       setText('statRejected', data.stats.rejected);
       setText('qaPending', data.stats.pending);
 
-      const summaryBox = document.getElementById('modelSummaryBox');   // administrator only
+      const summaryBox = document.getElementById('modelSummaryBox');   // admin only
       if (summaryBox) { summaryBox.hidden = !data.model_summary; document.getElementById('modelNone').hidden = !!data.model_summary; }
       if (summaryBox && data.model_summary) {
         setText('modelR2', data.model_summary.r2_score);
@@ -343,7 +340,7 @@ function refreshDashboard() {
     .catch(function () { /* silent retry on next interval */ });
 }
 setInterval(refreshDashboard, 5000);
-// Clicking (or Enter on) the Model Status figures opens Model Performance.
+// model status -> Model Performance
 const modelBox = document.getElementById('modelSummaryBox');
 if (modelBox) {
   const openModel = function () {
@@ -352,7 +349,7 @@ if (modelBox) {
   modelBox.addEventListener('click', openModel);
   modelBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') openModel(); });
 }
-// Clicking anywhere on a recent prediction opens it.
+// recent prediction rows are clickable
 document.getElementById('recentPredictionsBody').addEventListener('click', function (e) {
   const tr = e.target.closest('tr[data-href]');
   if (tr && !e.target.closest('a')) {
@@ -364,9 +361,9 @@ document.getElementById('recentPredictionsBody').addEventListener('click', funct
 <script>
 Chart.defaults.font.family = "Poppins, sans-serif";
 Chart.defaults.color = window.chartTheme().text;
-Chart.defaults.animation = false;  // charts appear at once, no draw-in
+Chart.defaults.animation = false;
 renderCharts(lastDashboardData, true);
-// Seed the change-tracker with what is on screen so the first poll doesn't redraw.
+// seed the tracker so the first poll doesn't redraw
 changed('trend', [lastDashboardData.fuel_trend_labels, lastDashboardData.fuel_trend_values, lastDashboardData.fuel_trend_months]);
 changed('avp', [lastDashboardData.avp_labels, lastDashboardData.avp_actual, lastDashboardData.avp_predicted, lastDashboardData.avp_missing, lastDashboardData.avp_urls]);
 </script>

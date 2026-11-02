@@ -1,14 +1,7 @@
-"""Prepare an empty Firebase Firestore database for a new installation (used by
-the online deployment on every start; safe to run again and again):
+"""Set up a new Firestore database. Safe to run more than once.
 
-1. Checks that the Firebase project can be reached with the service account key.
-2. If there are no user accounts yet, creates the administrator account
-   admin1114 with the password in ADMIN_PASSWORD (and ADMIN_FULL_NAME).
-
-Firestore needs no tables: each collection (users, vehicles, trip_records,
-predictions, notification_dismissals) appears with its first record.
-It adds no sample vehicles, trips or default passwords, so a new office
-starts with an empty, private system.
+Checks the Firebase connection, then creates the admin account (admin1114,
+password from ADMIN_PASSWORD) if there are no users yet. No sample data.
 
 Run:  python init_db.py
 """
@@ -31,7 +24,7 @@ def main():
         print(" * Firebase Firestore is ready.")
         if users:
             return 0
-        username = ADMIN_ACCOUNT  # the only administrator account
+        username = ADMIN_ACCOUNT
         password = os.environ.get("ADMIN_PASSWORD") or ""
         full_name = (os.environ.get("ADMIN_FULL_NAME") or "System Administrator").strip()
         if not username or len(password) < 8 or not (re.search(r"[A-Za-z]", password) and re.search(r"\d", password)):

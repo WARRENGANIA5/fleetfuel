@@ -72,7 +72,7 @@
 
 {% block extra_scripts %}
 <script>
-// Check the new password in the browser before it is sent (the server checks again).
+// client-side password check (server checks again)
 (function () {
   const cur = document.getElementById('current_password'), pw = document.getElementById('new_password'),
         confirm = document.getElementById('confirm_password'), feedback = document.getElementById('newPwFeedback');

@@ -3,9 +3,10 @@
 Pagkatapos sini, may HTTPS link ang system (halimbawa `https://gsu-fleetfuel.up.railway.app`)
 nga mabuksan sa bisan ano nga phone, tablet, ukon computer nga may internet.
 
-> **Ngaa indi Vercel?** Indi magkasya sa Vercel ang Python libraries sang model (mga 350 MB). Wala man
-> sini sang background tasks (backup kag reconnect sa Firestore) kag storage para sa backups. Ang Railway
-> may tanan sina. Ang database amo gihapon ang **Firebase Firestore** (pareho sa office computer).
+> **Vercel kag Railway:** Ang online link karon (<https://gsu-fleetfuel.vercel.app>) nagadalagan sa Vercel,
+> nga nag-auto-deploy halin sa GitHub `main`. Ang Vercel read-only kag serverless: wala sini sang background
+> tasks (backup kag reconnect sa Firestore), storage para sa backups, kag pag-upload sang model. Gamita ang
+> Railway kon kinahanglan ang tanan sina. Ang database amo gihapon ang **Firebase Firestore** (pareho sa office computer).
 
 > **Antes mag-upload sang data sang gobyerno online,** pamangkot anay sa Data Protection Officer ukon
 > ICT office sang agency (RA 10173, Data Privacy Act). Ang Railway kag ang Firebase nagabutang sang data

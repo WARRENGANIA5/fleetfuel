@@ -1,8 +1,6 @@
 """
-Trains the Linear Regression fuel-consumption model for the Government
-Fleet Fuel Consumption Prediction System and saves the fitted
-preprocessing + regression Pipeline via Joblib, together with its
-evaluation metrics (model/metrics.json).
+Train the linear regression model and save the pipeline (Joblib) and
+model/metrics.json.
 
 Run:  python model/train_model.py
 """
@@ -37,7 +35,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HISTORICAL_PATH = os.path.join(BASE_DIR, "data", "historical_fleet_data.csv")
 SUPPLEMENTARY_PATH = os.path.join(BASE_DIR, "data", "supplementary_data.csv")
 MODEL_PATH = os.path.join(BASE_DIR, "model", "linear_regression_pipeline.joblib")
-# The cleaned and merged dataset the model is trained on (Pandas output, Chapter III).
+# cleaned + merged training data
 CLEANED_PATH = os.path.join(BASE_DIR, "data", "cleaned_merged_dataset.csv")
 METRICS_PATH = os.path.join(BASE_DIR, "model", "metrics.json")
 
@@ -46,8 +44,7 @@ RANDOM_STATE = 42
 
 
 def _replace_with_retry(src, dst, attempts=40, delay=0.05):
-    """os.replace, retried briefly: on Windows the swap fails while another
-    thread (a page reading metrics) or OneDrive sync has the file open."""
+    """os.replace with retries (Windows/OneDrive may have the file open)."""
     import time
     for i in range(attempts):
         try:
@@ -59,9 +56,7 @@ def _replace_with_retry(src, dst, attempts=40, delay=0.05):
 
 
 def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
-    """Clean `df`, fit the pipeline, evaluate it, and save both the pipeline
-    and metrics.json. Shared by the CLI below and by the web app's automatic
-    retraining (app.py), so both always train the exact same way."""
+    """Clean `df`, fit and evaluate the pipeline, then save it with metrics.json."""
     log("[2/6] Removing records with missing values or zero distance, and IQR outliers per engine power...")
     df = clean_data(df)
     log(f"      Usable records after cleaning: {len(df)}")
@@ -75,8 +70,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     log("[3/6] Splitting train/test sets (80/20)...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
 
-    # Fuel type 1/0 and Distance x Engine Power, with distance and power
-    # mean-centered on the training set (removes the interaction's collinearity).
+    # centered terms to keep VIF low
     encoder = build_feature_encoder().fit(X_train)
     centers = (encoder.distance_mean_, encoder.power_mean_)
     terms = encoder.transform(X)
@@ -106,7 +100,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
 
     log(f"[6/6] Running {CV_FOLDS}-Fold Cross-Validation on full dataset...")
     kfold = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-    # R2, MAE and RMSE on every fold (scikit-learn reports the errors as negatives).
+    # sklearn returns the errors as negatives
     cv = cross_validate(pipeline, X, y, cv=kfold,
                         scoring=("r2", "neg_mean_absolute_error", "neg_root_mean_squared_error"))
     cv_scores = cv["test_r2"]
@@ -118,7 +112,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     log(f"      CV mean RMSE: {cv_rmse.mean():.4f} L (+/- {cv_rmse.std():.4f})")
 
     log("      Checking regression assumptions (statsmodels)...")
-    # Durbin-Watson on the residuals of the local trips arranged by date of travel.
+    # Durbin-Watson on local trips sorted by date
     local = df[df["data_source"].isin(["historical", "system"])] if "data_source" in df else df.iloc[0:0]
     local_resid = None
     if not local.empty:
@@ -129,8 +123,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
         log(f"        {t['assumption']:<26} {t['test']:<26} {'PASS' if t['passed'] else 'NOT MET'}")
 
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    # Write to temp files and swap in, so a page reading mid-retrain never
-    # sees a half-written model or metrics file.
+    # write to temp files then swap, so readers never see a partial file
     joblib.dump(pipeline, MODEL_PATH + ".tmp")
     _replace_with_retry(MODEL_PATH + ".tmp", MODEL_PATH)
     log(f"Model pipeline saved to {MODEL_PATH}")
@@ -158,9 +151,8 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
         "equation_terms": MODEL_TERMS,
         "intercept": float(f"{float(regressor.intercept_):.6g}"),
         "coefficients": {t: float(f"{c:.6g}") for t, c in coefficients.items()},
-        # Distance and engine power are centered on these training means.
         "centering": {"distance_km": round(centers[0], 4), "engine_power_kw": round(centers[1], 4)},
-        # The same fitted equation in the original units (the form of Chapter III).
+        # equation in original units
         "raw_intercept": float(f"{raw_b0:.6g}"),
         "raw_coefficients": {t: float(f"{c:.6g}") for t, c in raw_coef.items()},
         "vif_threshold": VIF_THRESHOLD,
@@ -170,13 +162,11 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
         "selected_categorical_features": [],
         "data_sources": {k: int(v) for k, v in df["data_source"].value_counts().items()} if "data_source" in df else {},
         "diagnostics": diagnostics,
-        # Range of every input the model saw, so the app can warn when a
-        # prediction is asked for outside it (extrapolation).
+        # input ranges for extrapolation warnings
         "feature_ranges": {col: [round(float(X[col].min()), 2), round(float(X[col].max()), 2)]
                            for col in ("distance_km", "engine_power_kw")},
         "category_values": {"fuel_type": sorted(X["fuel_type"].astype(str).unique().tolist())},
-        # The same ranges per fuel type: e.g. the diesel trips may come from fewer
-        # vehicles and distances than the gasoline trips.
+        # same, per fuel type
         "ranges_by_fuel": {fuel: {col: [round(float(g[col].min()), 2), round(float(g[col].max()), 2)]
                                   for col in ("distance_km", "engine_power_kw")} | {"records": int(len(g))}
                            for fuel, g in X.groupby(X["fuel_type"].astype(str))},
@@ -196,22 +186,20 @@ def main():
               "(see data/SUPPLEMENTARY_DATASET_SOURCE.md); historical_fleet_data.csv may hold only its header row.")
         sys.exit(1)
 
-    # Prefer the web app's loader so the trip records entered in the system
-    # (Firebase Firestore) are trained on together with the historical CSV.
+    # use the app's loader to include Firestore trips
     try:
         from app import app, retrain_model
         with app.app_context():
             print("[1/6] Loading historical CSV + system trip records...")
             return retrain_model(log=print)
-    except Exception as exc:  # database unavailable -> CSV only
+    except Exception as exc:  # no database, CSV only
         print(f"      (System trip records unavailable: {exc}; training on CSV only)")
 
     print("[1/6] Loading and merging datasets...")
     info = supplementary_info(SUPPLEMENTARY_PATH)
     df = load_and_merge_datasets(HISTORICAL_PATH, SUPPLEMENTARY_PATH)
     if df[TARGET_COLUMN].dropna().empty:
-        # The historical CSV holds only headers when the model trains on the
-        # trip records in the database alone, so there is nothing to fall back on.
+        # the CSV is empty when all trips live in the database
         print("Nothing to train on: the historical CSV has no rows and the trip records in the database could "
               "not be loaded. Check the internet connection and firebase-key.json, then run this again.")
         sys.exit(1)

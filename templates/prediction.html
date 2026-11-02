@@ -72,7 +72,7 @@
 const vehicleSelect = document.getElementById('vehicleSelect');
 const predForm = vehicleSelect.closest('form');
 
-// Show the engine power and fuel type the model will use for the chosen vehicle.
+// show the selected vehicle's engine power and fuel type
 function showVehicleDetails() {
   const opt = vehicleSelect.options[vehicleSelect.selectedIndex];
   const chosen = opt && opt.value;
@@ -82,8 +82,7 @@ function showVehicleDetails() {
 vehicleSelect.addEventListener('change', showVehicleDetails);
 showVehicleDetails();
 
-// After a validation error the fields are prefilled by the server, and a plain
-// reset would restore those values; clear them for real instead.
+// reset() would restore server-prefilled values, so clear manually
 predForm.addEventListener('reset', function () {
   setTimeout(function () {
     predForm.classList.remove('was-validated');
@@ -93,7 +92,7 @@ predForm.addEventListener('reset', function () {
   });
 });
 
-// ---- Real-time: vehicles and model status refresh every 5s ----
+// ---- refresh vehicles and model status every 5s ----
 let lastOptionsJson = null;
 function setPredLive(state, text) {
   const b = document.getElementById('predLive');
@@ -116,7 +115,7 @@ function refreshPredictionOptions() {
       if (json === lastOptionsJson) return;
       lastOptionsJson = json;
 
-      // Rebuild the vehicle list, keeping the current choice when it still exists.
+      // rebuild the list, keep the selection
       const current = vehicleSelect.value;
       vehicleSelect.innerHTML = '<option value="" disabled>Select vehicle</option>' +
         d.vehicles.map(function (v) {
