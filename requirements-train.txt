@@ -1,4 +1,4 @@
-# Office server / Railway: the web app plus model training, diagnostics and
+# Office server: the web app plus model training, diagnostics and
 # the evaluation figures, served with Waitress.
 -r requirements.txt
 matplotlib==3.9.0

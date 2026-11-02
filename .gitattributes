@@ -1,3 +1,0 @@
-# Shell scripts run on Linux in the cloud: keep LF line endings.
-*.sh text eol=lf
-Dockerfile text eol=lf

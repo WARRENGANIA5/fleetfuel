@@ -33,10 +33,8 @@ class Config:
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5 MB upload limit
 
     MODEL_DIR = os.path.join(BASE_DIR, "model")
-    # deploy/start.sh points this at the persistent volume online
-    MODEL_STORE = os.environ.get("MODEL_STORE") or MODEL_DIR
-    MODEL_PATH = os.path.join(MODEL_STORE, "linear_regression_pipeline.joblib")
-    METRICS_PATH = os.path.join(MODEL_STORE, "metrics.json")
+    MODEL_PATH = os.path.join(MODEL_DIR, "linear_regression_pipeline.joblib")
+    METRICS_PATH = os.path.join(MODEL_DIR, "metrics.json")
 
     DATA_DIR = os.path.join(BASE_DIR, "data")
     HISTORICAL_DATA_PATH = os.path.join(DATA_DIR, "historical_fleet_data.csv")

@@ -52,7 +52,7 @@ gov-fleets/
 ├── static/
 │   ├── css/style.css
 │   ├── js/script.js
-│   ├── images/seal.svg         Logo and browser-tab icon
+│   ├── images/seal.svg         Logo and browser-tab icon (FF Prediction logo in the centre)
 │   ├── images/glass-aurora.jpg Light-mode dashboard background
 │   └── vendor/                 Bootstrap, Chart.js, Font Awesome, Poppins (offline copies)
 ├── reports/figures/            Evaluation figures (generated)
@@ -63,9 +63,8 @@ gov-fleets/
 │   ├── install_autostart.bat, uninstall_autostart.bat, fleetfuel_watcher.ps1  Start the app when Windows signs in
 │   └── allow_network_access.bat  One-time firewall rule for LAN access
 ├── docs/
-│   ├── DEPLOY_ONLINE.md, DEPLOY_RENDER.md  How to put the system online
 │   └── THESIS_*.md             Thesis text: Chapter III code, Chapters IV and V, updates
-└── api/, public/, deploy/, Dockerfile, vercel.json, railway.json, render.yaml  Online hosting (must stay in the root)
+└── api/, public/, vercel.json  Online link on Vercel, auto-deployed from GitHub main (must stay in the root)
 ```
 
 ## 3. About the Dataset
