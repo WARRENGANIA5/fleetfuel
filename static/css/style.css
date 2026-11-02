@@ -1331,8 +1331,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 .auth-frame.shards-in .shard-br { bottom: var(--in); right: var(--in); }
 .auth-frame.shards-center .shard-tl { top: calc(50% - var(--s) / 2 + var(--n)); left: calc(50% - var(--s) / 2 + var(--n)); transform: scale(1.4); }
 .auth-frame.shards-center .shard-br { bottom: calc(50% - var(--s) / 2 + var(--n)); right: calc(50% - var(--s) / 2 + var(--n)); transform: scale(1.4); }
-.auth-frame.shards-pulse .glass-shard { animation: shard-pulse 0.5s ease-in-out; }
-@keyframes shard-pulse { 50% { filter: drop-shadow(0 0 14px rgba(76, 180, 255, 1)) drop-shadow(0 0 34px rgba(38, 151, 255, 0.7)); } }
+.auth-frame.shards-quick .glass-shard { transition-duration: 0.25s; }
 .auth-frame.no-anim .glass-shard,
 .auth-frame.no-anim .glass-shard > i { transition: none; }
 

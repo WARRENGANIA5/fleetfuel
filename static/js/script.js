@@ -768,12 +768,11 @@ document.addEventListener('show.bs.modal', function (e) {
       sessionStorage.setItem('fleetfuel-auth-switch', '1');
       sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: frame.offsetWidth, h: card.offsetHeight }));
     } catch (e) {}
-    Array.from(card.children).forEach(function (el, i) { el.style.transitionDelay = (i * 35) + 'ms'; });
-    frame.classList.add('is-leaving', 'shards-lit', 'shards-in');
+    Array.from(card.children).forEach(function (el, i) { el.style.transitionDelay = (i * 15) + 'ms'; });
+    frame.classList.add('is-leaving', 'shards-quick', 'shards-lit', 'shards-in');
     beamSpeed(3);
-    later(380, function () { frame.classList.add('shards-center'); });
-    later(880, function () { frame.classList.add('shards-pulse'); });
-    later(1000, function () { location.href = href; });
+    later(150, function () { frame.classList.add('shards-center'); });
+    later(400, function () { location.href = href; });
   }
 
   // animate card size from the previous page
@@ -798,18 +797,18 @@ document.addEventListener('show.bs.modal', function (e) {
     const rows = Array.from(card.children);
     frame.classList.add('no-anim', 'shards-lit', 'shards-in', 'shards-center', 'is-leaving');
     beamSpeed(3);
-    later(1000, function () { beamSpeed(1); });
+    later(600, function () { beamSpeed(1); });
     void frame.offsetWidth;
     frame.classList.remove('no-anim');
     root.classList.remove('auth-arriving');
     morphFromPrevious();
-    later(560, function () { frame.classList.remove('shards-center'); });
-    later(980, function () { frame.classList.remove('shards-in', 'shards-lit'); });
-    later(900, function () {
-      rows.forEach(function (el, i) { el.style.transitionDelay = (i * 60) + 'ms'; });
+    later(250, function () { frame.classList.remove('shards-center'); });
+    later(600, function () { frame.classList.remove('shards-in', 'shards-lit'); });
+    later(350, function () {
+      rows.forEach(function (el, i) { el.style.transitionDelay = (i * 30) + 'ms'; });
       frame.classList.remove('is-leaving');
     });
-    later(1900, function () { rows.forEach(function (el) { el.style.transitionDelay = ''; }); });
+    later(1100, function () { rows.forEach(function (el) { el.style.transitionDelay = ''; }); });
   }
 
   document.addEventListener('click', function (e) {
@@ -822,7 +821,7 @@ document.addEventListener('show.bs.modal', function (e) {
 
   // back button: show the form again
   window.addEventListener('pageshow', function (e) {
-    if (e.persisted) frame.classList.remove('is-leaving', 'shards-lit', 'shards-in', 'shards-center', 'shards-pulse');
+    if (e.persisted) frame.classList.remove('is-leaving', 'shards-quick', 'shards-lit', 'shards-in', 'shards-center');
   });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrive);
