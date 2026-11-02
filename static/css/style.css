@@ -102,10 +102,10 @@ a { text-decoration: none; color: inherit; }
 }
 
 .brand-icon {
-  width: 66px;
-  height: 46px;
-  padding: 4px 6px;
-  border-radius: 12px;
+  width: 50px;
+  height: 50px;
+  padding: 3px;
+  border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   display: flex;
@@ -548,9 +548,9 @@ a { text-decoration: none; color: inherit; }
   animation: fadeUp 0.5s ease both;
 }
 .login-logo {
-  width: 170px; height: 118px;
-  padding: 10px 12px;
-  border-radius: 18px;
+  width: 130px; height: 130px;
+  padding: 14px;
+  border-radius: 50%;
   background: #ffffff;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 18px;
@@ -1354,7 +1354,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 
 /* heading */
 .auth-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
-.auth-brand .login-logo { width: 84px; height: 58px; padding: 5px 7px; border-radius: 14px; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+.auth-brand .login-logo { width: 72px; height: 72px; padding: 5px; border-radius: 50%; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
 .auth-brand .login-title { text-align: left; font-size: 24px; font-weight: 700; margin: 0; line-height: 1.15; }
 .auth-brand .login-sub { text-align: left; font-size: 12.5px; margin: 2px 0 0; }
 .login-card.text-center .auth-brand { justify-content: center; text-align: left; }
