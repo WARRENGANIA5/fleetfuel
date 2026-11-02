@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="GSU FleetFuel logo">
+  <title>GSU FleetFuel Logo</title>
+  <!-- Logo of the GSU FleetFuel system: a double gold margin with the system name and
+       its full name in the thesis (Fuel Consumption Prediction System), and the system's
+       own fuel-drop emblem at the centre. It names the system only, not the university,
+       so it is not mistaken for the official GSU seal. -->
+  <defs>
+    <clipPath id="inner"><circle cx="300" cy="300" r="198"/></clipPath>
+    <linearGradient id="ff-drop" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#45f3ff"/>
+      <stop offset="0.55" stop-color="#2a9bff"/>
+      <stop offset="1" stop-color="#1f5fe0"/>
+    </linearGradient>
+    <linearGradient id="ff-road" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#0a1f3d" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#0a1f3d" stop-opacity="0.1"/>
+    </linearGradient>
+    <radialGradient id="ff-shine" cx="0.32" cy="0.22" r="0.55">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="ff-clip">
+      <path d="M32 5C26.6 13.2 13.5 25.8 13.5 38.4a18.5 18.5 0 0 0 37 0C50.5 25.8 37.4 13.2 32 5Z"/>
+    </clipPath>
+    <path id="topArc" d="M66 300A234 234 0 0 1 534 300"/>
+    <path id="botArc" d="M48 300A252 252 0 0 0 552 300"/>
+  </defs>
+
+  <!-- ring with double gold margin -->
+  <circle cx="300" cy="300" r="298" fill="#e0a82e"/>
+  <circle cx="300" cy="300" r="291" fill="#0f2e5c"/>
+  <circle cx="300" cy="300" r="282" fill="none" stroke="#e0a82e" stroke-width="2.5"/>
+  <text font-family="Segoe UI, Arial, Helvetica, sans-serif" font-weight="800" font-size="46" fill="#ffffff" letter-spacing="6">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">GSU FLEETFUEL</textPath>
+  </text>
+  <text font-family="Segoe UI, Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="#f2c14e" letter-spacing="2.5">
+    <textPath href="#botArc" startOffset="50%" text-anchor="middle">FUEL CONSUMPTION PREDICTION SYSTEM</textPath>
+  </text>
+  <circle cx="56" cy="300" r="6" fill="#f2c14e"/>
+  <circle cx="544" cy="300" r="6" fill="#f2c14e"/>
+
+  <!-- medallion -->
+  <circle cx="300" cy="300" r="208" fill="#e0a82e"/>
+  <circle cx="300" cy="300" r="202" fill="#0f2e5c"/>
+  <g clip-path="url(#inner)">
+    <rect x="100" y="100" width="400" height="400" fill="#f4f9ff"/>
+  </g>
+
+  <!-- the system's own logo: a fuel drop (fuel consumed per trip) with the fleet's
+       road running into it; the centre marks rise toward the top: trips along a
+       fitted trend -->
+  <g transform="translate(300 152) scale(5.6) translate(-32 -5)">
+    <path d="M32 5C26.6 13.2 13.5 25.8 13.5 38.4a18.5 18.5 0 0 0 37 0C50.5 25.8 37.4 13.2 32 5Z" fill="#ffffff" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M32 5C26.6 13.2 13.5 25.8 13.5 38.4a18.5 18.5 0 0 0 37 0C50.5 25.8 37.4 13.2 32 5Z" fill="url(#ff-drop)"/>
+    <g clip-path="url(#ff-clip)">
+      <ellipse cx="25.5" cy="21" rx="9.5" ry="14" fill="url(#ff-shine)"/>
+      <path d="M18.2 60 30.7 24.5h2.6L45.8 60Z" fill="url(#ff-road)"/>
+      <path d="M17.6 60 30.5 24.5h.7L19.9 60Z" fill="#ffffff"/>
+      <path d="M46.4 60 33.5 24.5h-.7L44.1 60Z" fill="#ffffff"/>
+      <g fill="#5ff7d6">
+        <rect x="30.85" y="50" width="2.3" height="5.6" rx="1.15"/>
+        <rect x="31.1" y="41.4" width="1.8" height="4.4" rx="0.9"/>
+        <rect x="31.33" y="34.5" width="1.34" height="3.3" rx="0.67"/>
+        <rect x="31.5" y="29.1" width="1" height="2.4" rx="0.5"/>
+      </g>
+    </g>
+    <path d="M27.6 12.5Q23.4 19 21.2 25.4" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.55"/>
+  </g>
+
+
+
+</svg>

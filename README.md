@@ -52,8 +52,7 @@ gov-fleets/
 ├── static/
 │   ├── css/style.css
 │   ├── js/script.js
-│   ├── images/logo.png         Logo (login, sign-up, sidebar)
-│   ├── images/favicon.png      Browser-tab icon
+│   ├── images/seal.svg         Logo and browser-tab icon
 │   ├── images/glass-aurora.jpg Light-mode dashboard background
 │   └── vendor/                 Bootstrap, Chart.js, Font Awesome, Poppins (offline copies)
 ├── reports/figures/            Evaluation figures (generated)

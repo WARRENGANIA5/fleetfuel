@@ -1,8 +1,4 @@
 :root {
-  /* logo colours (navy, orange, green) */
-  --brand-navy: #1c1f73;
-  --brand-orange: #ee7a2b;
-  --brand-green: #5cbf3f;
   /* dark theme palette */
   --navy-950: #171927;
   --navy-900: #2a2d3e;
@@ -93,7 +89,6 @@ a { text-decoration: none; color: inherit; }
 }
 
 .sidebar-brand {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -102,28 +97,19 @@ a { text-decoration: none; color: inherit; }
 }
 
 .brand-icon {
-  width: 66px;
+  width: 46px;
   height: 46px;
-  padding: 4px 6px;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.brand-icon img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.brand-icon img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 3px 6px rgba(38, 151, 255, 0.35)); }
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 .brand-title { font-weight: 700; font-size: 15px; }
 .brand-sub { font-size: 11px; color: rgba(255,255,255,0.55); }
-/* thin line in the logo colours under the sidebar brand */
-.sidebar-brand::after {
-  content: ""; position: absolute; left: 20px; right: 20px; bottom: -1px; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, var(--brand-green), var(--blue-600) 50%, var(--brand-orange));
-  opacity: 0.55;
-}
 
 .sidebar-nav {
   flex: 1;
@@ -548,15 +534,13 @@ a { text-decoration: none; color: inherit; }
   animation: fadeUp 0.5s ease both;
 }
 .login-logo {
-  width: 170px; height: 118px;
-  padding: 10px 12px;
-  border-radius: 18px;
-  background: #ffffff;
+  width: 120px; height: 120px;
+  border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 18px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(38, 151, 255, 0.35);
 }
-.login-logo img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.login-logo img { width: 100%; height: 100%; display: block; }
 .login-title { text-align: center; font-weight: 800; color: var(--text-dark); font-size: 22px; margin-bottom: 4px; }
 .login-sub { text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 24px; }
 .caps-warning { margin-top: 6px; font-size: 12px; color: var(--warning); }
@@ -1154,8 +1138,8 @@ html[data-theme="light"] {
 
 /* sidebar */
 html[data-theme="light"] .sidebar { background: #ffffff; border-right: 1px solid var(--border-soft); box-shadow: none; }
-html[data-theme="light"] .brand-icon { box-shadow: 0 2px 8px rgba(28, 31, 115, 0.12); }
-html[data-theme="light"] .brand-title { color: var(--brand-navy); }
+html[data-theme="light"] .brand-icon { box-shadow: none; }
+html[data-theme="light"] .brand-title { color: var(--text-dark); }
 html[data-theme="light"] .nav-link { position: relative; color: #475467; border-radius: 8px; }
 html[data-theme="light"] .nav-link i { color: #98a2b3; }
 html[data-theme="light"] .nav-link:hover { background: #f9fafb; color: var(--text-dark); transform: none; }
@@ -1354,7 +1338,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
 
 /* heading */
 .auth-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
-.auth-brand .login-logo { width: 84px; height: 58px; padding: 5px 7px; border-radius: 14px; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+.auth-brand .login-logo { width: 52px; height: 52px; margin: 0; flex-shrink: 0; box-shadow: 0 6px 18px rgba(38, 151, 255, 0.35); }
 .auth-brand .login-title { text-align: left; font-size: 24px; font-weight: 700; margin: 0; line-height: 1.15; }
 .auth-brand .login-sub { text-align: left; font-size: 12.5px; margin: 2px 0 0; }
 .login-card.text-center .auth-brand { justify-content: center; text-align: left; }
@@ -1428,7 +1412,7 @@ html[data-theme="light"] .login-card .auth-input .form-control:focus { backgroun
 html[data-theme="light"] .login-card .form-control:-webkit-autofill,
 html[data-theme="light"] .login-card .form-control:-webkit-autofill:hover,
 html[data-theme="light"] .login-card .form-control:-webkit-autofill:focus { -webkit-text-fill-color: #101828; -webkit-box-shadow: 0 0 0 1000px #eef4ff inset; box-shadow: 0 0 0 1000px #eef4ff inset; }
-html[data-theme="light"] .auth-brand .login-logo { box-shadow: 0 6px 16px rgba(28, 31, 115, 0.14); }
+html[data-theme="light"] .auth-brand .login-logo { box-shadow: 0 6px 16px rgba(38, 151, 255, 0.2); }
 html[data-theme="light"] .auth-switch a { color: var(--blue-600); }
 html[data-theme="light"] .card-beam .beam-a { background: linear-gradient(90deg, rgba(43, 152, 255, 0), #2b98ff); }
 
