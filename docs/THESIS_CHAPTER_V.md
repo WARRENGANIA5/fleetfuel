@@ -11,7 +11,7 @@ General Services Office and motorpool staff.
 
 1. **Data collection.** The researchers gathered 93 official trips of SFA 4714 from the Monthly Report of Official
    Travel (January–June 2026), the vehicle records of the nine fleet vehicles, 7,496 trip records built from online
-   datasets, and a supplementary dataset of 99,898 records, for a total of 107,487 trip records.
+   datasets, and 92,402 other online records in the supplementary dataset, for a total of 99,991 trip records.
 2. **Preprocessing.** After merging the records, removing records with missing values or zero distance, and removing
    extreme outliers with the IQR method within each engine-power group, 96,134 records remained. All 93 local trips
    were kept. Fuel type was encoded as 1 for gasoline and 0 for diesel, and the interaction term Distance × Engine
@@ -19,7 +19,7 @@ General Services Office and motorpool staff.
 3. **Model development.** Using an 80/20 split (76,907 training and 19,227 testing records), the model produced the
    equation ŷ = −1.8174 + 0.04036(Distance) + 0.03258(Engine Power) − 3.0161(Fuel Type) + 0.000503(Distance ×
    Engine Power). All terms were significant at α = 0.05.
-4. **Model evaluation.** On the testing set the model reached R² = 0.9502, MAE = 2.51 liters and RMSE = 4.84 liters.
+4. **Model evaluation.** On the testing set the model reached R² = 0.9502, MAE = 2.51 liters and RMSE = 4.84 liters. Within the fleet's operating range (diesel, 30 to 400 km, 51 to 177 kW) it reached R² = 0.8893 and MAE = 2.01 liters.
    5-fold cross-validation gave a mean R² of 0.951 with a standard deviation of 0.0008. The assumption checks found
    unequal variance, non-normal residuals, a nonlinear pattern, and autocorrelation among the local trips
    (Durbin-Watson = 0.936); multicollinearity was not present.
@@ -38,11 +38,11 @@ Based on the findings, the following conclusions were drawn:
    cover only one vehicle over six months.
 2. Distance traveled, engine power and fuel type are suitable predictors of fuel consumed per trip. Distance is the
    strongest predictor, and the predictors do not carry overlapping information.
-3. Linear Regression predicts fuel consumption for the government fleet with high accuracy. It explains about 95
-   percent of the variation in fuel consumed, with an average error of about 2.5 liters per trip.
+3. On the merged dataset, Linear Regression predicts fuel consumption with high accuracy. It explains about 95
+   percent of the variation in fuel consumed, with an average error of about 2.5 liters per trip. Within the fleet's operating range it explains about 89 percent, with an average error of about 2.0 liters.
 4. The model is stable. Its accuracy stays almost the same across all five cross-validation folds, so the result does
    not depend on one particular train-test split.
-5. The errors are larger for long trips and large vehicles, and the residuals do not fully meet the assumptions of
+5. The errors are larger for long trips, and the residuals do not fully meet the assumptions of
    Linear Regression. The model is reliable as a reference figure, but its coefficient intervals should be read with
    the robust standard errors, and a prediction for a long trip carries a wider margin of error.
 6. The web application gives the General Services Office and motorpool staff a computed, per-trip fuel estimate

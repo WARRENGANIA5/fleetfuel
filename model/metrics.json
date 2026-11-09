@@ -2,6 +2,12 @@
   "r2_score": 0.9502,
   "mae": 2.5137,
   "rmse": 4.8378,
+  "fleet_range_metrics": {
+    "records": 6852,
+    "r2_score": 0.8893,
+    "mae": 2.0069,
+    "rmse": 2.9178
+  },
   "cv_folds": 5,
   "cv_mean_r2": 0.951,
   "cv_std_r2": 0.0008,

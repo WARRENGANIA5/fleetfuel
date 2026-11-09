@@ -26,6 +26,7 @@ from model.preprocess import (
     TARGET_COLUMN,
     build_feature_encoder,
     clean_data,
+    fleet_range_mask,
     raw_equation,
     load_and_merge_datasets,
     supplementary_info,
@@ -98,6 +99,16 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     log(f"      MAE      : {mae:.4f} L")
     log(f"      RMSE     : {rmse:.4f} L")
 
+    # same metrics for the records within the fleet's operating range
+    in_range = fleet_range_mask(X_test).to_numpy()
+    fleet_metrics = None
+    if in_range.sum() >= 2:
+        fleet_metrics = {"records": int(in_range.sum()),
+                         "r2_score": round(float(r2_score(y_test[in_range], y_pred[in_range])), 4),
+                         "mae": round(float(mean_absolute_error(y_test[in_range], y_pred[in_range])), 4),
+                         "rmse": round(float(np.sqrt(mean_squared_error(y_test[in_range], y_pred[in_range]))), 4)}
+        log(f"      Fleet operating range: {fleet_metrics}")
+
     log(f"[6/6] Running {CV_FOLDS}-Fold Cross-Validation on full dataset...")
     kfold = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     # sklearn returns the errors as negatives
@@ -136,6 +147,7 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
         "r2_score": round(float(r2), 4),
         "mae": round(float(mae), 4),
         "rmse": round(float(rmse), 4),
+        "fleet_range_metrics": fleet_metrics,
         "cv_folds": CV_FOLDS,
         "cv_mean_r2": round(float(cv_scores.mean()), 4),
         "cv_std_r2": round(float(cv_scores.std()), 4),

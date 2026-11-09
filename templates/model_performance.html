@@ -73,15 +73,16 @@
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-layer-group text-primary"></i> <span>Train-Test Split vs <span class="mpFolds">{{ metrics.cv_folds }}</span>-Fold Cross-Validation</span></div>
   <div class="table-wrap"><table class="table-fleet diag-table">
-    <thead><tr><th>Measure</th><th>Test Set</th><th>CV Mean</th></tr></thead>
+    <thead><tr><th>Measure</th><th>Test Set</th><th>Fleet Range (<span id="fleetN">{{ metrics.fleet_range_metrics.records if metrics.fleet_range_metrics else '—' }}</span>)</th><th>CV Mean</th></tr></thead>
     <tbody>
-      <tr><td>R&sup2; Score</td><td id="cvTestR2">{{ metrics.r2_score }}</td><td id="cvMeanR2">{{ metrics.cv_mean_r2 }}</td></tr>
-      <tr><td>Mean Absolute Error</td><td><span id="cvTestMae">{{ metrics.mae }}</span> L</td>
+      <tr><td>R&sup2; Score</td><td id="cvTestR2">{{ metrics.r2_score }}</td><td id="fleetR2">{{ metrics.fleet_range_metrics.r2_score if metrics.fleet_range_metrics else '—' }}</td><td id="cvMeanR2">{{ metrics.cv_mean_r2 }}</td></tr>
+      <tr><td>Mean Absolute Error</td><td><span id="cvTestMae">{{ metrics.mae }}</span> L</td><td id="fleetMae">{{ (metrics.fleet_range_metrics.mae ~ ' L') if metrics.fleet_range_metrics else '—' }}</td>
         <td id="cvMeanMae">{{ (metrics.cv_mean_mae ~ ' L') if metrics.cv_mean_mae is not none else '—' }}</td></tr>
-      <tr><td>Root Mean Squared Error</td><td><span id="cvTestRmse">{{ metrics.rmse }}</span> L</td>
+      <tr><td>Root Mean Squared Error</td><td><span id="cvTestRmse">{{ metrics.rmse }}</span> L</td><td id="fleetRmse">{{ (metrics.fleet_range_metrics.rmse ~ ' L') if metrics.fleet_range_metrics else '—' }}</td>
         <td id="cvMeanRmse">{{ (metrics.cv_mean_rmse ~ ' L') if metrics.cv_mean_rmse is not none else '—' }}</td></tr>
     </tbody>
   </table></div>
+  <p class="diag-note mt-2 mb-0">Fleet Range: test records within the operating range of the university fleet (diesel, 30–400 km, 51–177 kW).</p>
 </div>
 
 <div class="row g-3 mb-3">
@@ -352,6 +353,10 @@ function refreshModelPerformance() {
         setText('cvTestR2', m.r2_score); setText('cvMeanR2', m.cv_mean_r2);
         setText('cvTestMae', m.mae); setText('cvMeanMae', liters(m.cv_mean_mae));
         setText('cvTestRmse', m.rmse); setText('cvMeanRmse', liters(m.cv_mean_rmse));
+        const fleet = m.fleet_range_metrics || {};
+        setText('fleetN', fleet.records != null ? fleet.records : '—');
+        setText('fleetR2', fleet.r2_score != null ? fleet.r2_score : '—');
+        setText('fleetMae', liters(fleet.mae)); setText('fleetRmse', liters(fleet.rmse));
         renderDiagnostics(m);
       }
       const key = JSON.stringify(data.charts);

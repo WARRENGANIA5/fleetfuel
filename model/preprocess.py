@@ -29,6 +29,11 @@ TARGET_COLUMN = "actual_fuel_consumption"
 NUMERIC_FEATURES = MODEL_TERMS
 CATEGORICAL_FEATURES = []
 
+# operating range of the university fleet (all diesel; local trips 32-372 km)
+FLEET_FUEL_TYPE = "Diesel"
+FLEET_DISTANCE_KM = (30, 400)
+FLEET_POWER_KW = (51, 177)
+
 # local trip export and vehicle records (joined on plate number)
 TRIP_COLUMNS = ["trip_date", "plate_number", "distance_km", TARGET_COLUMN]
 VEHICLE_COLUMNS = ["plate_number", "brand_model", "fuel_type", "engine_power_kw"]
@@ -79,6 +84,14 @@ def raw_equation(intercept, coefficients, centers):
     d, p = centers
     return (intercept - b1 * d - b2 * p + b4 * d * p,
             {"distance_km": b1 - b4 * p, "engine_power_kw": b2 - b4 * d, "fuel_type_code": b3, "distance_x_power": b4})
+
+
+def fleet_range_mask(frame):
+    """Records of the same kind as the fleet's: diesel, its trip distances and engine powers."""
+    frame = pd.DataFrame(frame)
+    return ((frame["fuel_type"].astype(str).str.strip().str.title() == FLEET_FUEL_TYPE)
+            & frame["distance_km"].between(*FLEET_DISTANCE_KM)
+            & frame["engine_power_kw"].between(*FLEET_POWER_KW))
 
 
 def merge_trips_and_vehicles(trips, vehicles):

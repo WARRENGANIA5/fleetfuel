@@ -15,8 +15,8 @@ The researchers gathered three sources of data.
 | Monthly Report of Official Travel (GSO) | 93 | Official trips of SFA 4714, January–June 2026 |
 | Vehicle records of the university fleet | 9 vehicles | Plate number, vehicle model, fuel type and engine power (kW) |
 | Trip records from online datasets | 7,496 | Diesel van trips from the European Environment Agency (2025), matched to the fleet vehicles |
-| Supplementary dataset | 99,898 | 50,508 gasoline records (Fan & Song) and 49,390 diesel van records (EEA) |
-| **Total trip records** | **107,487** | |
+| Other online records (supplementary dataset) | 92,402 | 50,508 gasoline records (Fan & Song) and the other 41,894 diesel van records (EEA) |
+| **Total trip records** | **99,991** | Each online record is used only once |
 
 The 93 local trips cover distances of 32 to 372 km (mean 176 km) with a mean fuel consumption of 17.6 liters per
 trip. Because the local records cover a single vehicle over six months, the supplementary records widen the
@@ -35,8 +35,8 @@ per 100 km within each engine-power group.
 |---|---|---|---|
 | Local trips (GSO) | 93 | 93 | 0 |
 | Online trip records | 7,496 | 7,194 | 302 |
-| Supplementary dataset | 99,898 | 88,847 | 11,051 |
-| **Total** | **107,487** | **96,134** | **11,353 (10.6%)** |
+| Other online records (supplementary dataset) | 92,402 | 88,847 | 3,555 |
+| **Total** | **99,991** | **96,134** | **3,857 (3.9%)** |
 
 None of the local trips fell outside the IQR bounds, so all 93 GSO records were kept. The final
 modelling-ready dataset holds 96,134 records: 46,937 diesel and 49,197 gasoline. Fuel type was encoded as
@@ -109,15 +109,17 @@ close to the 17.6-liter average of its recorded trips.
 
 **Table 6. Performance on the testing set**
 
-| Metric | Value |
-|---|---|
-| R-Squared (R²) | 0.9502 |
-| Mean Absolute Error (MAE) | 2.5137 L |
-| Root Mean Squared Error (RMSE) | 4.8378 L |
+| Metric | Value | Fleet Range |
+|---|---|---|
+| R-Squared (R²) | 0.9502 | 0.8893 |
+| Mean Absolute Error (MAE) | 2.5137 L | 2.0069 L |
+| Root Mean Squared Error (RMSE) | 4.8378 L | 2.9178 L |
 
 The model explains 95.02 percent of the variation in fuel consumed. On average, a prediction differs from the
 actual fuel consumed by 2.51 liters. The RMSE of 4.84 liters is almost twice the MAE, which shows that a small
-number of trips, mostly the long trips and the larger vehicles, have larger errors than the typical trip.
+number of trips, mostly the long trips, have larger errors than the typical trip.
+
+The Fleet Range column covers the 6,852 test records within the operating range of the university fleet (diesel, 30 to 400 km, 51 to 177 kW). There the model explains 88.93 percent of the variation, with an average error of 2.01 liters. The value is lower than on the full testing set because the range leaves out the very long trips and the gasoline records, which widen the spread of fuel consumed. It better reflects the expected performance of the model on the university fleet.
 
 **Table 7. 5-fold cross-validation**
 
@@ -160,8 +162,8 @@ rejections partly reflect the sample size. Still, the residual plot confirms une
 heteroskedasticity-robust (HC3) standard errors were used for the coefficients in Table 5. The RESET result
 agrees with the limitation stated in Chapter I that a Linear Regression model cannot fully capture nonlinear
 patterns. The Durbin-Watson value of 0.936 shows positive autocorrelation among the local trips: consecutive
-trips of SFA 4714 tend to be over- or under-predicted together, likely because of routes and conditions the
-records do not capture (speed, load, road condition). These departures affect the confidence intervals of the
+trips of SFA 4714 tend to be over- or under-predicted together. Since the local fuel figures follow a fixed rule of
+one liter per 10 kilometers, these residuals depend only on the trip distance, so the statistic reflects the order of the distances traveled. These departures affect the confidence intervals of the
 coefficients more than the predictions themselves, and the stable cross-validation results show that the
 predictive accuracy holds.
 
@@ -171,16 +173,16 @@ The trained model was saved with Joblib and integrated into the Flask web applic
 Consumption Prediction System. The staff log in, select a vehicle and enter the trip distance. The system retrieves
 the engine power and fuel type of the selected vehicle from its records in Firebase Firestore, passes the values
 to the model and displays the predicted fuel consumption in liters. Each prediction is stored in the Prediction
-History, where the administrator compares the predicted figure with the fuel request before approving it and
-later records the actual fuel consumed. The Model Performance page shows the metrics, coefficients and charts
+History, where the administrator compares the predicted figure with the fuel request before approving it, and the actual fuel consumed is
+recorded after the trip. The Model Performance page shows the metrics, coefficients and charts
 reported in this chapter. The application is deployed online at https://gsu-fleetfuel.vercel.app.
 
 ## 8. Summary of Results
 
-- The final dataset holds 96,134 records after removing 11,353 records (10.6%) with missing values, zero distance or
+- The final dataset holds 96,134 records after removing 3,857 records (3.9%) with missing values, zero distance or
   extreme fuel use; all 93 local trips were kept.
 - Distance traveled is the strongest predictor of fuel consumed (r = 0.96); all VIF values are below 5.
-- The Linear Regression model reached R² = 0.9502, MAE = 2.51 L and RMSE = 4.84 L on the testing set.
+- The Linear Regression model reached R² = 0.9502, MAE = 2.51 L and RMSE = 4.84 L on the testing set. Within the fleet's operating range it reached R² = 0.8893 and MAE = 2.01 L.
 - 5-fold cross-validation gave a mean R² of 0.951 (standard deviation 0.0008), confirming a stable model.
 - The residuals show unequal variance, non-normality and autocorrelation among the local trips, so robust
   standard errors were used; multicollinearity is not a problem.

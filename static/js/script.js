@@ -50,8 +50,8 @@ window.chartTheme = function () {
     text: light ? '#667085' : '#9698a9',
     grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)',
     // line colours per theme
-    line: light ? '#2b251d' : '#2697ff',
-    lineFill: light ? 'rgba(43, 37, 29, 0.08)' : 'rgba(38,151,255,0.12)',
+    line: light ? '#3f73ad' : '#2697ff',
+    lineFill: light ? 'rgba(63, 115, 173, 0.12)' : 'rgba(38,151,255,0.12)',
     line2: light ? '#c8792b' : '#26e5c5',
     line2Fill: light ? 'rgba(200, 121, 43, 0.12)' : 'rgba(38,229,197,0.12)'
   };
