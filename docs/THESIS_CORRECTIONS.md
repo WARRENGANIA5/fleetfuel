@@ -224,7 +224,13 @@ reject fuel requests." with:
 
 Added to the system (Model Performance) and the manuscript: on the 6,852 test records within the fleet's operating range (diesel, 30–400 km, 51–177 kW), R² = 0.8893, MAE = 2.0069 L, RMSE = 2.9178 L. The full testing-set results (R² = 0.9502) are kept. Changed: Abstract, the metrics paragraph and its code in Chapter III, T16 and Table 9, Chapter V.
 
-## K. To confirm
+## K. Model retrained on the fleet's operating range (supersedes section J)
+
+The model now trains on diesel records of 30–400 km and 51–177 kW only (34,471 records after cleaning).
+R² = 0.8877, MAE = 1.9759 L, RMSE = 2.8900 L; 5-fold mean R² = 0.8879. Fuel type is constant, so its coefficient is 0.
+The current manuscript is `Fuel Consumption Prediction (10) - fix.pdf`; earlier figures in this file (such as 96,134 records and R² 0.9502) describe the previous model.
+
+## L. To confirm
 
 - The drafts in `docs/THESIS_CHAPTER_IV.md` and `THESIS_CHAPTER_V.md` say "motorpool staff" where the manuscript says
   "Transportation Office". Use one name throughout.

@@ -48,6 +48,9 @@ def within_iqr(per_100km):
 per_100km = df["actual_fuel_consumption"] / df["distance_km"] * 100
 keep = per_100km.groupby(df["engine_power_kw"], group_keys=False).apply(within_iqr)
 df = df[keep]
+
+# Keep the fleet's operating range: diesel, 30-400 km, 51-177 kW
+df = df[(df["fuel_type"] == "Diesel") & df["distance_km"].between(30, 400) & df["engine_power_kw"].between(51, 177)]
 ```
 
 ## 4. Encoding the fuel type
@@ -65,7 +68,7 @@ df["fuel_type_code"] = df["fuel_type"].map({"Gasoline": 1, "Diesel": 0})
 ```python
 from sklearn.model_selection import train_test_split
 
-predictors = ["distance_km", "engine_power_kw", "fuel_type_code"]
+predictors = ["distance_km", "engine_power_kw"]  # fuel type is 0 (diesel) in every record
 X = df[predictors]
 y = df["actual_fuel_consumption"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -170,7 +173,7 @@ print("Durbin-Watson:", round(durbin_watson(local_residuals), 3))
 
 ## 12. R-Squared, MAE and RMSE
 
-*After: "...which reflect the vehicles and trips of the university fleet."*
+*After: "The metrics are computed for the full testing set."*
 
 ```python
 import numpy as np
@@ -181,12 +184,6 @@ mae = mean_absolute_error(y_test, y_pred)
 rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 print(f"R² = {r2:.4f}   MAE = {mae:.4f} L   RMSE = {rmse:.4f} L")
 
-# Records within the fleet's operating range: diesel, 30-400 km, 51-177 kW
-in_range = (X_test["fuel_type_code"] == 0) & X_test["distance_km"].between(30, 400) & X_test["engine_power_kw"].between(51, 177)
-fleet_pred = y_pred[in_range.to_numpy()]
-print("Fleet range R²:", round(r2_score(y_test[in_range], fleet_pred), 4),
-      "MAE:", round(mean_absolute_error(y_test[in_range], fleet_pred), 4),
-      "RMSE:", round(np.sqrt(mean_squared_error(y_test[in_range], fleet_pred)), 4))
 ```
 
 ## 13. 5-fold cross-validation

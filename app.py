@@ -1644,7 +1644,7 @@ def load_system_trip_records():
     df = merge_trips_and_vehicles(trips, vehicles)
     if "source" not in df:
         df["source"] = None
-    df["data_source"] = np.where(df["source"].notna(), ONLINE_TRIPS_LABEL, "system")
+    df["data_source"] = np.where(df["source"].notna(), ONLINE_TRIPS_LABEL, "local")
     df["trip_date"] = df["trip_date"].astype(str)
     for col in ("distance_km", "actual_fuel_consumption", "engine_power_kw"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -1751,7 +1751,11 @@ def build_model_charts():
     if _MODEL_CHARTS_CACHE["key"] == key:
         return _MODEL_CHARTS_CACHE["data"]
 
-    df = clean_data(load_training_frame())
+    # the dataset the model was trained on, so newer trips don't shift the split
+    trained_path = os.path.join(os.path.dirname(app.config["HISTORICAL_DATA_PATH"]), "cleaned_merged_dataset.csv")
+    df = pd.read_csv(trained_path) if os.path.exists(trained_path) else None
+    if df is None or len(df) != metrics.get("total_records"):
+        df = clean_data(load_training_frame())
     X_train, X_test, y_train, y_test = train_test_split(
         df[FEATURE_COLUMNS], df[TARGET_COLUMN], test_size=0.2, random_state=42)
     y_pred = pipeline.predict(X_test)
@@ -1776,6 +1780,16 @@ def build_model_charts():
     if residuals.max() > edges[-1]:
         labels[-1] = f"{fmt(round(edges[-2], 2))} or more"
 
+    # Q-Q plot: every tail point, thinned in the middle; line through mean with slope std
+    from scipy import stats
+    ordered = np.sort(residuals)
+    n = len(ordered)
+    theoretical = stats.norm.ppf(np.arange(1, n + 1) / (n + 1))
+    keep = np.unique(np.concatenate([np.arange(min(40, n)), np.linspace(0, n - 1, min(300, n)).astype(int),
+                                     np.arange(max(n - 40, 0), n)]))
+    qq_slope, qq_mean = float(residuals.std()), float(residuals.mean())
+    qq_ends = [float(theoretical[0]), float(theoretical[-1])]
+
     # correlation heatmap; constant columns are skipped
     terms = pipeline.named_steps["encoder"].transform(df[FEATURE_COLUMNS]).assign(**{TARGET_COLUMN: df[TARGET_COLUMN].astype(float)})
     corr_cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
@@ -1797,6 +1811,8 @@ def build_model_charts():
             "within_1": round(float((np.abs(residuals) <= 1).mean() * 100), 1),
             "bin_width": width,
         },
+        "qq_points": [{"x": round(float(theoretical[i]), 3), "y": round(float(ordered[i]), 2)} for i in keep],
+        "qq_line": [{"x": round(t, 3), "y": round(qq_mean + qq_slope * t, 2)} for t in qq_ends],
         "corr_labels": corr_cols,
         "corr_matrix": corr.values.tolist(),
         "corr_records": int(len(df)),

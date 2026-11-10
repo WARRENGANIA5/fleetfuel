@@ -117,7 +117,7 @@ def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None, 
     if not historical.empty:
         frames.append(historical.assign(data_source="historical"))
     if extra_df is not None and not extra_df.empty:
-        label = extra_df["data_source"].fillna("system") if "data_source" in extra_df else "system"
+        label = extra_df["data_source"].fillna("local") if "data_source" in extra_df else "local"
         frames.append(extra_df.assign(data_source=label))
     supplementary = pd.read_csv(supplementary_path)
     supplementary = supplementary.drop(index=[i for i in exclude_supplementary_rows if i in supplementary.index])
@@ -131,7 +131,7 @@ def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None, 
 
 def clean_data(df):
     """Drop missing/zero-distance rows, then IQR outliers on L/100 km per
-    engine-power group."""
+    engine-power group, then keep the fleet's operating range."""
     df = df.copy()
     for col in ("distance_km", "engine_power_kw", TARGET_COLUMN):
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -149,6 +149,7 @@ def clean_data(df):
     per_100km = df[TARGET_COLUMN] / df["distance_km"] * 100
     keep = per_100km.groupby(df["engine_power_kw"], group_keys=False).apply(within_iqr)
     df = df[keep.reindex(df.index).fillna(False).astype(bool)]
+    df = df[fleet_range_mask(df)]
     return df.reset_index(drop=True)
 
 

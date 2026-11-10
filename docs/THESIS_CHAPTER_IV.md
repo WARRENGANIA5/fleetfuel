@@ -1,8 +1,8 @@
-# Chapter IV — Results and Discussion (draft, October 30, 2026)
+# Chapter IV — Results and Discussion (draft, November 9, 2026)
 
-Draft text for Chapter IV. Every figure comes from the trained model (`model/metrics.json`, model version
-v20261030104247), the cleaned dataset (`data/cleaned_merged_dataset.csv`) and the charts in `reports/figures/`.
-The sections follow the specific objectives of the study.
+Draft text for Chapter IV. Every figure comes from the trained model (`model/metrics.json`), the cleaned dataset
+(`data/cleaned_merged_dataset.csv`) and the charts in `reports/figures/`. The sections follow the specific
+objectives of the study.
 
 ## 1. Data Collection
 
@@ -19,8 +19,8 @@ The researchers gathered three sources of data.
 | **Total trip records** | **99,991** | Each online record is used only once |
 
 The 93 local trips cover distances of 32 to 372 km (mean 176 km) with a mean fuel consumption of 17.6 liters per
-trip. Because the local records cover a single vehicle over six months, the supplementary records widen the
-range of distances, engine powers and fuel types available to the model.
+trip. Because the local records cover a single vehicle over six months, the online records widen the range of
+distances and engine powers available to the model.
 
 ## 2. Data Preprocessing
 
@@ -35,41 +35,37 @@ per 100 km within each engine-power group.
 |---|---|---|---|
 | Local trips (GSO) | 93 | 93 | 0 |
 | Online trip records | 7,496 | 7,194 | 302 |
-| Other online records (supplementary dataset) | 92,402 | 88,847 | 3,555 |
-| **Total** | **99,991** | **96,134** | **3,857 (3.9%)** |
+| Other online records (supplementary dataset) | 92,402 | 27,184 | 65,218 |
+| **Total** | **99,991** | **34,471** | **65,520 (65.5%)** |
 
-None of the local trips fell outside the IQR bounds, so all 93 GSO records were kept. The final
-modelling-ready dataset holds 96,134 records: 46,937 diesel and 49,197 gasoline. Fuel type was encoded as
-1 for gasoline and 0 for diesel, and the interaction term Distance × Engine Power was added.
+The IQR method removed 3,857 records. The other 61,663 records were outside the operating range of the university
+fleet (diesel, 30 to 400 km, 51 to 177 kW), including every gasoline record. All 93 GSO records were kept. The final
+modelling-ready dataset holds 34,471 diesel records. Fuel type was encoded as 0 for diesel, so it is the same in
+every record, and the interaction term Distance × Engine Power was added.
 
 **Table 3. Descriptive statistics of the final dataset**
 
 | Variable | Mean | Std. Dev. | Minimum | Maximum |
 |---|---|---|---|---|
-| Distance traveled (km) | 166.79 | 226.01 | 1.50 | 1,000.00 |
-| Engine power (kW) | 110.67 | 22.63 | 51.00 | 221.00 |
-| Fuel type (1 = Gasoline) | 0.51 | 0.50 | 0 | 1 |
-| Fuel consumed (L) | 15.42 | 21.73 | 0.10 | 210.70 |
+| Distance traveled (km) | 151.36 | 92.17 | 30.00 | 400.00 |
+| Engine power (kW) | 95.35 | 22.28 | 51.00 | 177.00 |
+| Fuel consumed (L) | 14.24 | 8.73 | 1.90 | 96.10 |
 
 ## 3. Variable Selection
 
 **Figure 2. Correlation heatmap** (`reports/figures/correlation_heatmap.png`)
 
-Distance traveled has a very strong positive correlation with fuel consumed (r = 0.96), confirming it as the main
-predictor. Fuel type has a moderate negative correlation (r = −0.54), and engine power a weak negative
-correlation (r = −0.22). The negative sign of engine power does not mean that stronger engines use less fuel.
-It comes from the composition of the data: the gasoline records have higher engine power (104–147 kW) but mostly
-shorter distances, while the diesel records include the long trips. Once distance and fuel type are held
-constant in the regression, engine power has a positive effect (Section 4).
+Distance traveled has a strong positive correlation with fuel consumed (r = 0.88), confirming it as the main
+predictor. Engine power has a weak positive correlation (r = 0.15). Fuel type has no correlation to report because
+every record in the final dataset is diesel.
 
 **Table 4. Variance Inflation Factor (VIF)** (`reports/figures/vif.png`)
 
 | Predictor | VIF |
 |---|---|
-| Distance traveled | 1.64 |
-| Engine power | 1.76 |
-| Fuel type | 2.28 |
-| Distance × Engine Power | 1.25 |
+| Distance traveled | 1.03 |
+| Engine power | 1.03 |
+| Distance × Engine Power | 1.01 |
 
 All VIF values are below the threshold of 5, so the predictors do not carry overlapping information. Distance and
 engine power were mean-centered before forming the interaction term; this removes the collinearity between the
@@ -77,57 +73,53 @@ interaction and the predictors it is built from without changing any prediction.
 
 ## 4. Model Development
 
-The dataset was split into 80 percent training (76,907 records) and 20 percent testing (19,227 records). The
+The dataset was split into 80 percent training (27,576 records) and 20 percent testing (6,895 records). The
 Linear Regression model trained on the training set produced the following equation:
 
-> ŷ = −1.8174 + 0.04036(Distance) + 0.03258(Engine Power) − 3.0161(Fuel Type) + 0.000503(Distance × Engine Power)
+> ŷ = −1.7904 + 0.03263(Distance) + 0.03167(Engine Power) + 0.000573(Distance × Engine Power)
 
-where ŷ is the predicted fuel consumed in liters, Distance is in kilometers, Engine Power is in kilowatts and Fuel
-Type is 1 for gasoline and 0 for diesel.
+where ŷ is the predicted fuel consumed in liters, Distance is in kilometers and Engine Power is in kilowatts. Since
+every record is diesel, the coefficient of Fuel Type is 0 and the term does not appear.
 
 **Table 5. Regression coefficients** (standard errors are heteroskedasticity-robust, HC3)
 
 | Term | Coefficient (centered) | Std. Error | p-value |
 |---|---|---|---|
-| Intercept | 17.82 | 0.0252 | < 0.001 |
-| Distance traveled | 0.09602 | 0.00025 | < 0.001 |
-| Engine power | 0.1166 | 0.00083 | < 0.001 |
-| Fuel type | −3.016 | 0.0433 | < 0.001 |
-| Distance × Engine Power | 0.000503 | 0.0000086 | < 0.001 |
+| Intercept | 14.46 | 0.0192 | < 0.001 |
+| Distance traveled | 0.0873 | 0.00028 | < 0.001 |
+| Engine power | 0.1186 | 0.00101 | < 0.001 |
+| Distance × Engine Power | 0.000573 | 0.0000144 | < 0.001 |
 
 All terms are statistically significant at α = 0.05. At the average engine power, each additional kilometer
-adds about 0.096 liters (around 9.6 L per 100 km). Each additional kilowatt adds about 0.117 liters at the average
+adds about 0.087 liters (around 8.7 L per 100 km). Each additional kilowatt adds about 0.119 liters at the average
 distance. The positive interaction term shows that larger engines use more fuel per kilometer, so the gap between
-small and large vehicles grows on longer trips. Holding distance and engine power constant, gasoline trips use
-about 3.02 liters less than diesel trips in this dataset.
+small and large vehicles grows on longer trips.
 
 For example, a 176 km trip of SFA 4714 (diesel, 95 kW) gives:
-ŷ = −1.8174 + 0.04036(176) + 0.03258(95) − 3.0161(0) + 0.000503(176 × 95) ≈ **16.79 liters**,
+ŷ = −1.7904 + 0.03263(176) + 0.03167(95) + 0.000573(176 × 95) ≈ **16.55 liters**,
 close to the 17.6-liter average of its recorded trips.
 
 ## 5. Model Evaluation
 
 **Table 6. Performance on the testing set**
 
-| Metric | Value | Fleet Range |
-|---|---|---|
-| R-Squared (R²) | 0.9502 | 0.8893 |
-| Mean Absolute Error (MAE) | 2.5137 L | 2.0069 L |
-| Root Mean Squared Error (RMSE) | 4.8378 L | 2.9178 L |
+| Metric | Value |
+|---|---|
+| R-Squared (R²) | 0.8877 |
+| Mean Absolute Error (MAE) | 1.9759 L |
+| Root Mean Squared Error (RMSE) | 2.8900 L |
 
-The model explains 95.02 percent of the variation in fuel consumed. On average, a prediction differs from the
-actual fuel consumed by 2.51 liters. The RMSE of 4.84 liters is almost twice the MAE, which shows that a small
-number of trips, mostly the long trips, have larger errors than the typical trip.
-
-The Fleet Range column covers the 6,852 test records within the operating range of the university fleet (diesel, 30 to 400 km, 51 to 177 kW). There the model explains 88.93 percent of the variation, with an average error of 2.01 liters. The value is lower than on the full testing set because the range leaves out the very long trips and the gasoline records, which widen the spread of fuel consumed. It better reflects the expected performance of the model on the university fleet.
+The model explains 88.77 percent of the variation in fuel consumed. On average, a prediction differs from the
+actual fuel consumed by 1.98 liters. The RMSE of 2.89 liters is higher than the MAE, which shows that some trips
+have larger errors than the typical trip.
 
 **Table 7. 5-fold cross-validation**
 
 | Metric | Mean | Std. Dev. |
 |---|---|---|
-| R² | 0.9510 | 0.0008 |
-| MAE | 2.503 L | 0.018 |
-| RMSE | 4.810 L | 0.035 |
+| R² | 0.8879 | 0.0015 |
+| MAE | 1.993 L | 0.012 |
+| RMSE | 2.922 L | 0.030 |
 
 **Figure 3. Cross-validation R² per fold** (`reports/figures/cv_r2_scores.png`)
 
@@ -150,40 +142,40 @@ values.
 
 | Assumption | Test | Result | Rule | Met? |
 |---|---|---|---|---|
-| Linearity | Ramsey RESET | F = 1,024.35, p < 0.001 | p > 0.05 | No |
-| Independence of errors | Durbin-Watson (93 local trips by date) | 0.936 | 1.5 to 2.5 | No |
-| Normality of errors | Jarque-Bera | skew 2.21, kurtosis 28.70, p < 0.001 | p > 0.05 | No |
-| Equal variance | Breusch-Pagan | 13,776.99, p < 0.001 | p > 0.05 | No |
-| No multicollinearity | VIF | highest 2.28 | ≤ 5 | Yes |
+| Linearity | Ramsey RESET | F = 38.99, p < 0.001 | p > 0.05 | No |
+| Independence of errors | Durbin-Watson (93 local trips by date) | 0.784 | 1.5 to 2.5 | No |
+| Normality of errors | Jarque-Bera | skew 1.17, kurtosis 12.23, p < 0.001 | p > 0.05 | No |
+| Equal variance | Breusch-Pagan | 3,074.54, p < 0.001 | p > 0.05 | No |
+| No multicollinearity | VIF | highest 1.03 | ≤ 5 | Yes |
 
 The residuals are centered on zero, but their spread grows with the predicted fuel, and the distribution has a
-sharp peak with long tails. With 96,134 records, these formal tests detect even small departures, so the
+sharp peak with long tails. With 34,471 records, these formal tests detect even small departures, so the
 rejections partly reflect the sample size. Still, the residual plot confirms unequal variance, so
 heteroskedasticity-robust (HC3) standard errors were used for the coefficients in Table 5. The RESET result
 agrees with the limitation stated in Chapter I that a Linear Regression model cannot fully capture nonlinear
-patterns. The Durbin-Watson value of 0.936 shows positive autocorrelation among the local trips: consecutive
+patterns. The Durbin-Watson value of 0.784 shows positive autocorrelation among the local trips: consecutive
 trips of SFA 4714 tend to be over- or under-predicted together. Since the local fuel figures follow a fixed rule of
-one liter per 10 kilometers, these residuals depend only on the trip distance, so the statistic reflects the order of the distances traveled. These departures affect the confidence intervals of the
-coefficients more than the predictions themselves, and the stable cross-validation results show that the
-predictive accuracy holds.
+one liter per 10 kilometers, these residuals depend only on the trip distance, so the statistic reflects the order of the distances traveled. These departures
+affect the confidence intervals of the coefficients more than the predictions themselves, and the stable
+cross-validation results show that the predictive accuracy holds.
 
 ## 7. Integration and Implementation of the Web Application
 
 The trained model was saved with Joblib and integrated into the Flask web application, the GSU FleetFuel Fuel
 Consumption Prediction System. The staff log in, select a vehicle and enter the trip distance. The system retrieves
 the engine power and fuel type of the selected vehicle from its records in Firebase Firestore, passes the values
-to the model and displays the predicted fuel consumption in liters. Each prediction is stored in the Prediction
-History, where the administrator compares the predicted figure with the fuel request before approving it, and the actual fuel consumed is
+to the model and displays the predicted fuel consumption in liters. A trip outside 30 to 400 km receives a warning
+that the estimate is outside the range the model was trained on. Each prediction is stored in the
+Prediction History, where the administrator compares the predicted figure with the fuel request before approving it, and the actual fuel consumed is
 recorded after the trip. The Model Performance page shows the metrics, coefficients and charts
 reported in this chapter. The application is deployed online at https://gsu-fleetfuel.vercel.app.
 
 ## 8. Summary of Results
 
-- The final dataset holds 96,134 records after removing 3,857 records (3.9%) with missing values, zero distance or
-  extreme fuel use; all 93 local trips were kept.
-- Distance traveled is the strongest predictor of fuel consumed (r = 0.96); all VIF values are below 5.
-- The Linear Regression model reached R² = 0.9502, MAE = 2.51 L and RMSE = 4.84 L on the testing set. Within the fleet's operating range it reached R² = 0.8893 and MAE = 2.01 L.
-- 5-fold cross-validation gave a mean R² of 0.951 (standard deviation 0.0008), confirming a stable model.
+- The final dataset holds 34,471 diesel records within the fleet's operating range; all 93 local trips were kept.
+- Distance traveled is the strongest predictor of fuel consumed (r = 0.88); all VIF values are below 5.
+- The Linear Regression model reached R² = 0.8877, MAE = 1.98 L and RMSE = 2.89 L on the testing set.
+- 5-fold cross-validation gave a mean R² of 0.8879 (standard deviation 0.0015), confirming a stable model.
 - The residuals show unequal variance, non-normality and autocorrelation among the local trips, so robust
   standard errors were used; multicollinearity is not a problem.
 - The model is integrated into a web application that gives the General Services Office and motorpool staff a

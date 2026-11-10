@@ -34,21 +34,40 @@ function stopPageTimers() {
 function currentTheme() {
   return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 }
-function setTheme(theme) {
+function setTheme(theme, origin) {
   const root = document.documentElement;
+  function apply() {
+    if (theme === 'light') root.setAttribute('data-theme', 'light');
+    else root.removeAttribute('data-theme');
+    root.setAttribute('data-bs-theme', theme);
+    try { localStorage.setItem('fleetfuel-theme', theme); } catch (e) {}
+    labelThemeToggle();
+    recolorCharts(theme);
+  }
+  // spread the new theme out from the button where the browser can
+  if (origin && document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.classList.add('theme-reveal');
+    const vt = document.startViewTransition(apply);
+    vt.ready.then(function () {
+      const r = Math.hypot(Math.max(origin.x, innerWidth - origin.x), Math.max(origin.y, innerHeight - origin.y));
+      root.animate(
+        { clipPath: ['circle(0px at ' + origin.x + 'px ' + origin.y + 'px)', 'circle(' + r + 'px at ' + origin.x + 'px ' + origin.y + 'px)'] },
+        { duration: 550, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' }
+      );
+    }).catch(function () {});
+    vt.finished.finally(function () { root.classList.remove('theme-reveal'); });
+    return;
+  }
   root.classList.add('theme-switching');
-  if (theme === 'light') root.setAttribute('data-theme', 'light');
-  else root.removeAttribute('data-theme');
-  root.setAttribute('data-bs-theme', theme);
-  try { localStorage.setItem('fleetfuel-theme', theme); } catch (e) {}
+  apply();
   setTimeout(function () { root.classList.remove('theme-switching'); }, 350);
 }
-window.chartTheme = function () {
-  const light = currentTheme() === 'light';
+window.chartTheme = function (theme) {
+  const light = (theme || currentTheme()) === 'light';
   return {
     light: light,
-    text: light ? '#667085' : '#9698a9',
-    grid: light ? 'rgba(16, 24, 40, 0.07)' : 'rgba(255, 255, 255, 0.06)',
+    text: light ? '#465466' : '#9698a9',
+    grid: light ? 'rgba(30, 45, 65, 0.1)' : 'rgba(255, 255, 255, 0.06)',
     // line colours per theme
     line: light ? '#3f73ad' : '#2697ff',
     lineFill: light ? 'rgba(63, 115, 173, 0.12)' : 'rgba(38,151,255,0.12)',
@@ -56,6 +75,21 @@ window.chartTheme = function () {
     line2Fill: light ? 'rgba(200, 121, 43, 0.12)' : 'rgba(38,229,197,0.12)'
   };
 };
+// charts already drawn keep the old theme's colours unless swapped
+function recolorCharts(theme) {
+  if (!window.Chart) return;
+  const from = window.chartTheme(theme === 'light' ? 'dark' : 'light');
+  const to = window.chartTheme(theme);
+  const swap = {};
+  ['text', 'grid', 'line', 'lineFill', 'line2', 'line2Fill'].forEach(function (k) { swap[from[k]] = to[k]; });
+  function on(obj, key) { if (obj && swap[obj[key]]) obj[key] = swap[obj[key]]; }
+  Chart.defaults.color = to.text;
+  Object.values(Chart.instances).forEach(function (chart) {
+    chart.data.datasets.forEach(function (d) { on(d, 'borderColor'); on(d, 'backgroundColor'); });
+    Object.values(chart.options.scales || {}).forEach(function (s) { on(s.grid, 'color'); on(s.ticks, 'color'); on(s.title, 'color'); });
+    chart.update('none');
+  });
+}
 // theme toggle
 function labelThemeToggle() {
   const btn = document.querySelector('[data-theme-toggle]');
@@ -65,9 +99,15 @@ function labelThemeToggle() {
   btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
 }
 document.addEventListener('click', function (e) {
-  if (!e.target.closest('[data-theme-toggle]')) return;
-  setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
-  labelThemeToggle();
+  const btn = e.target.closest('[data-theme-toggle]');
+  if (!btn) return;
+  const box = btn.getBoundingClientRect();
+  btn.classList.remove('is-flipping');
+  void btn.offsetWidth; // restart the animation on quick repeat presses
+  btn.classList.add('is-flipping');
+  clearTimeout(btn.flipTimer);
+  btn.flipTimer = setTimeout(function () { btn.classList.remove('is-flipping'); }, 700);
+  setTheme(currentTheme() === 'dark' ? 'light' : 'dark', { x: box.left + box.width / 2, y: box.top + box.height / 2 });
 });
 
 // ---- Page setup, runs on load and after every in-app page switch ----

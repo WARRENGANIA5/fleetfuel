@@ -115,3 +115,5 @@ records ("supplementary"). Each online record is used once (`source_row` links a
 `supplementary_data.csv`, which training then leaves out): 99,991 records, 96,134 after cleaning.
 The local-trip checks (Durbin-Watson, local R²) use only the GSO trips. `python colab/make_colab_files.py`
 refreshes the Colab files.
+
+**Since 2026-11-09** training keeps only the fleet's operating range after cleaning (diesel, 30-400 km, 51-177 kW): 34,471 records. The other records stay in the files.

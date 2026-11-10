@@ -73,16 +73,17 @@
 <div class="card-surface mb-3">
   <div class="section-title"><i class="fa-solid fa-layer-group text-primary"></i> <span>Train-Test Split vs <span class="mpFolds">{{ metrics.cv_folds }}</span>-Fold Cross-Validation</span></div>
   <div class="table-wrap"><table class="table-fleet diag-table">
-    <thead><tr><th>Measure</th><th>Test Set</th><th>Fleet Range (<span id="fleetN">{{ metrics.fleet_range_metrics.records if metrics.fleet_range_metrics else '—' }}</span>)</th><th>CV Mean</th></tr></thead>
+    <thead><tr><th>Measure</th><th>Test Set</th><th>CV Mean</th><th>CV Std. Dev.</th></tr></thead>
     <tbody>
-      <tr><td>R&sup2; Score</td><td id="cvTestR2">{{ metrics.r2_score }}</td><td id="fleetR2">{{ metrics.fleet_range_metrics.r2_score if metrics.fleet_range_metrics else '—' }}</td><td id="cvMeanR2">{{ metrics.cv_mean_r2 }}</td></tr>
-      <tr><td>Mean Absolute Error</td><td><span id="cvTestMae">{{ metrics.mae }}</span> L</td><td id="fleetMae">{{ (metrics.fleet_range_metrics.mae ~ ' L') if metrics.fleet_range_metrics else '—' }}</td>
-        <td id="cvMeanMae">{{ (metrics.cv_mean_mae ~ ' L') if metrics.cv_mean_mae is not none else '—' }}</td></tr>
-      <tr><td>Root Mean Squared Error</td><td><span id="cvTestRmse">{{ metrics.rmse }}</span> L</td><td id="fleetRmse">{{ (metrics.fleet_range_metrics.rmse ~ ' L') if metrics.fleet_range_metrics else '—' }}</td>
-        <td id="cvMeanRmse">{{ (metrics.cv_mean_rmse ~ ' L') if metrics.cv_mean_rmse is not none else '—' }}</td></tr>
+      <tr><td>R&sup2; Score</td><td id="cvTestR2">{{ metrics.r2_score }}</td><td id="cvMeanR2">{{ metrics.cv_mean_r2 }}</td><td id="cvStdR2">{{ metrics.cv_std_r2 }}</td></tr>
+      <tr><td>Mean Absolute Error</td><td><span id="cvTestMae">{{ metrics.mae }}</span> L</td>
+        <td id="cvMeanMae">{{ (metrics.cv_mean_mae ~ ' L') if metrics.cv_mean_mae is not none else '—' }}</td>
+        <td id="cvStdMae">{{ metrics.cv_std_mae }}</td></tr>
+      <tr><td>Root Mean Squared Error</td><td><span id="cvTestRmse">{{ metrics.rmse }}</span> L</td>
+        <td id="cvMeanRmse">{{ (metrics.cv_mean_rmse ~ ' L') if metrics.cv_mean_rmse is not none else '—' }}</td>
+        <td id="cvStdRmse">{{ metrics.cv_std_rmse }}</td></tr>
     </tbody>
   </table></div>
-  <p class="diag-note mt-2 mb-0">Fleet Range: test records within the operating range of the university fleet (diesel, 30–400 km, 51–177 kW).</p>
 </div>
 
 <div class="row g-3 mb-3">
@@ -90,7 +91,7 @@
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-square-root-variable text-primary"></i> Regression Equation and Multicollinearity (VIF)</div>
       <div class="equation-box mb-2" id="equationRaw" style="font-family:monospace;font-size:13px;overflow-x:auto;white-space:nowrap;">—</div>
-      <p class="diag-note">Fuel Type: 1 = Gasoline, 0 = Diesel. VIF above <strong id="vifThreshold">5</strong> = high collinearity.</p>
+      <p class="diag-note">Fuel Type: 1 = Gasoline, 0 = Diesel. Every record is diesel, so its coefficient is 0 and the term does not appear. VIF above <strong id="vifThreshold">5</strong> = high collinearity.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Term</th><th>Coefficient</th><th>VIF</th><th>Collinearity</th></tr></thead>
         <tbody id="vifBody"></tbody>
@@ -99,10 +100,20 @@
   </div>
   <div class="col-12">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Durbin-Watson Test</div>
-      <p class="diag-note">Residuals of the local trips arranged by date of travel. A value close to 2 means the errors are independent.</p>
+      <div class="section-title"><i class="fa-solid fa-list-ol text-primary"></i> Regression Coefficients</div>
+      <p class="diag-note">Distance and engine power are centered on the training means. Standard errors are heteroskedasticity-robust (HC3).</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
-        <thead><tr><th>Assumption</th><th>Statistic</th><th>Rule</th><th>Result</th></tr></thead>
+        <thead><tr><th>Term</th><th>Coefficient (centered)</th><th>Std. Error</th><th>p-value</th></tr></thead>
+        <tbody id="coefBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Assumption Tests</div>
+      <p class="diag-note">The Durbin-Watson statistic uses the residuals of the local trips arranged by date of travel.</p>
+      <div class="table-wrap"><table class="table-fleet diag-table">
+        <thead><tr><th>Assumption</th><th>Test</th><th>Result</th><th>Rule</th><th>Met?</th></tr></thead>
         <tbody id="diagBody"></tbody>
       </table></div>
     </div>
@@ -126,6 +137,19 @@
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-chart-column text-primary"></i> Histogram of Residuals</div>
       <canvas id="distChart" height="240"></canvas>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-wave-square text-primary"></i> Q-Q Plot of Residuals</div>
+      <canvas id="qqChart" height="240"></canvas>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-simple text-primary"></i> Cross-Validation R&sup2; per Fold</div>
+      <canvas id="cvChart" height="240"></canvas>
+      <p class="text-muted small mb-0" id="cvChartEmpty" hidden>Not in the uploaded results.</p>
     </div>
   </div>
   <div class="col-md-6">
@@ -166,7 +190,7 @@ const axis = function (title) {
   return { grid: { color: gridColor }, ticks: { color: chartColors.text },
            title: { display: true, text: title, color: chartColors.text } };
 };
-let avpChart = null, residualChart = null, distChart = null;
+let avpChart = null, residualChart = null, distChart = null, qqChart = null, cvChart = null;
 // no tooltips on reference lines
 function onlyPoints(item) { return item.datasetIndex === 0; }
 function signed(v) { return (v > 0 ? '+' : '') + Number(v).toFixed(2); }
@@ -185,7 +209,7 @@ function strength(v) {
 // blue = positive, orange = negative
 function corrColor(v) {
   const a = Math.min(Math.abs(v), 1);
-  const base = chartColors.light ? [255, 255, 255] : [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
+  const base = chartColors.light ? [214, 223, 233] : [42, 45, 62], pos = [38, 151, 255], neg = [255, 138, 76];
   const t = v >= 0 ? pos : neg;
   return 'rgb(' + base.map(function (b, i) { return Math.round(b + (t[i] - b) * a); }).join(',') + ')';
 }
@@ -276,6 +300,20 @@ function drawCharts(c) {
         scales: { x: axis('Residual (Actual − Predicted, L)'), y: Object.assign(axis('Number of Test Trips'), { beginAtZero: true }) }
       }
     });
+    qqChart = new Chart(document.getElementById('qqChart'), {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'Residuals', data: c.qq_points, borderColor: '#2697ff',
+          backgroundColor: 'rgba(38,151,255,0.45)', pointRadius: 3 },
+        { label: 'Normal Line', type: 'line', data: c.qq_line, borderColor: '#26e5c5',
+          borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+      ] },
+      options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+                 plugins: { legend: { display: true }, tooltip: { filter: onlyPoints, callbacks: { label: function (item) {
+                   return ['Theoretical: ' + item.raw.x, 'Residual: ' + signed(item.raw.y) + ' L'];
+                 } } } },
+                 scales: { x: axis('Theoretical Quantiles'), y: axis('Sample Quantiles (L)') } }
+    });
   } else {
     avpChart.data.datasets[0].data = c.avp_points;
     avpChart.data.datasets[1].data = c.avp_line;
@@ -287,8 +325,38 @@ function drawCharts(c) {
     distChart.data.datasets[0].data = c.resid_counts;
     distChart.data.datasets[1].data = c.resid_counts;
     distChart.update();
+    qqChart.data.datasets[0].data = c.qq_points;
+    qqChart.data.datasets[1].data = c.qq_line;
+    qqChart.update();
   }
   renderHeatmap(c);
+}
+
+function drawCvChart(m) {
+  const folds = m.cv_r2_folds || [];
+  document.getElementById('cvChart').hidden = !folds.length;
+  document.getElementById('cvChartEmpty').hidden = !!folds.length;
+  if (!folds.length) return;
+  const labels = folds.map(function (_, i) { return 'Fold ' + (i + 1); });
+  const mean = folds.map(function () { return m.cv_mean_r2; });
+  if (cvChart) {
+    cvChart.data.labels = labels;
+    cvChart.data.datasets[0].data = folds;
+    cvChart.data.datasets[1].data = mean;
+    cvChart.data.datasets[1].label = 'Mean R² = ' + m.cv_mean_r2;
+    cvChart.update();
+    return;
+  }
+  cvChart = new Chart(document.getElementById('cvChart'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [
+      { label: 'R²', data: folds, backgroundColor: 'rgba(38,151,255,0.55)', borderColor: '#2697ff', borderWidth: 1, borderRadius: 4 },
+      { type: 'line', label: 'Mean R² = ' + m.cv_mean_r2, data: mean, borderColor: '#26e5c5',
+        borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+    ] },
+    options: { plugins: { legend: { display: true } },
+               scales: { x: axis('Fold'), y: Object.assign(axis('R²'), { min: 0, max: 1 }) } }
+  });
 }
 
 function renderDiagnostics(m) {
@@ -296,6 +364,17 @@ function renderDiagnostics(m) {
   const badge = function (ok, yes, no) { return '<span class="badge-status ' + (ok ? 'badge-active' : 'badge-maintenance') + '">' + (ok ? yes : no) + '</span>'; };
   // scientific notation for tiny coefficients
   const num = function (v) { const a = Math.abs(v); return (a !== 0 && a < 0.001) ? Number(v).toExponential(3) : String(v); };
+  // same digits as the written equation
+  const eqNum = function (v) {
+    const a = Math.abs(v), s = v < 0 ? '−' : '';
+    return s + (a >= 1 ? a.toFixed(4) : a < 0.001 ? a.toFixed(6) : a.toPrecision(4));
+  };
+  const coefNum = function (v) { const a = Math.abs(v); return Number(v).toFixed(a >= 1 ? 2 : a >= 0.001 ? 4 : 6); };
+  const errNum = function (v) {
+    const a = v * (1 + 1e-9);
+    return a >= 0.01 ? a.toFixed(4) : a >= 0.0001 ? a.toFixed(5) : String(Number(a.toPrecision(3)));
+  };
+  const pNum = function (p) { return p == null ? '' : p < 0.001 ? 'p &lt; 0.001' : 'p = ' + Number(p).toFixed(3); };
   const fmtVif = function (v) { return v == null ? '—' : (v >= 1000 ? '&gt;1000' : Number(v).toFixed(2)); };
   const vifBody = document.getElementById('vifBody');
   const terms = m.equation_terms || [];
@@ -305,33 +384,54 @@ function renderDiagnostics(m) {
     const coef = m.raw_coefficients || m.coefficients || {}, vif = m.vif || {};
     // equation in original units
     const equation = function (b0, b, symbols) {
-      return 'ŷ = ' + num(b0) + terms.map(function (t) {
-        const v = Number(b[t] || 0);
-        return (v < 0 ? ' − ' : ' + ') + num(Math.abs(v)) + symbols[t];
+      return 'ŷ = ' + eqNum(b0) + terms.filter(function (t) { return Number(b[t] || 0) !== 0; }).map(function (t) {
+        const v = Number(b[t]);
+        return (v < 0 ? ' − ' : ' + ') + eqNum(Math.abs(v)) + symbols[t];
       }).join('');
     };
     document.getElementById('equationRaw').textContent = m.raw_coefficients
-      ? equation(m.raw_intercept, m.raw_coefficients, { distance_km: '(Distance)', engine_power_kw: '(Power)', fuel_type_code: '(FuelType)', distance_x_power: '(Distance × Power)' })
+      ? equation(m.raw_intercept, m.raw_coefficients, { distance_km: '(Distance)', engine_power_kw: '(Engine Power)', fuel_type_code: '(Fuel Type)', distance_x_power: '(Distance × Engine Power)' })
       : '—';
     vifBody.innerHTML = '<tr><td>Intercept (β<sub>0</sub>)</td><td>' + num(m.raw_intercept != null ? m.raw_intercept : m.intercept) + '</td><td>—</td><td>—</td></tr>' +
       terms.map(function (t, i) {
         const v = vif[t];
-        const level = v == null ? '<span class="text-muted">Same value in every record</span>'
-          : badge(v <= threshold, 'Low', 'High (VIF &gt; ' + threshold + ')');
+        if (v == null) return '';  // same value in every record
+        const level = badge(v <= threshold, 'Low', 'High (VIF &gt; ' + threshold + ')');
         return '<tr><td>' + escapeHtml(name(t)) + ' (β<sub>' + (i + 1) + '</sub>)</td><td>' + num(coef[t]) + '</td><td>' +
           fmtVif(v) + '</td><td>' + level + '</td></tr>';
       }).join('');
   } else if (vifBody) {
     vifBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
   }
-  // Durbin-Watson only, VIF has its own table
-  const dw = ((m.diagnostics || {}).tests || []).filter(function (t) { return t.key === 'independence'; })[0];
+  const diag = m.diagnostics || {};
+  const coefBody = document.getElementById('coefBody');
+  if (coefBody && (diag.coefficients || []).length) {
+    coefBody.innerHTML = diag.coefficients.map(function (c) {
+      // full precision for the tiny interaction coefficient
+      const value = (m.coefficients || {})[c.feature];
+      return '<tr><td>' + escapeHtml(c.feature === 'Intercept' ? c.feature : name(c.feature)) + '</td><td>' +
+        coefNum(value != null ? value : c.coef) + '</td><td>' + errNum(c.std_err) + '</td><td>' +
+        (c.p_value < 0.001 ? '&lt; 0.001' : Number(c.p_value).toFixed(3)) + '</td></tr>';
+    }).join('');
+  } else if (coefBody) {
+    coefBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
+  }
   const diagBody = document.getElementById('diagBody');
-  if (diagBody && dw) {
-    diagBody.innerHTML = '<tr><td>' + escapeHtml(dw.assumption) + '</td><td>' + dw.statistic + '</td><td>' +
-      escapeHtml(dw.rule) + '</td><td>' + badge(dw.passed, 'Met', 'Not met') + '</td></tr>';
+  if (diagBody && (diag.tests || []).length) {
+    const result = function (t) {
+      const stat = Number(t.statistic).toLocaleString('en-US', { maximumFractionDigits: 3 });
+      if (t.key === 'linearity') return 'F = ' + Number(t.statistic).toFixed(2) + ', ' + pNum(t.p_value);
+      if (t.key === 'normality') return ((t.meaning.match(/skew [^)]*/) || [stat])[0]) + ', ' + pNum(t.p_value);
+      if (t.key === 'equal_variance') return Number(t.statistic).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ', ' + pNum(t.p_value);
+      if (t.key === 'multicollinearity') return 'highest ' + Number(t.statistic).toFixed(2);
+      return stat;
+    };
+    diagBody.innerHTML = diag.tests.map(function (t) {
+      return '<tr><td>' + escapeHtml(t.assumption) + '</td><td>' + escapeHtml(t.test) + '</td><td>' + result(t) + '</td><td>' +
+        escapeHtml(t.rule) + '</td><td>' + badge(t.passed, 'Yes', 'No') + '</td></tr>';
+    }).join('');
   } else if (diagBody) {
-    diagBody.innerHTML = '<tr><td colspan="4" class="text-muted">Not in the uploaded results.</td></tr>';
+    diagBody.innerHTML = '<tr><td colspan="5" class="text-muted">Not in the uploaded results.</td></tr>';
   }
 }
 
@@ -353,11 +453,9 @@ function refreshModelPerformance() {
         setText('cvTestR2', m.r2_score); setText('cvMeanR2', m.cv_mean_r2);
         setText('cvTestMae', m.mae); setText('cvMeanMae', liters(m.cv_mean_mae));
         setText('cvTestRmse', m.rmse); setText('cvMeanRmse', liters(m.cv_mean_rmse));
-        const fleet = m.fleet_range_metrics || {};
-        setText('fleetN', fleet.records != null ? fleet.records : '—');
-        setText('fleetR2', fleet.r2_score != null ? fleet.r2_score : '—');
-        setText('fleetMae', liters(fleet.mae)); setText('fleetRmse', liters(fleet.rmse));
+        setText('cvStdR2', m.cv_std_r2); setText('cvStdMae', m.cv_std_mae); setText('cvStdRmse', m.cv_std_rmse);
         renderDiagnostics(m);
+        drawCvChart(m);
       }
       const key = JSON.stringify(data.charts);
       if (key !== lastChartsKey) { lastChartsKey = key; drawCharts(data.charts); }

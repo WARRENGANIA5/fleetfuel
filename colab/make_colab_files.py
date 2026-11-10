@@ -20,7 +20,7 @@ vehicles = pd.read_csv(VEHICLES_PATH)
 local = merge_trips_and_vehicles(trips, vehicles)
 # supplementary file excludes rows already in trip records
 online = local["source"].notna() if "source" in local else False
-local["data_source"] = np.where(online, "trip_records_online", "system")
+local["data_source"] = np.where(online, "trip_records_online", "local")
 supplementary = pd.read_csv(SUPPLEMENTARY_PATH).assign(data_source="supplementary")
 raw = pd.concat([f for f in (local, supplementary) if not f.empty], ignore_index=True)
 df = clean_data(raw)
@@ -32,7 +32,7 @@ df.head()'''
 
 MERGE_TEXT = '''## 3. Merge and clean the data
 The trips are merged with the vehicle records using the plate number; each record is labeled with its source:
-**system** (the GSO's own trips), **trip_records_online** (the online-dataset trips of Trip Records) and
+**local** (the GSO's own trips), **trip_records_online** (the online-dataset trips of Trip Records) and
 **supplementary** (the other online records).'''
 
 AUTO_DATA_TEXT = '''## 1. Data collection — the datasets (built into this notebook)
@@ -56,7 +56,7 @@ Download the three files from the web application: **Model Performance → Uploa
 * **supplementary_data.csv** — the other online records, with the same variables.'''
 
 DW_TEXT = '''## 7. Regression assumption checks (LINE conditions)
-Durbin-Watson is computed on the residuals of the GSO's own trips (data_source "system") arranged by date of travel. Coefficient standard errors and p-values are heteroskedasticity-robust (HC3).'''
+Durbin-Watson is computed on the residuals of the GSO's own trips (data_source "local") arranged by date of travel. Coefficient standard errors and p-values are heteroskedasticity-robust (HC3).'''
 
 
 def lines(text):

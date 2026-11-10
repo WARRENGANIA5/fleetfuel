@@ -1,52 +1,74 @@
 {
-  "r2_score": 0.9502,
-  "mae": 2.5137,
-  "rmse": 4.8378,
-  "fleet_range_metrics": {
-    "records": 6852,
-    "r2_score": 0.8893,
-    "mae": 2.0069,
-    "rmse": 2.9178
-  },
+  "model_version": "v20261109210623",
+  "r2_score": 0.8877,
+  "mae": 1.9759,
+  "rmse": 2.89,
   "cv_folds": 5,
-  "cv_mean_r2": 0.951,
-  "cv_std_r2": 0.0008,
-  "cv_mean_mae": 2.503,
-  "cv_std_mae": 0.0183,
-  "cv_mean_rmse": 4.8099,
-  "cv_std_rmse": 0.0349,
-  "train_size": 76907,
-  "test_size": 19227,
-  "total_records": 96134,
+  "cv_mean_r2": 0.8879,
+  "cv_std_r2": 0.0015,
+  "cv_r2_folds": [
+    0.8877,
+    0.8883,
+    0.8859,
+    0.8905,
+    0.8869
+  ],
+  "cv_mean_mae": 1.993,
+  "cv_std_mae": 0.0116,
+  "cv_mean_rmse": 2.9223,
+  "cv_std_rmse": 0.0301,
+  "train_size": 27576,
+  "test_size": 6895,
+  "total_records": 34471,
+  "trained_at": "2026-11-09T21:06:23",
+  "status": "active",
   "equation_terms": [
     "distance_km",
     "engine_power_kw",
     "fuel_type_code",
     "distance_x_power"
   ],
-  "intercept": 17.8184,
+  "intercept": 14.463,
   "coefficients": {
-    "distance_km": 0.0960242,
-    "engine_power_kw": 0.11658,
-    "fuel_type_code": -3.01608,
-    "distance_x_power": 0.000503143
+    "distance_km": 0.0873046,
+    "engine_power_kw": 0.118596,
+    "fuel_type_code": 0.0,
+    "distance_x_power": 0.000573461
   },
   "centering": {
-    "distance_km": 166.9518,
-    "engine_power_kw": 110.6327
+    "distance_km": 151.584,
+    "engine_power_kw": 95.3464
   },
-  "raw_intercept": -1.81739,
+  "raw_intercept": -1.79043,
   "raw_coefficients": {
-    "distance_km": 0.0403601,
-    "engine_power_kw": 0.0325798,
-    "fuel_type_code": -3.01608,
-    "distance_x_power": 0.000503143
+    "distance_km": 0.0326272,
+    "engine_power_kw": 0.0316687,
+    "fuel_type_code": 0.0,
+    "distance_x_power": 0.000573461
   },
+  "vif_threshold": 5.0,
   "vif": {
-    "distance_km": 1.64,
-    "engine_power_kw": 1.76,
-    "fuel_type_code": 2.28,
-    "distance_x_power": 1.25
+    "fuel_type_code": null,
+    "distance_km": 1.03,
+    "engine_power_kw": 1.03,
+    "distance_x_power": 1.01
+  },
+  "correlations": {
+    "distance_km": 0.881,
+    "engine_power_kw": 0.151,
+    "distance_x_power": 0.21
+  },
+  "selected_numeric_features": [
+    "distance_km",
+    "engine_power_kw",
+    "fuel_type_code",
+    "distance_x_power"
+  ],
+  "selected_categorical_features": [],
+  "data_sources": {
+    "supplementary": 27184,
+    "trip_records_online": 7194,
+    "local": 93
   },
   "diagnostics": {
     "tests": [
@@ -54,7 +76,7 @@
         "key": "linearity",
         "assumption": "Linearity",
         "test": "Ramsey RESET test",
-        "statistic": 1024.354,
+        "statistic": 38.993,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
@@ -64,7 +86,7 @@
         "key": "independence",
         "assumption": "Independence of errors",
         "test": "Durbin-Watson statistic",
-        "statistic": 0.936,
+        "statistic": 0.784,
         "p_value": null,
         "passed": false,
         "rule": "1.5 to 2.5 (close to 2 = independent)",
@@ -74,17 +96,17 @@
         "key": "normality",
         "assumption": "Normality of errors",
         "test": "Jarque-Bera test",
-        "statistic": 2179153.993,
+        "statistic": 104177.027,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
-        "meaning": "Residuals follow a normal distribution (skew 2.21, kurtosis 28.70)."
+        "meaning": "Residuals follow a normal distribution (skew 1.17, kurtosis 12.23)."
       },
       {
         "key": "equal_variance",
         "assumption": "Equal variance of errors",
         "test": "Breusch-Pagan test",
-        "statistic": 13776.987,
+        "statistic": 3074.539,
         "p_value": 0.0,
         "passed": false,
         "rule": "p > 0.05",
@@ -94,7 +116,7 @@
         "key": "multicollinearity",
         "assumption": "No multicollinearity",
         "test": "Variance Inflation Factor",
-        "statistic": 2.28,
+        "statistic": 1.03,
         "p_value": null,
         "passed": true,
         "rule": "every VIF \u2264 5",
@@ -104,101 +126,68 @@
     "coefficients": [
       {
         "feature": "Intercept",
-        "coef": 17.82,
-        "std_err": 0.02517,
+        "coef": 14.46,
+        "std_err": 0.01918,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "distance_km",
-        "coef": 0.09602,
-        "std_err": 0.0002458,
+        "coef": 0.0873,
+        "std_err": 0.0002751,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "engine_power_kw",
-        "coef": 0.1166,
-        "std_err": 0.0008334,
-        "p_value": 0.0,
-        "significant": true
-      },
-      {
-        "feature": "fuel_type_code",
-        "coef": -3.016,
-        "std_err": 0.04327,
+        "coef": 0.1186,
+        "std_err": 0.001005,
         "p_value": 0.0,
         "significant": true
       },
       {
         "feature": "distance_x_power",
-        "coef": 0.0005031,
-        "std_err": 8.598e-06,
+        "coef": 0.0005735,
+        "std_err": 1.444e-05,
         "p_value": 0.0,
         "significant": true
       }
     ],
-    "constant_terms": [],
-    "ols_r2": 0.9512,
-    "ols_adj_r2": 0.9512,
+    "constant_terms": [
+      "fuel_type_code"
+    ],
+    "ols_r2": 0.888,
+    "ols_adj_r2": 0.8879,
     "alpha": 0.05,
     "std_err_type": "HC3 (heteroskedasticity-robust)"
   },
-  "model_version": "v20261030104247",
-  "trained_at": "2026-10-30T10:42:47",
-  "status": "active",
-  "source": "Google Colab notebook (colab/fuel_consumption_linear_regression_AUTO.ipynb), run on this computer",
-  "vif_threshold": 5.0,
-  "selected_numeric_features": [
-    "distance_km",
-    "engine_power_kw",
-    "fuel_type_code",
-    "distance_x_power"
-  ],
-  "selected_categorical_features": [],
-  "data_sources": {
-    "supplementary": 88847,
-    "trip_records_online": 7194,
-    "system": 93
-  },
   "feature_ranges": {
     "distance_km": [
-      1.5,
-      1000.0
+      30.0,
+      400.0
     ],
     "engine_power_kw": [
       51.0,
-      221.0
+      177.0
     ]
   },
   "category_values": {
     "fuel_type": [
-      "Diesel",
-      "Gasoline"
+      "Diesel"
     ]
   },
   "ranges_by_fuel": {
     "Diesel": {
       "distance_km": [
         30.0,
-        1000.0
+        400.0
       ],
       "engine_power_kw": [
         51.0,
-        221.0
+        177.0
       ],
-      "records": 46937
-    },
-    "Gasoline": {
-      "distance_km": [
-        1.5,
-        716.66
-      ],
-      "engine_power_kw": [
-        104.0,
-        147.0
-      ],
-      "records": 49197
+      "records": 34471
     }
-  }
+  },
+  "source": "Google Colab notebook (colab/fuel_consumption_linear_regression_AUTO.ipynb), run on this computer"
 }
