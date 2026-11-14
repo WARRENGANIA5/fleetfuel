@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1201" viewBox="0 0 1000 1201">
+<defs><marker id="a1d2430" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d2430"/></marker><marker id="a1f6670" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f6670"/></marker><marker id="aa87f12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a87f12"/></marker></defs>
+<rect x="0" y="0" width="1000" height="1201" fill="#ffffff"/>
+<text x="500.0" y="52.0" font-family="Arial, Helvetica, sans-serif" font-size="37.5" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Inference and Integration Architecture</text>
+<text x="500.0" y="88.0" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#4a5566" text-anchor="middle" font-style="italic">Three tiers, the steps of one prediction, and how a new model is added</text>
+<rect x="20.0" y="130.0" width="230.0" height="630.0" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<text x="135.0" y="160.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#4a5566" text-anchor="middle">CLIENT</text>
+<rect x="290.0" y="130.0" width="410.0" height="630.0" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<text x="495.0" y="160.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#4a5566" text-anchor="middle">APPLICATION SERVER</text>
+<rect x="740.0" y="130.0" width="240.0" height="630.0" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<text x="860.0" y="160.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#4a5566" text-anchor="middle">DATA AND MODEL</text>
+<rect x="40.0" y="190.0" width="190.0" height="109.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="135.0" y="223.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Users</text>
+<text x="135.0" y="255.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">GSO staff,</text>
+<text x="135.0" y="281.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">administrator</text>
+<rect x="40.0" y="400.0" width="190.0" height="134.8" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="135.0" y="433.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Web Browser</text>
+<text x="135.0" y="465.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">HTML,</text>
+<text x="135.0" y="491.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Bootstrap,</text>
+<text x="135.0" y="516.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Chart.js</text>
+<path d="M135.0,299.2 L135.0,399.0" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="310.0" y="175.0" width="370.0" height="565.0" rx="10" fill="#ffffff" stroke="#1f3a5f" stroke-width="1.8"/>
+<text x="495.0" y="207.0" font-family="Arial, Helvetica, sans-serif" font-size="22.5" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Flask Web Application</text>
+<text x="495.0" y="233.0" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#4a5566" text-anchor="middle" font-style="italic">office server (Waitress) · online link (Vercel)</text>
+<rect x="340.0" y="260.0" width="310.0" height="109.2" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="495.0" y="293.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Pages and Routes</text>
+<text x="495.0" y="325.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">app.py: forms, pages, JSON</text>
+<text x="495.0" y="351.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">API</text>
+<rect x="340.0" y="420.0" width="310.0" height="109.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="495.0" y="453.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Prediction Module</text>
+<text x="495.0" y="485.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">validate input, predict,</text>
+<text x="495.0" y="511.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">warn</text>
+<rect x="340.0" y="590.0" width="310.0" height="83.6" rx="8" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
+<text x="495.0" y="623.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">Data Access</text>
+<text x="495.0" y="655.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">db.py, trip_dataset.py</text>
+<path d="M760.0,241.0 V328.6 A100.0,11 0 0 0 960.0,328.6 V241.0" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<ellipse cx="860.0" cy="241.0" rx="100.0" ry="11" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="860.0" y="281.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">CSV Datasets</text>
+<text x="860.0" y="313.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">online trips</text>
+<path d="M760.0,410.6 V523.8 A100.0,11 0 0 0 960.0,523.8 V410.6" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<ellipse cx="860.0" cy="410.6" rx="100.0" ry="11" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="860.0" y="451.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Trained Model</text>
+<text x="860.0" y="483.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">.joblib +</text>
+<text x="860.0" y="508.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">metrics.json</text>
+<path d="M760.0,567.8 V709.0 A100.0,11 0 0 0 960.0,709.0 V567.8" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
+<ellipse cx="860.0" cy="567.8" rx="100.0" ry="11" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
+<text x="860.0" y="608.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">Firebase</text>
+<text x="860.0" y="636.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">Firestore</text>
+<text x="860.0" y="668.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">users, vehicles,</text>
+<text x="860.0" y="693.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">trips, requests</text>
+<path d="M230.0,445.4 L339.0,314.6" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<circle cx="277.0" cy="358.0" r="17.5" fill="#7a1f2b"/>
+<text x="277.0" y="365.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<path d="M340.0,344.6 L231.0,489.4" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<circle cx="293.0" cy="443.0" r="17.5" fill="#7a1f2b"/>
+<text x="293.0" y="450.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<path d="M495.0,369.2 L495.0,419.0" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<circle cx="521.0" cy="394.6" r="17.5" fill="#7a1f2b"/>
+<text x="521.0" y="402.1" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<path d="M650.0,474.6 L759.0,474.6" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" marker-start="url(#a1d2430)" stroke-linejoin="round"/>
+<circle cx="705.0" cy="450.6" r="17.5" fill="#7a1f2b"/>
+<text x="705.0" y="458.1" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<path d="M495.0,529.2 L495.0,589.0" fill="none" stroke="#1d2430" stroke-width="2" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<circle cx="521.0" cy="559.6" r="17.5" fill="#7a1f2b"/>
+<text x="521.0" y="567.1" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<path d="M650.0,631.8 L759.0,631.8" fill="none" stroke="#1f6670" stroke-width="2" marker-end="url(#a1f6670)" marker-start="url(#a1f6670)" stroke-linejoin="round"/>
+<path d="M650.0,284.8 L759.0,284.8" fill="none" stroke="#a87f12" stroke-width="2" marker-end="url(#aa87f12)" marker-start="url(#aa87f12)" stroke-linejoin="round"/>
+<text x="30.0" y="822.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Adding a new model</text>
+<rect x="40.0" y="840.0" width="230.0" height="109.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="155.0" y="873.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Google Colab</text>
+<text x="155.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">train and evaluate</text>
+<rect x="330.0" y="840.0" width="230.0" height="109.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="445.0" y="873.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Upload Model</text>
+<text x="445.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">admin, Model</text>
+<text x="445.0" y="931.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Performance</text>
+<rect x="620.0" y="840.0" width="230.0" height="109.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="735.0" y="873.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Upload Check</text>
+<text x="735.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">same terms, same</text>
+<text x="735.0" y="931.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">results</text>
+<path d="M270.0,894.6 L329.0,894.6" fill="none" stroke="#a87f12" stroke-width="2" marker-end="url(#aa87f12)" stroke-linejoin="round"/>
+<path d="M560.0,894.6 L619.0,894.6" fill="none" stroke="#a87f12" stroke-width="2" marker-end="url(#aa87f12)" stroke-linejoin="round"/>
+<path d="M850.0,894.6 L992.0,894.6 L992.0,467.2 L961.0,467.2" fill="none" stroke="#a87f12" stroke-width="2.4" marker-end="url(#aa87f12)" stroke-linejoin="round"/>
+<rect x="912.1" y="866.4" width="75.7" height="24.2" rx="4" fill="#ffffff" opacity="0.96"/>
+<text x="950.0" y="882.6" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="bold" fill="#a87f12" text-anchor="middle">replace</text>
+<text x="30.0" y="993.2" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Steps of one prediction</text>
+<circle cx="48.0" cy="1025.2" r="17.5" fill="#7a1f2b"/>
+<text x="48.0" y="1032.7" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="76.0" y="1031.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">Staff sends the vehicle and the planned distance.</text>
+<circle cx="48.0" cy="1059.2" r="17.5" fill="#7a1f2b"/>
+<text x="48.0" y="1066.7" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="76.0" y="1065.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">The route checks the input and gets the vehicle's engine power and fuel type.</text>
+<circle cx="48.0" cy="1093.2" r="17.5" fill="#7a1f2b"/>
+<text x="48.0" y="1100.7" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="76.0" y="1099.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">The trained model predicts the fuel in liters.</text>
+<circle cx="48.0" cy="1127.2" r="17.5" fill="#7a1f2b"/>
+<text x="48.0" y="1134.7" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<text x="76.0" y="1133.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">The request and a pending trip are saved in Firestore.</text>
+<circle cx="48.0" cy="1161.2" r="17.5" fill="#7a1f2b"/>
+<text x="48.0" y="1168.7" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<text x="76.0" y="1167.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">The result is shown; the administrator approves or rejects it.</text>
+</svg>

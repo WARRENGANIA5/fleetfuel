@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetFuel CRISP-DM Diagrams</title>
+<style>
+  @page { size: 8.5in 13in; margin: 0.5in; }
+  body { font-family: "Times New Roman", Times, serif; color: #111; margin: 0; background: #fff; }
+  .page { page-break-after: always; break-after: page; display: flex; flex-direction: column; height: 11.95in; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  .fig { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .fig img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .caption { font-size: 12pt; font-weight: bold; text-align: center; margin: 10pt 0 0; }
+  p { font-size: 12pt; line-height: 1.5; text-align: justify; margin: 0 0 6pt; text-indent: 0.4in; }
+  .cover { justify-content: center; text-align: center; }
+  .cover h1 { font-size: 20pt; margin: 0 0 10pt; }
+  .cover h2 { font-size: 14pt; font-weight: normal; margin: 0 0 30pt; }
+  .cover table { margin: 0 auto; border-collapse: collapse; font-size: 12pt; text-align: left; }
+  .cover td, .cover th { border: 1px solid #888; padding: 6pt 10pt; }
+  .cover th { background: #eef2f7; }
+  .text { height: auto; display: block; }
+  .text h2 { font-size: 15pt; text-align: center; margin: 0 0 12pt; }
+  .text h3 { font-size: 12pt; margin: 14pt 0 6pt; }
+</style>
+</head>
+<body>
+
+<section class="page cover">
+  <h1>System Diagrams Based on CRISP-DM</h1>
+  <h2>Performance of Linear Regression Model in Predicting Fuel Consumption for the Government Fleets<br>
+  FleetFuel Prediction System — General Services Office, Guimaras State University</h2>
+  <table>
+    <tr><th>Figure</th><th>Diagram</th><th>Used instead of</th><th>CRISP-DM phases</th></tr>
+    <tr><td>1</td><td>Data Pipeline Diagram</td><td>Data Flow Diagram (DFD)</td><td>Data Understanding, Data Preparation, Modeling</td></tr>
+    <tr><td>2</td><td>Analytical Data Model Schema</td><td>Entity Relationship Diagram (ERD)</td><td>Data Understanding, Data Preparation</td></tr>
+    <tr><td>3</td><td>ML Lifecycle and Decision Flow</td><td>Flowchart</td><td>All six phases</td></tr>
+    <tr><td>4</td><td>Inference and Integration Architecture</td><td>System Architecture</td><td>Deployment</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <div class="fig"><img src="fig1_data_pipeline.svg" alt="Data Pipeline Diagram"></div>
+  <div class="caption">Figure 1. Data Pipeline Diagram of the FleetFuel Prediction System</div>
+</section>
+
+<section class="page">
+  <div class="fig"><img src="fig2_analytical_data_model.svg" alt="Analytical Data Model Schema"></div>
+  <div class="caption">Figure 2. Analytical Data Model Schema of the FleetFuel Prediction System</div>
+</section>
+
+<section class="page">
+  <div class="fig"><img src="fig3_ml_lifecycle_decision_flow.svg" alt="ML Lifecycle and Decision Flow"></div>
+  <div class="caption">Figure 3. Machine Learning Lifecycle and Decision Flow (CRISP-DM)</div>
+</section>
+
+<section class="page">
+  <div class="fig"><img src="fig4_inference_integration_architecture.svg" alt="Inference and Integration Architecture"></div>
+  <div class="caption">Figure 4. Inference and Integration Architecture of the FleetFuel Prediction System</div>
+</section>
+
+<section class="page text">
+<h2>Figure Descriptions</h2>
+<h3>Figure 1. Data Pipeline Diagram</h3>
+<p>Figure 1 shows the seven stages that turn the collected records into the trained model. The data come from the GSO trip reports (93 trips), the vehicle records (9 vehicles), the fuel requests of the GSO staff, and two online datasets (99,898 records). They are stored in Firebase Firestore and in CSV files. The trips are joined with their vehicles by plate number and merged with the online data. Cleaning removes missing and invalid values and outliers (IQR rule), and it keeps only the fleet's range: diesel, 30–400 km, and 51–177 kW. This leaves 34,471 clean records. Four model terms are formed: distance, engine power, fuel type, and distance × engine power. The data are split 80/20 with 5-fold cross-validation, and the trained Linear Regression model is saved with its results (R² = 0.8877).</p>
+<h3>Figure 2. Analytical Data Model Schema</h3>
+<p>Figure 2 shows the data as a star schema. The two fact tables are Fact Trip, with one row per trip and the measures distance and actual fuel, and Fact Prediction, with one row per fuel request and the predicted and actual fuel. They are described by the dimension tables Vehicle (plate number, model, fuel type, engine power), Date, Data Source (local, online trips, or supplementary), and User. A fuel request is linked to at most one trip. The Model Input View is derived from the trips and vehicles. It holds the predictors X1 to X4 and the target Y used to train the model.</p>
+<h3>Figure 3. Machine Learning Lifecycle and Decision Flow</h3>
+<p>Figure 3 shows the six CRISP-DM phases of the study as a cycle. If the evaluation is not good enough, the work goes back to an earlier phase. Part A shows how the model is built: the data are prepared and the model is trained, then it is deployed only if it is accurate and every VIF is at most 5; otherwise the data are revised. Part B shows how the model is used: a fuel request with valid input is predicted, the administrator approves or rejects it, and the actual fuel is recorded. When enough new trips have been collected, the model is retrained.</p>
+<h3>Figure 4. Inference and Integration Architecture</h3>
+<p>Figure 4 shows the three tiers of the system. Users work in the web browser (client). The Flask web application runs on the GSO office server or on the online link (application server). Firebase Firestore, the CSV datasets, and the trained model form the data and model tier. The numbered steps show one prediction: the request is sent, the input is checked, the model predicts the fuel, the request and a pending trip are saved, and the result is shown for approval. A new model is trained in Google Colab, uploaded by the administrator, and checked before it replaces the current model.</p>
+</section>
+</body>
+</html>
