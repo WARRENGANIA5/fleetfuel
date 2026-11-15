@@ -4,6 +4,12 @@ REM Backs up the database first, and restarts the app if it crashes.
 cd /d "%~dp0.."
 title FleetFuel Server
 
+REM stop_server.bat also stops the watcher; start it again (if autostart is
+REM installed) so the system keeps restarting itself. Only one watcher runs.
+if exist "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\FleetFuel Server.cmd" (
+    start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0fleetfuel_watcher.ps1"
+)
+
 netstat -ano | find ":5000 " | find "LISTENING" >nul
 if not errorlevel 1 (
     echo FleetFuel is already running on this computer: http://127.0.0.1:5000
