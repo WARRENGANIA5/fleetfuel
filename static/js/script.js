@@ -662,7 +662,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.user-name').forEach(function (el) { el.textContent = me.full_name; });
         document.querySelectorAll('.user-role').forEach(function (el) { el.textContent = me.role; });
         const initial = document.getElementById('topbarAvatarInitial');
-        if (initial) initial.textContent = me.initial;
+        if (initial) {
+          // profile picture if there is one, else the first letter of the name
+          const img = initial.querySelector('img');
+          if (me.avatar) {
+            if (!img || img.getAttribute('src') !== me.avatar) initial.innerHTML = '<img src="' + me.avatar.replace(/"/g, '&quot;') + '" alt="">';
+          } else if (img || initial.textContent !== me.initial) {
+            initial.textContent = me.initial;
+          }
+        }
         if (document.getElementById('settingsFullName')) {
           syncField('settingsFullName', me.full_name);
           syncField('settingsPosition', me.role);
@@ -756,52 +764,6 @@ document.addEventListener('show.bs.modal', function (e) {
   const SIZE_KEY = 'fleetfuel-auth-size';
   const later = function (ms, fn) { setTimeout(fn, ms); };
 
-  // two lights running around the card edge (transform-only keyframes)
-  const beamLights = Array.from(frame.querySelectorAll('.card-beam .beam'));
-  let beamRuns = [], beamTimer = null;
-  function runBeams() {
-    if (!beamLights.length || calm || !card.animate) return;
-    const w = card.offsetWidth, h = card.offsetHeight, e = 0.5;
-    const c = parseFloat(getComputedStyle(card).getPropertyValue('--cut')) || 30;
-    const pts = [[c, e], [w - e, e], [w - e, h - c], [w - c, h - e], [e, h - e], [e, c], [c, e]];
-    // clip so tails don't stick out at the corners
-    const o = 3, d = o * 0.414;
-    beamLights[0].parentNode.style.clipPath = 'polygon(' + [[c - d, -o], [w + o, -o], [w + o, h - c + d], [w - c + d, h + o], [-o, h + o], [-o, c - d]]
-      .map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
-    let total = 0, last = null;
-    const segs = [];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      let angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
-      if (last !== null) while (angle - last < -180) angle += 360;
-      segs.push({ a: a, b: b, len: len, at: total, angle: angle });
-      total += len;
-      last = angle;
-    }
-    const done = beamRuns.map(function (r) { return r.currentTime || 0; });
-    beamRuns.forEach(function (r) { r.cancel(); });
-    beamRuns = beamLights.map(function (el, n) {
-      const bw = el.offsetWidth, frames = [];
-      const at = function (sg, d) { return [sg.a[0] + (sg.b[0] - sg.a[0]) * d / sg.len, sg.a[1] + (sg.b[1] - sg.a[1]) * d / sg.len]; };
-      const key = function (offset, p, angle) {
-        frames.push({ offset: offset / total, transform: 'translate(' + (p[0] - bw).toFixed(1) + 'px,' + (p[1] - 1).toFixed(1) + 'px) rotate(' + angle.toFixed(1) + 'deg)' });
-      };
-      // only rotate near the corners
-      segs.forEach(function (sg, i) {
-        const turn = Math.min(8, sg.len / 3);
-        key(sg.at, sg.a, i === 0 ? sg.angle : segs[i - 1].angle);
-        key(sg.at + turn, at(sg, turn), sg.angle);
-        if (i === segs.length - 1) key(total, sg.b, sg.angle);
-      });
-      const run = el.animate(frames, { duration: 7000, iterations: Infinity, easing: 'linear' });
-      run.currentTime = done[n] != null ? done[n] : n * 3500;
-      return run;
-    });
-  }
-  function beamSpeed(rate) { beamRuns.forEach(function (r) { r.playbackRate = rate; }); }
-  runBeams();
-  if (window.ResizeObserver) new ResizeObserver(function () { clearTimeout(beamTimer); beamTimer = setTimeout(runBeams, 120); }).observe(card);
-
   function leave(href) {
     if (calm) { location.href = href; return; }
     try {
@@ -810,7 +772,6 @@ document.addEventListener('show.bs.modal', function (e) {
     } catch (e) {}
     Array.from(card.children).forEach(function (el, i) { el.style.transitionDelay = (i * 15) + 'ms'; });
     frame.classList.add('is-leaving', 'shards-quick', 'shards-lit', 'shards-in');
-    beamSpeed(3);
     later(150, function () { frame.classList.add('shards-center'); });
     later(400, function () { location.href = href; });
   }
@@ -836,8 +797,6 @@ document.addEventListener('show.bs.modal', function (e) {
     if (!root.classList.contains('auth-arriving')) return;
     const rows = Array.from(card.children);
     frame.classList.add('no-anim', 'shards-lit', 'shards-in', 'shards-center', 'is-leaving');
-    beamSpeed(3);
-    later(600, function () { beamSpeed(1); });
     void frame.offsetWidth;
     frame.classList.remove('no-anim');
     root.classList.remove('auth-arriving');

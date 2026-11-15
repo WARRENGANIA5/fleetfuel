@@ -252,6 +252,46 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; flex-shrink: 0;
 }
+.user-avatar { overflow: hidden; }
+.user-avatar img, .avatar-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Settings: profile picture (click the picture to change it, like the GSU-GO admin profile) */
+.avatar-setting { display: flex; align-items: center; gap: 18px; margin-bottom: 22px; }
+.avatar-pick { position: relative; width: 76px; height: 76px; padding: 0; border: 0; background: none; cursor: pointer; flex-shrink: 0; border-radius: 50%; }
+.avatar-pick:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 3px; }
+.avatar-preview {
+  width: 76px; height: 76px; border-radius: 50%; overflow: hidden;
+  background: var(--blue-100); color: var(--blue-600);
+  display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800;
+}
+.avatar-badge {
+  position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--blue-600); color: #fff; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.avatar-identity { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.avatar-name { font-size: 18px; font-weight: 700; color: var(--blue-600); line-height: 1.2; overflow-wrap: anywhere; }
+/* options sheet (like the GSU-GO app) */
+.offcanvas.avatar-sheet {
+  height: auto; max-width: 560px; margin: 0 auto; border: 0;
+  border-radius: 22px 22px 0 0; background: var(--card-bg); color: inherit;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
+}
+.avatar-sheet .offcanvas-body { padding: 14px 10px 22px; }
+.sheet-item {
+  display: flex; align-items: center; gap: 22px; width: 100%; padding: 15px 22px;
+  border: 0; border-radius: 12px; background: none; color: inherit; font-size: 16px; text-align: left;
+}
+.sheet-item i { width: 22px; font-size: 20px; text-align: center; }
+.sheet-item:hover, .sheet-item:focus-visible { background: var(--card-bg-alt); outline: none; }
+.sheet-item.sheet-danger { color: var(--danger); }
+/* See Profile Picture */
+.avatar-view-dialog { max-width: 420px; }
+.avatar-view { background: none; border: 0; box-shadow: none; align-items: center; }
+.avatar-view img { width: 100%; max-width: 380px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+.avatar-view-close { position: absolute; top: -42px; right: 0; z-index: 1; width: 1.3em; height: 1.3em; opacity: .9; }
+/* Take Photo */
+.avatar-camera { width: 260px; height: 260px; margin: 0 auto; border-radius: 50%; overflow: hidden; background: #000; }
+.avatar-camera video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .user-meta { display: flex; flex-direction: column; line-height: 1.2; }
 .user-name { font-size: 13.5px; font-weight: 600; }
 .user-role { font-size: 11.5px; color: var(--text-muted); }
@@ -1330,17 +1370,6 @@ html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent; }
 .shard-tl > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='7,7 65,7 7,65' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .shard-br > i { --shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='93,35 93,93 35,93' stroke='%23000' stroke-width='14' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 
-/* edge lights (path set by script.js) */
-.card-beam { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.card-beam .beam {
-  position: absolute; left: 0; top: 0; width: 130px; height: 2px; border-radius: 2px;
-  transform-origin: 100% 50%; will-change: transform;
-  background: linear-gradient(90deg, rgba(154, 216, 255, 0), #c9ecff);
-  box-shadow: 0 0 8px 1px rgba(76, 180, 255, 0.85), 0 0 18px 2px rgba(38, 151, 255, 0.45);
-}
-.card-beam .beam-b { background: linear-gradient(90deg, rgba(76, 180, 255, 0), #4cb4ff); }
-html.auth-arriving .card-beam { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { .card-beam { display: none; } }
 
 /* Login <-> Sign Up transition (steps driven by script.js) */
 .login-card > * { transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -1409,6 +1438,7 @@ html.auth-arriving .glass-shard { opacity: 0; }
   .glass-shard { --s: 40px; --o: -14px; --in: 8px; --n: 4px; }
   .auth-brand .login-title { font-size: 21px; }
 }
+
 @media (prefers-reduced-motion: reduce) { .auth-bg .streak-group { animation: none; } }
 
 /* light mode auth pages */
@@ -1436,7 +1466,6 @@ html[data-theme="light"] .login-card .form-control:-webkit-autofill:hover,
 html[data-theme="light"] .login-card .form-control:-webkit-autofill:focus { -webkit-text-fill-color: #101828; -webkit-box-shadow: 0 0 0 1000px #eef4ff inset; box-shadow: 0 0 0 1000px #eef4ff inset; }
 html[data-theme="light"] .auth-brand .login-logo { box-shadow: 0 6px 16px rgba(38, 151, 255, 0.2); }
 html[data-theme="light"] .auth-switch a { color: var(--blue-600); }
-html[data-theme="light"] .card-beam .beam-a { background: linear-gradient(90deg, rgba(43, 152, 255, 0), #2b98ff); }
 
 /* ================= Light mode: glass dashboard =================
    Signed-in pages only (:has(.app-shell)). */

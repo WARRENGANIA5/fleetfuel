@@ -8,6 +8,67 @@
     <div class="card-surface">
       <div class="section-title"><i class="fa-solid fa-user text-primary"></i> Profile Information</div>
 
+      {# profile picture, same as the GSU-GO app: click it -> sheet with Take Photo,
+         Upload Photo, See / Remove Profile Picture. Cropped and shrunk in the browser. #}
+      <form method="POST" action="{{ url_for('update_avatar') }}" id="avatarForm" class="avatar-setting">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="avatar_data" id="avatarData">
+        <input type="hidden" name="action" id="avatarAction" value="">
+        <button type="button" class="avatar-pick" id="avatarChoose" title="Change profile picture" aria-label="Change profile picture"
+                data-bs-toggle="offcanvas" data-bs-target="#avatarSheet">
+          <span class="avatar-preview" id="avatarPreview">{% if user.avatar %}<img src="{{ url_for('avatar', user_id=user.id, v=user.avatar_v) }}" alt="Profile picture">{% else %}{{ ((user.full_name or 'U').split()|map('first')|join|upper)[:2] }}{% endif %}</span>
+          <span class="avatar-badge" id="avatarBadge"><i class="fa-solid fa-camera"></i></span>
+        </button>
+        <input type="file" id="avatarFile" accept="image/*" hidden>
+        <input type="file" id="avatarCameraFile" accept="image/*" capture="user" hidden>
+        <div class="avatar-identity">
+          <div class="avatar-name">{{ user.full_name }}</div>
+          <span class="badge-status badge-active">{{ user.position or user.role|capitalize }}</span>
+        </div>
+      </form>
+
+      {# action sheet #}
+      <div class="offcanvas offcanvas-bottom avatar-sheet" tabindex="-1" id="avatarSheet" aria-label="Profile picture options">
+        <div class="offcanvas-body">
+          <button type="button" class="sheet-item" data-avatar="camera"><i class="fa-solid fa-camera"></i> Take Photo</button>
+          <button type="button" class="sheet-item" data-avatar="upload"><i class="fa-regular fa-images"></i> Upload Photo</button>
+          {% if user.avatar %}
+          <button type="button" class="sheet-item" data-avatar="view"><i class="fa-regular fa-eye"></i> See Profile Picture</button>
+          <button type="button" class="sheet-item sheet-danger" data-avatar="remove"><i class="fa-regular fa-trash-can"></i> Remove Profile Picture</button>
+          {% endif %}
+        </div>
+      </div>
+
+      {# See Profile Picture #}
+      <div class="modal fade" id="avatarViewModal" tabindex="-1" aria-label="Profile picture" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered avatar-view-dialog">
+          <div class="modal-content avatar-view">
+            <button type="button" class="btn-close btn-close-white avatar-view-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            {% if user.avatar %}<img src="{{ url_for('avatar', user_id=user.id, v=user.avatar_v) }}" alt="Profile picture of {{ user.full_name }}">{% endif %}
+          </div>
+        </div>
+      </div>
+
+      {# Take Photo with the computer's camera #}
+      <div class="modal fade" id="avatarCameraModal" tabindex="-1" aria-label="Take photo" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="fa-solid fa-camera text-primary me-2"></i>Take Photo</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+              <div class="avatar-camera"><video id="avatarVideo" autoplay playsinline muted></video></div>
+              <p class="text-muted small mt-2 mb-0">Center your face in the circle.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-blue" id="avatarCapture"><i class="fa-solid fa-camera me-1"></i> Capture</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form method="POST" action="{{ url_for('update_profile') }}" class="needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
@@ -86,6 +147,100 @@
   }
   [cur, pw, confirm].forEach(function (el) { el.addEventListener('input', check); });
   pw.form.addEventListener('submit', check, true);
+})();
+
+// profile picture (admin and staff), same as the GSU-GO app: the sheet offers
+// Take Photo / Upload Photo / See / Remove. A new picture is cropped to a
+// centred square, shrunk to a 256 px JPEG and saved right away.
+(function () {
+  const MAX_SOURCE_BYTES = 10 * 1024 * 1024;  // reject obviously wrong files early
+  const SIZE = 256;
+  const form = document.getElementById('avatarForm'), file = document.getElementById('avatarFile'),
+        cameraFile = document.getElementById('avatarCameraFile'), data = document.getElementById('avatarData'),
+        action = document.getElementById('avatarAction'), preview = document.getElementById('avatarPreview'),
+        badge = document.getElementById('avatarBadge'), sheetEl = document.getElementById('avatarSheet'),
+        cameraEl = document.getElementById('avatarCameraModal'), video = document.getElementById('avatarVideo');
+  if (!form || !window.bootstrap) return;
+  const sheet = bootstrap.Offcanvas.getOrCreateInstance(sheetEl);
+  const cameraModal = bootstrap.Modal.getOrCreateInstance(cameraEl);
+  let saving = false, stream = null;
+
+  const fail = function (msg) {
+    saving = false;
+    badge.innerHTML = '<i class="fa-solid fa-camera"></i>';
+    if (window.showToast) showToast(msg, 'danger'); else alert(msg);
+  };
+  // draw the centred square of `source` (w x h) and save it
+  const saveSquare = function (source, w, h, mirror) {
+    const side = Math.min(w, h);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';  // transparent PNGs get a white background
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    if (mirror) { ctx.translate(SIZE, 0); ctx.scale(-1, 1); }  // camera preview is shown like a mirror
+    ctx.drawImage(source, (w - side) / 2, (h - side) / 2, side, side, 0, 0, SIZE, SIZE);
+    data.value = canvas.toDataURL('image/jpeg', 0.85);
+    action.value = '';
+    preview.innerHTML = '<img alt="Profile picture">';
+    preview.firstChild.src = data.value;
+    saving = true;
+    badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    form.submit();
+  };
+  const fromFile = function (input) {
+    const f = input.files && input.files[0];
+    input.value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) return fail('Please choose an image file.');
+    if (f.size > MAX_SOURCE_BYTES) return fail('That image is too large. Please choose one under 10MB.');
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = function () { URL.revokeObjectURL(url); saveSquare(img, img.naturalWidth, img.naturalHeight); };
+    img.onerror = function () { URL.revokeObjectURL(url); fail('That file is not a readable image.'); };
+    img.src = url;
+  };
+  file.addEventListener('change', function () { fromFile(file); });
+  cameraFile.addEventListener('change', function () { fromFile(cameraFile); });
+
+  // Take Photo: the computer's camera in a window; phones (or no camera
+  // access, e.g. http on another PC) use the phone camera through the file input
+  const stopCamera = function () {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null;
+    video.srcObject = null;
+  };
+  const takePhoto = function () {
+    const canUseCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.isSecureContext
+      && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!canUseCamera) { cameraFile.click(); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } }, audio: false })
+      .then(function (s) { stream = s; video.srcObject = s; cameraModal.show(); })
+      .catch(function () { fail('The camera could not be opened. Allow camera access in the browser, or use Upload Photo.'); });
+  };
+  document.getElementById('avatarCapture').addEventListener('click', function () {
+    if (!video.videoWidth) return;
+    const w = video.videoWidth, h = video.videoHeight;
+    cameraModal.hide();
+    saveSquare(video, w, h, true);
+  });
+  cameraEl.addEventListener('hidden.bs.modal', stopCamera);
+  window.addEventListener('pagehide', stopCamera);
+
+  sheetEl.addEventListener('click', function (e) {
+    const item = e.target.closest('[data-avatar]');
+    if (!item || saving) return;
+    const what = item.dataset.avatar;
+    sheet.hide();
+    if (what === 'upload') file.click();
+    else if (what === 'camera') takePhoto();
+    else if (what === 'view') bootstrap.Modal.getOrCreateInstance(document.getElementById('avatarViewModal')).show();
+    else if (what === 'remove') {
+      action.value = 'remove';
+      data.value = '';
+      saving = true;
+      form.submit();
+    }
+  });
 })();
 </script>
 {% endblock %}

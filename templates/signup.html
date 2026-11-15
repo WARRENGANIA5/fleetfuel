@@ -18,7 +18,7 @@ try {
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=89) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=95) }}" rel="stylesheet">
 <style>
   /* cross-fade between login and sign-up */
   @view-transition { navigation: auto; }
@@ -57,7 +57,7 @@ try {
         <label class="auth-label" for="full_name">Full Name</label>
         <div class="auth-input">
           <i class="fa-regular fa-user field-icon"></i>
-          <input type="text" class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" placeholder="Swizzy" minlength="2" maxlength="100" required>
+          <input type="text" class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" placeholder="Enter your full name" minlength="2" maxlength="100" required>
         </div>
         <div class="invalid-feedback">Enter your full name.</div>
       </div>
@@ -66,7 +66,7 @@ try {
           <label class="auth-label" for="username">Username</label>
           <div class="auth-input">
             <i class="fa-solid fa-at field-icon"></i>
-            <input type="text" class="form-control" id="username" name="username" value="{{ form.get('username', '') }}" placeholder="swizzy" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
+            <input type="text" class="form-control" id="username" name="username" value="{{ form.get('username', '') }}" placeholder="Choose a username" pattern="[A-Za-z0-9_.\-]{3,50}" maxlength="50" required>
           </div>
           <div class="field-hint" id="usernameHint" aria-live="polite"></div>
         </div>
@@ -74,7 +74,7 @@ try {
           <label class="auth-label" for="email">Email Address</label>
           <div class="auth-input">
             <i class="fa-regular fa-envelope field-icon"></i>
-            <input type="email" class="form-control" id="email" name="email" value="{{ form.get('email', '') }}" placeholder="swizzy@gmail.com" maxlength="120" required>
+            <input type="email" class="form-control" id="email" name="email" value="{{ form.get('email', '') }}" placeholder="Enter your email address" maxlength="120" required>
           </div>
           <div class="field-hint" id="emailHint" aria-live="polite"></div>
         </div>
@@ -111,14 +111,13 @@ try {
     </form>
     <div class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Log in</a></div>
   </div>
-  <div class="card-beam" aria-hidden="true"><i class="beam beam-a"></i><i class="beam beam-b"></i></div>
   <span class="glass-shard shard-br" aria-hidden="true"><i></i></span>
   </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=50) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=52) }}"></script>
 <script>
 // live checks: username/email on the server, password rules here
 (function () {

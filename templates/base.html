@@ -10,7 +10,7 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=89) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=95) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -98,7 +98,7 @@
           </div>
         </div>
         <a href="{{ url_for('settings') }}" class="user-chip" title="Account Settings">
-          <div class="user-avatar" id="topbarAvatarInitial">{{ (session.get('full_name') or 'U')[0]|upper }}</div>
+          <div class="user-avatar" id="topbarAvatarInitial">{% if session.get('avatar_v') %}<img src="{{ url_for('avatar', user_id=session['user_id'], v=session['avatar_v']) }}" alt="">{% else %}{{ (session.get('full_name') or 'U')[0]|upper }}{% endif %}</div>
           <div class="user-meta">
             <span class="user-name">{{ session.get('full_name', 'User') }}</span>
             <span class="user-role">{{ session.get('position') or session.get('role', 'staff')|capitalize }}</span>
@@ -146,7 +146,7 @@
 <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=50) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=52) }}"></script>
 <div id="pageScripts" hidden>{% block extra_scripts %}{% endblock %}</div>
 </body>
 </html>

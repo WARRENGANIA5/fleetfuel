@@ -158,6 +158,7 @@ def login_required(view):
         session["username"], session["full_name"] = user["username"], user["full_name"]
         session["role"] = effective_role(user)
         session["position"] = user["position"] or ""
+        session["avatar_v"] = user.get("avatar_v") if user.get("avatar") else None
         # still on a default password, force a change first
         if session.get("must_change_pw") and request.endpoint not in _ALLOWED_BEFORE_PW_CHANGE:
             if request.path.startswith("/api/"):
@@ -398,6 +399,7 @@ def start_session(user):
     session["role"] = effective_role(user)
     session["position"] = user["position"] or ""
     session["pw_sig"] = password_signature(user["password_hash"])
+    session["avatar_v"] = user.get("avatar_v") if user.get("avatar") else None
 
 
 def wait_for_approval(user):
@@ -453,8 +455,11 @@ SIGNUP_LIMIT_PER_HOUR = 5
 
 
 def find_user(username):
-    """Account with this exact username."""
-    return next((u for u in db.records("users") if u["username"] == username), None)
+    """Account with this username. Usernames are unique ignoring case, so
+    "Admin1114" finds admin1114 too (an exact match wins)."""
+    rows = db.records("users")
+    return (next((u for u in rows if u["username"] == username), None)
+            or next((u for u in rows if u["username"].lower() == username.lower()), None))
 
 
 def username_taken(username, except_id=None):
@@ -664,7 +669,10 @@ def build_dashboard_context():
         ym = t["trip_date"].strftime("%Y-%m")
         totals[ym] = totals.get(ym, 0.0) + float(t["actual_fuel_consumption"])
     has_fuel_records = bool(fuel_trips or dataset["count"])
-    fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") for y, m in months] if has_fuel_records else []
+    # the current month is not over yet, so its total is still low; say so
+    this_month = (today_local().year, today_local().month)
+    fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") + (" (so far)" if (y, m) == this_month else "")
+                         for y, m in months] if has_fuel_records else []
     fuel_trend_values = [round(totals.get(f"{y:04d}-{m:02d}", 0.0), 2) for y, m in months] if has_fuel_records else []
     fuel_trend_months = [f"{y:04d}-{m:02d}" for y, m in months] if has_fuel_records else []  # click -> that month's trips
 
@@ -1291,6 +1299,8 @@ TRIP_NUMERIC_LIMITS = (
     ("distance_km", "Distance traveled", 0, 1000),
     ("actual_fuel_consumption", "Fuel consumed", 0, 1000),
 )
+# "1,234.5" is fine; a comma anywhere else ("1,0,0") is a typo
+THOUSANDS_RE = re.compile(r"\d{1,3}(,\d{3})+(\.\d*)?")
 # Outside this L/100 km range a trip still saves, but with a warning.
 TRIP_EFFICIENCY_WARN = (3, 60)
 
@@ -1358,9 +1368,11 @@ def validate_trip_form(f, trip_id=None):
         errors.append("Date of travel must be a valid date.")
     values = {}
     for field, label, lo, hi in TRIP_NUMERIC_LIMITS:
-        raw = (f.get(field) or "").strip().replace(",", "")
+        raw = (f.get(field) or "").strip()
         try:
-            value = float(raw)
+            if "," in raw and not THOUSANDS_RE.fullmatch(raw):
+                raise ValueError
+            value = float(raw.replace(",", ""))
             # NaN check
             if value != value or not lo < value <= hi:
                 raise ValueError
@@ -2030,7 +2042,59 @@ def api_me():
     return {
         "username": user["username"], "full_name": user["full_name"], "email": user["email"] or "",
         "role": user["position"] or user["role"].capitalize(), "position": user["position"] or "", "initial": (user["full_name"] or "U")[0].upper(),
+        "avatar": avatar_url(user) or "",
     }
+
+
+# Profile picture: the browser crops and shrinks it to a 256 px JPEG; it is kept
+# in the user's Firestore record so it also works on the read-only online link.
+AVATAR_MAX_BYTES = 150_000
+AVATAR_PREFIX = "data:image/jpeg;base64,"
+
+
+def avatar_url(user):
+    if not user or not user.get("avatar"):
+        return None
+    return url_for("avatar", user_id=user["id"], v=user.get("avatar_v") or 0)
+
+
+@app.route("/avatar/<int:user_id>")
+@login_required
+def avatar(user_id):
+    import base64
+    user = db.get("users", user_id)
+    if not user or not user.get("avatar"):
+        return {"error": "not_found"}, 404
+    # the URL changes with each new picture, so it can be cached for long
+    return Response(base64.b64decode(user["avatar"]), mimetype="image/jpeg",
+                    headers={"Cache-Control": "private, max-age=31536000"})
+
+
+@app.route("/settings/avatar", methods=["POST"])
+@login_required
+def update_avatar():
+    import base64
+    import binascii
+    if request.form.get("action") == "remove":
+        db.update("users", session["user_id"], avatar=None, avatar_v=None)
+        session["avatar_v"] = None
+        flash("Profile picture removed.", "success")
+        return redirect(url_for("settings"))
+    raw = request.form.get("avatar_data") or ""
+    try:
+        if not raw.startswith(AVATAR_PREFIX):
+            raise ValueError
+        data = base64.b64decode(raw[len(AVATAR_PREFIX):], validate=True)
+        if not data.startswith(b"\xff\xd8\xff") or len(data) > AVATAR_MAX_BYTES:  # JPEG
+            raise ValueError
+    except (ValueError, binascii.Error):
+        flash("Could not save the picture. Choose a JPG or PNG image and try again.", "danger")
+        return redirect(url_for("settings"))
+    version = int(time.time())
+    db.update("users", session["user_id"], avatar=base64.b64encode(data).decode("ascii"), avatar_v=version)
+    session["avatar_v"] = version
+    flash("Profile picture updated.", "success")
+    return redirect(url_for("settings"))
 
 
 @app.route("/settings/profile", methods=["POST"])

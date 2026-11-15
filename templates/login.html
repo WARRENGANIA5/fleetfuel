@@ -18,7 +18,7 @@ try {
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=89) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=95) }}" rel="stylesheet">
 <style>
   /* cross-fade between login and sign-up */
   @view-transition { navigation: auto; }
@@ -79,14 +79,13 @@ try {
     <div class="auth-switch">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></div>
     <div class="auth-help">Forgot your password? Ask the administrator.</div>
   </div>
-  <div class="card-beam" aria-hidden="true"><i class="beam beam-a"></i><i class="beam beam-b"></i></div>
   <span class="glass-shard shard-br" aria-hidden="true"><i></i></span>
   </div>
   <div class="login-footer">&copy; {{ current_year }} {{ org.org_name }} &middot; {{ org.office_name }}</div>
 </div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=50) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=52) }}"></script>
 <script>
 // Caps Lock warning
 (function () {

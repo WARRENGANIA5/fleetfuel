@@ -33,7 +33,8 @@ DATE_FIELDS = {"trip_date"}
 # Default value for every field so rows never miss a key.
 FIELDS = {
     "users": {"username": None, "password_hash": None, "full_name": None, "position": None,
-              "email": None, "role": "staff", "status": "active", "notif_seen_at": None, "created_at": None},
+              "email": None, "role": "staff", "status": "active", "notif_seen_at": None, "created_at": None,
+              "avatar": None, "avatar_v": None},   # profile picture: base64 JPEG + version
     "vehicles": {"plate_number": None, "brand_model": None, "fuel_type": None, "engine_power_kw": None,
                  "created_at": None, "updated_at": None},
     "trip_records": {"vehicle_id": None, "trip_date": None, "distance_km": None,
