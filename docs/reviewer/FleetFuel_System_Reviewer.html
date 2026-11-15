@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetFuel System Reviewer</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.3pt; line-height: 1.45; color: #1d2433; background: #fff; margin: 0; }
+  h1 { font-size: 21pt; margin: 0 0 4px; color: #7a1f2b; }
+  h2 { font-size: 13.5pt; color: #fff; background: #7a1f2b; padding: 5px 10px; margin: 20px 0 8px; border-radius: 4px; page-break-after: avoid; }
+  h3 { font-size: 11pt; color: #7a1f2b; margin: 12px 0 4px; page-break-after: avoid; }
+  p { margin: 4px 0 6px; }
+  .sub { color: #555; font-size: 10.5pt; margin-bottom: 2px; }
+  .cover { border: 2px solid #c9a227; border-radius: 8px; padding: 16px 18px; margin-bottom: 8px; background: #fdf9ef; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.4pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: #f1e6c8; text-align: left; padding: 4px 6px; border: 1px solid #d8cba5; }
+  td { padding: 4px 6px; border: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: #f3f3f3; padding: 0 3px; border-radius: 3px; }
+  .eq { font-family: Cambria, "Times New Roman", serif; font-size: 11.5pt; background: #f6f1e3; border-left: 4px solid #c9a227; padding: 6px 10px; margin: 6px 0; }
+  .box { border: 1px solid #c9d3e3; background: #f4f7fb; border-radius: 5px; padding: 6px 10px; margin: 6px 0; }
+  .tip { border-left: 4px solid #2f6db3; }
+  ul, ol { margin: 3px 0 6px 18px; padding: 0; }
+  li { margin: 1px 0; }
+  .qa p.q { font-weight: 600; margin: 8px 0 1px; color: #7a1f2b; }
+  .qa p.a { margin: 0 0 4px 12px; }
+  .cols { display: flex; gap: 12px; }
+  .cols > div { flex: 1; }
+  .flow { font-family: Consolas, monospace; font-size: 9pt; background: #f3f3f3; padding: 8px 10px; border-radius: 4px; white-space: pre; line-height: 1.35; }
+  .small { font-size: 8.8pt; color: #555; }
+  .pb { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>FleetFuel System Reviewer</h1>
+  <div class="sub"><b>Performance of Linear Regression Model in Predicting Fuel Consumption for the Government Fleets</b></div>
+  <div class="sub">Guimaras State University — General Services Office (GSO) · Prepared 15 November 2026</div>
+  <p class="small" style="margin-top:8px">A study guide on everything used to build the system: languages, frameworks, libraries, database, machine-learning method, data, tools, security and deployment, followed by practice defense questions.</p>
+</div>
+
+<h2>1. The System at a Glance</h2>
+<table>
+  <tr><th style="width:28%">Item</th><th>Answer</th></tr>
+  <tr><td>System name</td><td>FleetFuel (GSU Fleet Fuel Consumption Prediction System)</td></tr>
+  <tr><td>Purpose</td><td>Predict the fuel (liters) a university vehicle will consume on a planned trip, so the GSO can release the right amount of fuel and monitor actual use.</td></tr>
+  <tr><td>Users</td><td>Administrator (one account, <code>admin1114</code>) and GSO / motorpool staff</td></tr>
+  <tr><td>Type of system</td><td>Web-based information system with a built-in machine-learning model</td></tr>
+  <tr><td>Algorithm</td><td>Multiple Linear Regression (with one interaction term)</td></tr>
+  <tr><td>Methodology</td><td>CRISP-DM (Cross-Industry Standard Process for Data Mining)</td></tr>
+  <tr><td>Database</td><td>Google Firebase Cloud Firestore (NoSQL, cloud)</td></tr>
+  <tr><td>Where it runs</td><td>Office server PC on the GSO network (<code>http://&lt;server-IP&gt;:5000</code>) and online at <b>https://gsu-fleetfuel.vercel.app</b></td></tr>
+  <tr><td>Model accuracy</td><td>R² = 0.8877 · MAE = 1.98 L · RMSE = 2.89 L · 5-fold CV mean R² = 0.8879</td></tr>
+</table>
+
+<h2>2. Complete Technology Stack</h2>
+
+<h3>2.1 Programming and markup languages</h3>
+<table>
+  <tr><th style="width:22%">Language</th><th>Where / what for</th></tr>
+  <tr><td><b>Python 3</b> (3.10+)</td><td>The whole back end: web server (Flask), data layer, preprocessing, model training, statistical tests, backups, dataset builders.</td></tr>
+  <tr><td><b>HTML5</b></td><td>Page structure, written as Jinja2 templates in <code>templates/</code> (login, dashboard, prediction, trips, vehicles, users, settings, model performance, etc.).</td></tr>
+  <tr><td><b>CSS3</b></td><td>Design and light/dark themes in <code>static/css/style.css</code> (CSS variables, responsive layout, glass-style cards).</td></tr>
+  <tr><td><b>JavaScript</b> (ES6)</td><td>Interactivity in <code>static/js/script.js</code>: live refresh with <code>fetch()</code>, notifications bell, charts, live sign-up checks, theme switch, modals.</td></tr>
+  <tr><td><b>Jinja2</b> (template language)</td><td>Inserts server data into HTML; shared layout <code>base.html</code> with partials (<code>_theme_init</code>, <code>_theme_switch</code>, <code>_auth_bg</code>).</td></tr>
+  <tr><td><b>JSON</b> (data format)</td><td>Firestore stores documents (JSON-like); <code>metrics.json</code> stores the model results; backups are <code>.json</code>.</td></tr>
+  <tr><td>Windows Batch &amp; PowerShell</td><td>Server scripts: <code>start_server.bat</code>, <code>stop_server.bat</code>, <code>install_autostart.bat</code>, <code>allow_network_access.bat</code>, <code>fleetfuel_watcher.ps1</code>.</td></tr>
+  <tr><td>SVG</td><td>The round seal logo (<code>static/images/seal.svg</code>) and the thesis diagrams.</td></tr>
+</table>
+
+<h3>2.2 Back-end framework and Python libraries (web app — <code>requirements.txt</code>)</h3>
+<table>
+  <tr><th style="width:22%">Library</th><th style="width:10%">Version</th><th>Role in the system</th></tr>
+  <tr><td><b>Flask</b></td><td>3.0.3</td><td>Python micro web framework: URL routes, sessions, templates, JSON APIs. Main file <code>app.py</code>.</td></tr>
+  <tr><td><b>Werkzeug</b></td><td>3.0.3</td><td>Flask's toolkit: password hashing (<code>generate_password_hash</code> / <code>check_password_hash</code>, scrypt), <code>ProxyFix</code> for HTTPS hosting.</td></tr>
+  <tr><td><b>Flask-WTF</b></td><td>1.2.1</td><td>CSRF protection (<code>CSRFProtect</code>) on every form that changes data.</td></tr>
+  <tr><td><b>firebase-admin</b></td><td>7.7.0</td><td>Official Firebase Admin SDK: connects the server to Cloud Firestore with a service-account key; real-time snapshot listeners.</td></tr>
+  <tr><td><b>Pandas</b></td><td>2.2.2</td><td>Reading CSV files, merging trips with vehicles, cleaning, tables for training and display.</td></tr>
+  <tr><td><b>NumPy</b></td><td>1.26.4</td><td>Numerical arrays and math (residuals, ranges, statistics).</td></tr>
+  <tr><td><b>scikit-learn</b></td><td>1.5.1</td><td><code>LinearRegression</code>, <code>Pipeline</code>, <code>train_test_split</code>, <code>KFold</code>, <code>cross_validate</code>, R²/MAE/RMSE metrics, custom transformer (<code>TermEncoder</code>).</td></tr>
+  <tr><td><b>Joblib</b></td><td>1.4.2</td><td>Saves/loads the trained model file <code>linear_regression_pipeline.joblib</code>; Flask loads it to predict without retraining.</td></tr>
+  <tr><td><b>python-dotenv</b></td><td>1.0.1</td><td>Reads secret settings (<code>SECRET_KEY</code>, Firebase key path) from the <code>.env</code> file.</td></tr>
+</table>
+
+<h3>2.3 Training, statistics and server libraries (<code>requirements-train.txt</code>)</h3>
+<table>
+  <tr><th style="width:22%">Library</th><th style="width:10%">Version</th><th>Role</th></tr>
+  <tr><td><b>Statsmodels</b></td><td>0.14.5</td><td>Regression diagnostics: VIF, Ramsey RESET, Durbin-Watson, Jarque-Bera, Breusch-Pagan, OLS with HC3 robust standard errors (p-values).</td></tr>
+  <tr><td><b>Matplotlib</b></td><td>3.9.0</td><td>Draws the evaluation figures saved in <code>reports/figures/</code>.</td></tr>
+  <tr><td><b>Seaborn</b></td><td>0.13.2</td><td>Statistical plots on top of Matplotlib (correlation heatmap, residual histogram).</td></tr>
+  <tr><td><b>Waitress</b></td><td>3.0.2</td><td>Production WSGI server that runs the Flask app on the office server PC (instead of Flask's development server).</td></tr>
+</table>
+
+<h3>2.4 Front-end libraries (stored offline in <code>static/vendor/</code>)</h3>
+<table>
+  <tr><th style="width:22%">Library</th><th>Role</th></tr>
+  <tr><td><b>Bootstrap 5</b></td><td>Responsive CSS framework and JS components: grid, navbar/sidebar, cards, modals, forms, tables, alerts.</td></tr>
+  <tr><td><b>Chart.js</b></td><td>Live charts on the Dashboard and Model Performance (fuel trends, actual vs. predicted, etc.).</td></tr>
+  <tr><td><b>Font Awesome</b></td><td>Icons (menu, bell, car, gas pump, user, etc.).</td></tr>
+  <tr><td><b>Poppins</b> (Google Font)</td><td>The typeface of the whole interface.</td></tr>
+</table>
+<p class="small">They are copied into the project (not loaded from the internet), so the pages still look right on the office network without internet.</p>
+
+<h3>2.5 Database and cloud services</h3>
+<table>
+  <tr><th style="width:22%">Service</th><th>Role</th></tr>
+  <tr><td><b>Firebase Cloud Firestore</b></td><td>Cloud NoSQL document database (free Spark plan: 50,000 reads/day). Stores users, vehicles, trips, predictions, notifications.</td></tr>
+  <tr><td><b>Google Colab</b></td><td>Free online Jupyter notebook used to train the model (<code>colab/fuel_consumption_linear_regression.ipynb</code>); its model file is uploaded back into the system.</td></tr>
+  <tr><td><b>GitHub</b></td><td>Stores the source code (Git repository); the <code>main</code> branch is deployed online.</td></tr>
+  <tr><td><b>Vercel</b></td><td>Hosts the online link <b>gsu-fleetfuel.vercel.app</b> as a Python serverless function (<code>api/index.py</code>, <code>vercel.json</code>, region Tokyo <code>hnd1</code>); auto-deploys on every push to GitHub <code>main</code>.</td></tr>
+</table>
+
+<h3>2.6 Development tools</h3>
+<table>
+  <tr><th style="width:22%">Tool</th><th>Used for</th></tr>
+  <tr><td>Visual Studio Code</td><td>Code editor (with Claude Code AI assistant extension).</td></tr>
+  <tr><td>Git</td><td>Version control (commits, branches).</td></tr>
+  <tr><td>Python venv + pip</td><td>Isolated virtual environment (<code>venv/</code>) and installing the libraries.</td></tr>
+  <tr><td>Web browser (Edge/Chrome)</td><td>Testing the system at <code>http://127.0.0.1:5000</code>.</td></tr>
+  <tr><td>Firebase Console</td><td>Creating the Firestore database and the service-account key.</td></tr>
+  <tr><td>Jupyter Notebook (.ipynb)</td><td>The training notebook format used in Colab.</td></tr>
+  <tr><td>Windows Task / Startup scripts</td><td>Auto-start of the server when Windows signs in; firewall rule for port 5000.</td></tr>
+</table>
+
+<h3>2.7 Libraries installed automatically with the main ones (dependencies)</h3>
+<table>
+  <tr><th style="width:24%">Library</th><th>Comes with / used for</th></tr>
+  <tr><td><b>Jinja2</b></td><td>Installed with Flask — renders the HTML templates.</td></tr>
+  <tr><td><b>ItsDangerous</b></td><td>Installed with Flask — signs the session cookie so it cannot be tampered with.</td></tr>
+  <tr><td><b>Click</b>, <b>Blinker</b>, <b>MarkupSafe</b></td><td>Installed with Flask — command line, signals, safe HTML escaping (prevents XSS).</td></tr>
+  <tr><td><b>WTForms</b></td><td>Installed with Flask-WTF — the CSRF token handling.</td></tr>
+  <tr><td><b>google-cloud-firestore</b>, <b>google-api-core</b>, <b>google-auth</b>, <b>gRPC</b>, <b>protobuf</b></td><td>Installed with firebase-admin — the actual Firestore client, error types (<code>AlreadyExists</code>, <code>Conflict</code>), authentication with the service account, network protocol.</td></tr>
+  <tr><td><b>SciPy</b></td><td>Installed with scikit-learn/statsmodels — <code>scipy.stats.norm.ppf</code> for the residual Q-Q plot on Model Performance; statistical distributions inside statsmodels.</td></tr>
+  <tr><td><b>threadpoolctl</b></td><td>Installed with scikit-learn — controls CPU threads.</td></tr>
+  <tr><td><b>patsy</b></td><td>Installed with statsmodels — model formulas.</td></tr>
+  <tr><td><b>python-dateutil</b>, <b>pytz</b>, <b>tzdata</b></td><td>Installed with pandas — date handling; <code>dateutil.easter</code> is used to skip holidays when building the trip dataset.</td></tr>
+  <tr><td><b>Pillow</b>, <b>contourpy</b>, <b>cycler</b>, <b>fonttools</b>, <b>kiwisolver</b>, <b>pyparsing</b></td><td>Installed with Matplotlib — image saving (PNG) and drawing.</td></tr>
+</table>
+
+<h3>2.8 Python standard-library modules used in the back end</h3>
+<table>
+  <tr><th style="width:24%">Module</th><th>Used for</th></tr>
+  <tr><td><code>os</code>, <code>sys</code></td><td>File paths, environment variables, command-line arguments.</td></tr>
+  <tr><td><code>json</code></td><td>Reading/writing <code>metrics.json</code>, backups and API responses.</td></tr>
+  <tr><td><code>datetime</code>, <code>timezone</code>, <code>timedelta</code></td><td>Dates of travel, timestamps, Philippine time (UTC+08:00).</td></tr>
+  <tr><td><code>threading</code></td><td>Locks for safe data access; background threads (24-hour backup scheduler, Firestore listeners).</td></tr>
+  <tr><td><code>time</code></td><td>Retry delays, login lockout timing.</td></tr>
+  <tr><td><code>hashlib</code></td><td>Password-change signature (signs out old sessions); SHA-256 checks of the downloaded datasets.</td></tr>
+  <tr><td><code>secrets</code></td><td>Generating secure random keys/tokens.</td></tr>
+  <tr><td><code>re</code></td><td>Regular expressions for validating username, email, plate number, password rules.</td></tr>
+  <tr><td><code>functools.wraps</code></td><td>Building the <code>login_required</code> / <code>admin_required</code> decorators.</td></tr>
+  <tr><td><code>io</code></td><td>In-memory files for CSV downloads and model uploads.</td></tr>
+  <tr><td><code>copy</code></td><td>Copying records in the in-memory data store.</td></tr>
+  <tr><td><code>socket</code></td><td>Finding the server PC's network IP address to print the LAN link.</td></tr>
+  <tr><td><code>subprocess</code></td><td>Re-starting <code>app.py</code> inside the virtual environment (venv).</td></tr>
+  <tr><td><code>math</code>, <code>warnings</code></td><td>Calculations and silencing harmless warnings in the diagnostics.</td></tr>
+  <tr><td><code>textwrap</code>, <code>xml.sax.saxutils</code></td><td>Drawing the SVG thesis diagrams (<code>docs/diagrams/</code>).</td></tr>
+</table>
+
+<h3>2.9 Flask features used</h3>
+<table>
+  <tr><th style="width:24%">Feature</th><th>Used for</th></tr>
+  <tr><td><code>@app.route</code></td><td>Defines every page and API URL (GET and POST).</td></tr>
+  <tr><td><code>render_template</code></td><td>Shows the Jinja2 pages.</td></tr>
+  <tr><td><code>request</code></td><td>Reads form fields, query strings and uploaded files.</td></tr>
+  <tr><td><code>session</code></td><td>Keeps the logged-in user (signed cookie).</td></tr>
+  <tr><td><code>redirect</code>, <code>url_for</code></td><td>Moves the user to another page after an action.</td></tr>
+  <tr><td><code>flash</code></td><td>One-time success/error messages ("Trip added", etc.).</td></tr>
+  <tr><td><code>g</code>, <code>current_app</code>, <code>has_app_context</code></td><td>Per-request data and app settings inside <code>db.py</code>.</td></tr>
+  <tr><td><code>Response</code> / JSON</td><td>CSV downloads and the JSON data for live refresh.</td></tr>
+  <tr><td><code>@app.context_processor</code>, <code>@app.errorhandler</code></td><td>Values shared by all templates (user, notifications count); custom error pages (404, 413 file too large, 500, CSRF).</td></tr>
+  <tr><td>Decorators</td><td><code>login_required</code>, <code>admin_required</code> (role-based access control).</td></tr>
+</table>
+
+<h3>2.10 Firebase / Firestore features used</h3>
+<table>
+  <tr><th style="width:24%">Feature</th><th>Used for</th></tr>
+  <tr><td><code>credentials.Certificate</code> + <code>initialize_app</code></td><td>Server logs in with the private service-account key (<code>firebase-key.json</code>).</td></tr>
+  <tr><td><code>collection().document()</code></td><td><code>.set()</code> save, <code>.update()</code> edit, <code>.delete()</code> remove, <code>.create()</code> add with a new numeric ID, <code>.stream()</code> read all.</td></tr>
+  <tr><td><code>on_snapshot</code> (snapshot listener)</td><td>Real-time sync: Firestore pushes every change to the server's in-memory copy.</td></tr>
+  <tr><td><code>firestore.Increment</code></td><td>Atomic change counter (<code>_counters/_changes</code>).</td></tr>
+  <tr><td>Offline fallback</td><td>If Firestore cannot be reached, the app reads the newest JSON backup (read-only) and reconnects later.</td></tr>
+  <tr><td>Memory backend</td><td><code>DB_BACKEND=memory</code> — in-memory database used for testing.</td></tr>
+</table>
+
+<h3>2.11 Models used in the system</h3>
+<div class="box"><b>Only one prediction model is used: Multiple Linear Regression.</b> No other algorithm (Random Forest, Decision Tree, SVR, Ridge, Lasso, XGBoost, neural network) is in the system.</div>
+<table>
+  <tr><th style="width:28%">Model / class</th><th style="width:18%">Library</th><th>Role</th></tr>
+  <tr><td><b><code>LinearRegression</code></b></td><td>scikit-learn</td><td><b>The prediction model</b> — Ordinary Least Squares; fitted on the training set; predicts liters.</td></tr>
+  <tr><td><b><code>Pipeline</code></b></td><td>scikit-learn</td><td>Bundles <code>TermEncoder</code> → <code>LinearRegression</code> into one saved model (<code>linear_regression_pipeline.joblib</code>).</td></tr>
+  <tr><td><b><code>TermEncoder</code></b> (custom)</td><td>own code, based on <code>BaseEstimator</code> + <code>TransformerMixin</code></td><td>Preprocessing step: encodes fuel type (1/0), mean-centers distance and power, creates Distance × Power.</td></tr>
+  <tr><td><code>sm.OLS</code> (statsmodels)</td><td>statsmodels</td><td><b>Statistical check only</b>, not used to predict: the same regression refitted to get p-values with HC3 robust standard errors and the assumption tests.</td></tr>
+  <tr><td><code>train_test_split</code></td><td>scikit-learn</td><td>80% training / 20% testing split (random_state = 42).</td></tr>
+  <tr><td><code>KFold</code>, <code>cross_validate</code>, <code>cross_val_score</code></td><td>scikit-learn</td><td>5-fold cross-validation (shuffle, random_state = 42).</td></tr>
+  <tr><td><code>r2_score</code>, <code>mean_absolute_error</code>, <code>mean_squared_error</code></td><td>scikit-learn</td><td>R², MAE and RMSE (√MSE).</td></tr>
+  <tr><td><code>variance_inflation_factor</code></td><td>statsmodels</td><td>VIF (multicollinearity).</td></tr>
+  <tr><td><code>linear_reset</code></td><td>statsmodels</td><td>Ramsey RESET (linearity).</td></tr>
+  <tr><td><code>durbin_watson</code></td><td>statsmodels</td><td>Independence of errors.</td></tr>
+  <tr><td><code>jarque_bera</code></td><td>statsmodels</td><td>Normality of errors.</td></tr>
+  <tr><td><code>het_breuschpagan</code></td><td>statsmodels</td><td>Equal variance (homoscedasticity).</td></tr>
+  <tr><td><code>joblib.dump</code> / <code>joblib.load</code></td><td>Joblib</td><td>Save and load the trained pipeline.</td></tr>
+</table>
+
+<h3>2.12 File formats used</h3>
+<table>
+  <tr><th style="width:24%">Format</th><th>Where</th></tr>
+  <tr><td>.py</td><td>All back-end code.</td></tr>
+  <tr><td>.html (Jinja2)</td><td>18 page templates.</td></tr>
+  <tr><td>.css / .js</td><td>Design and interactivity.</td></tr>
+  <tr><td>.csv</td><td>Trip records, vehicle records, supplementary dataset, training downloads.</td></tr>
+  <tr><td>.joblib</td><td>The saved trained model.</td></tr>
+  <tr><td>.json</td><td><code>metrics.json</code>, <code>metrics_colab.json</code>, database backups, API data.</td></tr>
+  <tr><td>.ipynb</td><td>Google Colab training notebooks.</td></tr>
+  <tr><td>.env</td><td>Secret settings (not in Git).</td></tr>
+  <tr><td>.png / .svg / .jpg</td><td>Evaluation figures, logo seal, diagrams, background.</td></tr>
+  <tr><td>.woff2 / .ttf</td><td>Poppins and Font Awesome font files.</td></tr>
+  <tr><td>.bat / .ps1</td><td>Windows server scripts.</td></tr>
+  <tr><td>vercel.json, requirements.txt</td><td>Online deployment settings and library lists.</td></tr>
+</table>
+
+<h3>2.13 Data-building scripts</h3>
+<table>
+  <tr><th style="width:34%">Script</th><th>What it does</th></tr>
+  <tr><td><code>data/build/build_supplementary_dataset.py</code></td><td>Samples the 50,508 Fan &amp; Song gasoline trips (seed 42, 4 distance bands).</td></tr>
+  <tr><td><code>data/build/add_eea_diesel_vans.py</code></td><td>Adds the 49,390 EEA diesel vans; verifies the file with SHA-256.</td></tr>
+  <tr><td><code>data/build/build_trip_records_dataset.py</code></td><td>Builds the 7,496 online-dataset trips following the GSO weekday pattern (no trips on Philippine regular holidays).</td></tr>
+  <tr><td><code>colab/make_colab_files.py</code></td><td>Rebuilds the Colab notebooks and the three training CSV files.</td></tr>
+  <tr><td><code>docs/diagrams/make_diagrams.py</code></td><td>Draws the four CRISP-DM thesis diagrams (SVG/PNG/PDF).</td></tr>
+</table>
+
+<h2 class="pb">3. System Architecture</h2>
+<p>The system uses a <b>client–server, three-layer architecture</b> (presentation, application, data) with the ML model inside the application layer.</p>
+<div class="flow">  BROWSER (HTML + CSS + JS, Bootstrap, Chart.js)
+        |  HTTP requests / fetch() JSON every few seconds
+        v
+  FLASK APP  (app.py, run by Waitress on the server PC, or Vercel online)
+   |-- Routes & login/role checks (login_required, admin_required)
+   |-- Preprocessing (model/preprocess.py)  -->  Joblib model  -->  predicted liters
+   |-- Data layer (db.py): in-memory copy kept fresh by Firestore listeners
+        |
+        v
+  FIREBASE CLOUD FIRESTORE  (users, vehicles, trip_records, predictions, ...)
+
+  GOOGLE COLAB  --trains-->  linear_regression_pipeline.joblib + metrics  --upload-->  Flask</div>
+
+<h3>3.1 Main source files</h3>
+<table>
+  <tr><th style="width:30%">File / folder</th><th>Purpose</th></tr>
+  <tr><td><code>app.py</code></td><td>Flask application: all routes, login, roles, CRUD, predictions, notifications, uploads, backups scheduler.</td></tr>
+  <tr><td><code>config.py</code></td><td>Settings read from <code>.env</code> (secret key, Firebase key, session lifetime 8 h, 5 MB upload limit, file paths).</td></tr>
+  <tr><td><code>db.py</code></td><td>Firestore data layer: load/insert/update/delete, auto IDs, change counter, real-time snapshot listeners, offline fallback from backup.</td></tr>
+  <tr><td><code>trip_dataset.py</code></td><td>Trip Records from the online dataset (7,496 rows) and their saved edits (<code>trip_dataset_changes</code>).</td></tr>
+  <tr><td><code>timeutil.py</code></td><td>Philippine time (UTC+08:00) helpers.</td></tr>
+  <tr><td><code>init_db.py</code></td><td>Checks the Firestore connection and creates the first administrator.</td></tr>
+  <tr><td><code>backup_database.py</code></td><td>Backs up all collections to <code>backups/*.json</code> (keeps newest 30) and restores them.</td></tr>
+  <tr><td><code>model/preprocess.py</code></td><td>Shared preprocessing for training and prediction (encoding, centering, interaction term).</td></tr>
+  <tr><td><code>model/train_model.py</code></td><td>Trains, evaluates and saves the Linear Regression pipeline and <code>metrics.json</code>.</td></tr>
+  <tr><td><code>model/diagnostics.py</code></td><td>VIF and the LINE assumption tests (statsmodels).</td></tr>
+  <tr><td><code>model/evaluate_model.py</code></td><td>Generates the figures for the paper.</td></tr>
+  <tr><td><code>templates/</code>, <code>static/</code></td><td>Jinja2 pages; CSS, JS, images, offline vendor libraries.</td></tr>
+  <tr><td><code>colab/</code></td><td>Colab notebooks and the three training CSV files.</td></tr>
+  <tr><td><code>data/</code></td><td>Local GSO trips, supplementary dataset and the scripts that built them.</td></tr>
+  <tr><td><code>api/index.py</code>, <code>vercel.json</code></td><td>Entry point and settings for the Vercel online deployment.</td></tr>
+  <tr><td><code>scripts/</code></td><td>Windows server scripts (start, stop, auto-start, watcher, firewall).</td></tr>
+</table>
+
+<h2>4. Modules and Features</h2>
+<table>
+  <tr><th style="width:24%">Module (page)</th><th>What it does</th><th style="width:14%">Who</th></tr>
+  <tr><td>Login / Sign up</td><td>Login with lockout (5 failed tries = 15 min). Sign-up with live username/email/password checks; account waits for admin approval and auto-signs in once approved.</td><td>All</td></tr>
+  <tr><td>Dashboard</td><td>Summary cards and Chart.js charts of trips, fuel and predictions; refreshes live.</td><td>All</td></tr>
+  <tr><td>Fuel Prediction</td><td>Select vehicle + enter distance → system takes engine power and fuel type from the vehicle record → predicted liters with a range (± RMSE). Each prediction is a <b>fuel request</b> and auto-adds a Pending trip.</td><td>All</td></tr>
+  <tr><td>Prediction History</td><td>List of fuel requests; admin approves/rejects and sets liters to release; staff record actual fuel after the trip (flagged if outside the predicted range).</td><td>All / Admin</td></tr>
+  <tr><td>Trip Records</td><td>93 GSO trips (SFA 4714) + 7,496 online-dataset trips; search, pages; add/edit/delete.</td><td>View all; edit Admin</td></tr>
+  <tr><td>Vehicle Management</td><td>The 9 fleet vehicles: plate number, model, fuel type, engine power (kW).</td><td>Admin</td></tr>
+  <tr><td>Model Performance</td><td>R², MAE, RMSE, cross-validation, coefficients, VIF, assumption tests, charts; download the 3 training CSVs; upload a model trained in Colab.</td><td>All / upload Admin</td></tr>
+  <tr><td>User Accounts</td><td>Create staff accounts, edit, reset password, approve/reject sign-ups.</td><td>Admin</td></tr>
+  <tr><td>Account Settings</td><td>Change own username, name, email and password; light/dark theme.</td><td>All</td></tr>
+  <tr><td>Notifications bell</td><td>Real-time alerts: pending requests and sign-ups (admin), approved/rejected requests (staff).</td><td>All</td></tr>
+</table>
+
+<h3>4.1 All routes (URLs) of the back end</h3>
+<table>
+  <tr><th style="width:42%">Page routes</th><th>JSON API routes (live refresh)</th></tr>
+  <tr><td class="mono" style="background:none">/ · /login · /logout · /signup · /signup/pending · /signup/cancel<br>/dashboard<br>/prediction · /prediction/result/&lt;id&gt;<br>/prediction-history · …/&lt;id&gt;/actual · …/&lt;id&gt;/review · …/&lt;id&gt;/delete<br>/vehicles · /vehicles/add · …/&lt;id&gt;/edit · …/&lt;id&gt;/delete<br>/trips · /trips/add · /trips/&lt;id&gt;/edit · /delete · /trips/d&lt;id&gt;/edit · /delete<br>/model-performance · /model-performance/dataset/&lt;name&gt;.csv · /model-performance/upload<br>/settings · /settings/profile · /settings/password<br>/users · /users/add · /users/&lt;id&gt;/edit · /approve · /reject · /reset-password</td>
+  <td class="mono" style="background:none">/api/notifications<br>/api/notifications/dismiss<br>/api/notifications/dismiss-all<br>/api/notifications/seen<br>/api/signup/check<br>/api/signup/status<br>/api/dashboard-data<br>/api/prediction-options<br>/api/prediction/&lt;id&gt;/status<br>/api/prediction-history<br>/api/vehicles<br>/api/trips<br>/api/model-status<br>/api/model-performance-data<br>/api/me<br>/api/users</td></tr>
+</table>
+<p class="small">Pattern: <b>REST-style</b> URLs; GET shows data, POST changes data (always with a CSRF token). The JavaScript calls the <code>/api/...</code> routes with <code>fetch()</code> every few seconds (AJAX polling) so pages update without reloading.</p>
+
+<h2>5. Database Design (Firestore collections)</h2>
+<p>Firestore is a <b>NoSQL document database</b>: data is kept in <b>collections</b> of <b>documents</b> (fields like JSON), no tables or SQL. Only the server touches it (with a private service-account key), never the browser.</p>
+<table>
+  <tr><th style="width:26%">Collection</th><th>Stores</th></tr>
+  <tr><td><code>users</code></td><td>Username, full name, email, password hash, role (admin/staff), status (pending/active/rejected).</td></tr>
+  <tr><td><code>vehicles</code></td><td>Plate number, brand/model, fuel type, engine power (kW).</td></tr>
+  <tr><td><code>trip_records</code></td><td>Date of travel, plate number, distance (km), fuel consumed (L); link to a prediction.</td></tr>
+  <tr><td><code>predictions</code></td><td>Fuel requests: vehicle, distance, predicted liters, range, status, liters released, actual fuel, model version.</td></tr>
+  <tr><td><code>trip_dataset_changes</code></td><td>Edits/deletions made to the online-dataset trips.</td></tr>
+  <tr><td><code>notification_dismissals</code></td><td>Which notifications each user has dismissed/seen.</td></tr>
+  <tr><td><code>_counters/_changes</code></td><td>Change counter used to tell when data was saved.</td></tr>
+</table>
+<div class="box tip"><b>Real-time:</b> Firestore <b>snapshot listeners</b> keep an up-to-date copy of each collection in the server's memory. Pages poll the server every few seconds, and those refreshes cost <b>no Firestore reads</b>, so the system stays within the free quota.</div>
+
+<h2 class="pb">6. Machine Learning Model</h2>
+
+<h3>6.1 The model equation</h3>
+<div class="eq">ŷ = β<sub>0</sub> + β<sub>1</sub>(Distance) + β<sub>2</sub>(Engine Power) + β<sub>3</sub>(Fuel Type) + β<sub>4</sub>(Distance × Engine Power)</div>
+<ul>
+  <li><b>Dependent variable (y):</b> actual fuel consumed per trip, in liters.</li>
+  <li><b>Independent variables:</b> Distance (km), Engine Power (kW), Fuel Type (1 = Gasoline, 0 = Diesel).</li>
+  <li><b>Interaction term:</b> Distance × Engine Power — a bigger engine burns more fuel per kilometre, so the effect of distance depends on engine power.</li>
+</ul>
+<p><b>Fitted equation (original units):</b></p>
+<div class="eq">ŷ = −1.7904 + 0.03263(Distance) + 0.03167(Engine Power) + 0(Fuel Type) + 0.000573(Distance × Engine Power)</div>
+<p class="small">Fuel Type gets 0 because the final model is trained only on the fleet's operating range — diesel vehicles, 30–400 km, 51–177 kW — so there is no gasoline variation to learn. Centered form (used inside the pipeline): intercept 14.463; distance 0.0873; power 0.1186; interaction 0.000573; centers = 151.58 km and 95.35 kW.</p>
+
+<h3>6.2 Pipeline steps (CRISP-DM)</h3>
+<table>
+  <tr><th style="width:24%">CRISP-DM phase</th><th>What was done</th></tr>
+  <tr><td>1. Business Understanding</td><td>GSO needs to estimate fuel per official trip to plan fuel release and detect unusual use.</td></tr>
+  <tr><td>2. Data Understanding</td><td>Monthly Report of Official Travel (local trips) + vehicle records + open online datasets.</td></tr>
+  <tr><td>3. Data Preparation</td><td>Merge trips with vehicles by <b>plate number</b>; add supplementary data; drop missing values and zero distance; remove outliers with the <b>IQR rule</b> on L/100 km within each engine-power group; keep fleet range; encode fuel type; <b>mean-center</b> distance and power; add interaction term.</td></tr>
+  <tr><td>4. Modeling</td><td><b>80/20 train/test split</b> (random_state 42); scikit-learn <code>Pipeline</code> = <code>TermEncoder</code> + <code>LinearRegression</code> (Ordinary Least Squares).</td></tr>
+  <tr><td>5. Evaluation</td><td>R², MAE, RMSE on the test set; <b>5-fold cross-validation</b>; VIF; LINE assumption tests; residual plots.</td></tr>
+  <tr><td>6. Deployment</td><td>Save with <b>Joblib</b>; Flask loads it to predict; new models trained in Google Colab are uploaded through Model Performance (checked before use, no restart).</td></tr>
+</table>
+
+<h3>6.3 Evaluation results</h3>
+<div class="cols">
+<div>
+<table>
+  <tr><th>Metric</th><th>Value</th><th>Meaning</th></tr>
+  <tr><td>R²</td><td><b>0.8877</b></td><td>Model explains 88.77% of the variation in fuel used.</td></tr>
+  <tr><td>MAE</td><td><b>1.98 L</b></td><td>Average error per trip.</td></tr>
+  <tr><td>RMSE</td><td><b>2.89 L</b></td><td>Typical error (punishes big errors); also the ± range of a prediction.</td></tr>
+  <tr><td>5-fold CV R²</td><td>0.8879 ± 0.0015</td><td>Stable on all folds (0.886–0.891).</td></tr>
+  <tr><td>CV MAE / RMSE</td><td>1.99 L / 2.92 L</td><td>Same as the test set → no overfitting.</td></tr>
+</table>
+</div>
+<div>
+<table>
+  <tr><th>Data used</th><th>Records</th></tr>
+  <tr><td>Supplementary (online)</td><td>27,184</td></tr>
+  <tr><td>Trip Records (online)</td><td>7,194</td></tr>
+  <tr><td>Local GSO trips</td><td>93</td></tr>
+  <tr><td><b>Total (after cleaning)</b></td><td><b>34,471</b></td></tr>
+  <tr><td>Training set (80%)</td><td>27,576</td></tr>
+  <tr><td>Test set (20%)</td><td>6,895</td></tr>
+</table>
+</div>
+</div>
+
+<h3>6.4 Regression assumption tests (LINE + multicollinearity)</h3>
+<table>
+  <tr><th style="width:24%">Assumption</th><th style="width:22%">Test</th><th style="width:20%">Result</th><th>Interpretation</th></tr>
+  <tr><td>Linearity</td><td>Ramsey RESET</td><td>F = 38.99, p &lt; 0.001</td><td>Some non-linearity remains (common with very large samples).</td></tr>
+  <tr><td>Independence of errors</td><td>Durbin-Watson</td><td>0.784</td><td>Computed on local trips by date; below 1.5 → positive autocorrelation.</td></tr>
+  <tr><td>Normality of errors</td><td>Jarque-Bera</td><td>p &lt; 0.001</td><td>Residuals not perfectly normal; with n &gt; 30,000 the estimates stay reliable (Central Limit Theorem).</td></tr>
+  <tr><td>Equal variance</td><td>Breusch-Pagan</td><td>p &lt; 0.001</td><td>Heteroscedasticity → <b>HC3 robust standard errors</b> are used for p-values.</td></tr>
+  <tr><td>No multicollinearity</td><td>VIF (threshold 5)</td><td>1.01 – 1.03</td><td><b>Passed.</b> Centering removed the collinearity of the interaction term.</td></tr>
+</table>
+<p class="small">Figures for the paper (<code>reports/figures/</code>): actual vs. predicted, residual plot, residual histogram, Q-Q plot, correlation heatmap, VIF chart, CV R² scores.</p>
+
+<h2>7. Data Sources (100,000 records)</h2>
+<table>
+  <tr><th style="width:30%">Source</th><th style="width:14%">Records</th><th>Description</th></tr>
+  <tr><td>GSO Monthly Report of Official Travel (SFA 4714)</td><td>93 trips</td><td>Real collected local data: date, vehicle, distance, fuel consumed.</td></tr>
+  <tr><td>GSU fleet vehicle records</td><td>9 vehicles</td><td>Plate number, model, fuel type, engine power.</td></tr>
+  <tr><td>Fan &amp; Song (2022), Mendeley Data (CC BY 4.0)</td><td>50,508</td><td>Real-world gasoline trips, Beijing (10 car/SUV/van models), sampled over 4 distance bands, seed 42.</td></tr>
+  <tr><td>European Environment Agency (2024), CC BY 4.0</td><td>49,390</td><td>Diesel vans' on-board fuel meter data (40–250 kW, 30–1,000 km) so the model learns engine-power effects for diesel.</td></tr>
+  <tr><td colspan="2"><b>Total = 93 + 9 + 50,508 + 49,390 = 100,000</b></td><td>Trip Records page also shows 7,496 online-dataset trips following the GSO trip pattern.</td></tr>
+</table>
+
+<h2 class="pb">8. Security Features</h2>
+<ul>
+  <li><b>Password hashing</b> with Werkzeug scrypt — passwords are never stored in plain text.</li>
+  <li><b>CSRF protection</b> (Flask-WTF) on all forms that change data.</li>
+  <li><b>Login required</b> and <b>role-based access</b> (<code>login_required</code>, <code>admin_required</code>): staff cannot open admin pages.</li>
+  <li><b>Login lockout:</b> 5 failed attempts (same username + IP) → locked for 15 minutes.</li>
+  <li><b>Sessions:</b> 8-hour lifetime, HttpOnly + SameSite=Lax cookies, Secure cookies online (HTTPS); resetting a password signs that user out.</li>
+  <li><b>Account approval:</b> new sign-ups must be approved by the administrator.</li>
+  <li><b>Secrets in <code>.env</code></b> and <code>firebase-key.json</code> — never put in Git; the browser never connects to Firestore.</li>
+  <li><b>Upload checks:</b> 5 MB limit; an uploaded Colab model is accepted only if it is the expected Linear Regression pipeline and its predictions match its results file.</li>
+  <li><b>Backups:</b> automatic JSON backup at every start and every 24 hours (newest 30 kept), with restore.</li>
+</ul>
+
+<h2>9. Deployment and Running</h2>
+<table>
+  <tr><th style="width:24%">Setup</th><th>How it works</th></tr>
+  <tr><td>Office server (LAN)</td><td><code>scripts/start_server.bat</code> backs up the database, then runs the app with <b>Waitress</b> on port 5000; restarts it if it stops. Other PCs open <code>http://&lt;server-IP&gt;:5000</code>. <code>allow_network_access.bat</code> opens port 5000 for Private/Domain networks only. <code>install_autostart.bat</code> starts it when Windows signs in.</td></tr>
+  <tr><td>Online (Vercel)</td><td><b>https://gsu-fleetfuel.vercel.app</b> — Python serverless function, auto-deployed from GitHub <code>main</code>; same Firestore database; read-only file system (no uploads/backups there).</td></tr>
+  <tr><td>Local development</td><td><code>python -m venv venv</code> → <code>pip install -r requirements-train.txt</code> → <code>python model/train_model.py</code> → <code>python init_db.py</code> → <code>python app.py</code> → open <code>http://127.0.0.1:5000</code>.</td></tr>
+  <tr><td>Retraining</td><td>The web app never retrains by itself. Download the 3 CSVs (trip_records, vehicle_records, supplementary_data) → run the Colab notebook → upload the <code>.joblib</code> + <code>metrics_colab.json</code>.</td></tr>
+</table>
+
+<h2>10. Key Terms to Remember</h2>
+<table>
+  <tr><th style="width:26%">Term</th><th>Simple definition</th></tr>
+  <tr><td>Linear Regression</td><td>A model that predicts a number as a straight-line (weighted sum) of inputs; fitted by Ordinary Least Squares (minimizes squared errors).</td></tr>
+  <tr><td>Interaction term</td><td>Product of two variables (Distance × Power) letting one variable's effect depend on the other.</td></tr>
+  <tr><td>Mean-centering</td><td>Subtracting the training mean from a variable; lowers VIF without changing predictions.</td></tr>
+  <tr><td>R² (coefficient of determination)</td><td>Share of variation in y explained by the model (0–1; higher is better).</td></tr>
+  <tr><td>MAE / RMSE</td><td>Average absolute error / square root of mean squared error, both in liters (lower is better).</td></tr>
+  <tr><td>K-fold cross-validation</td><td>Data split into 5 parts; train on 4, test on 1, repeat 5 times; checks stability.</td></tr>
+  <tr><td>VIF</td><td>Variance Inflation Factor — measures multicollinearity; above 5 = problem.</td></tr>
+  <tr><td>IQR rule</td><td>Outlier if below Q1 − 1.5·IQR or above Q3 + 1.5·IQR.</td></tr>
+  <tr><td>Residual</td><td>Actual − predicted value.</td></tr>
+  <tr><td>Pipeline (scikit-learn)</td><td>Chains preprocessing and the model into one object, so prediction uses the same steps as training.</td></tr>
+  <tr><td>Joblib</td><td>Saves the trained Python model to a file and loads it again.</td></tr>
+  <tr><td>Flask / WSGI / Waitress</td><td>Python web framework / standard interface between Python apps and web servers / production server that implements it.</td></tr>
+  <tr><td>NoSQL / Firestore</td><td>Database without tables; stores documents in collections, in Google's cloud.</td></tr>
+  <tr><td>CSRF</td><td>Cross-Site Request Forgery — an attack where another site submits a form as the user; blocked by a secret token.</td></tr>
+  <tr><td>Serverless (Vercel)</td><td>Code runs on demand in the cloud without managing a server.</td></tr>
+</table>
+
+<h2 class="pb">11. Practice Defense Questions</h2>
+<div class="qa">
+<p class="q">1. What programming language and framework did you use?</p>
+<p class="a">Python with the Flask web framework for the back end; HTML5, CSS3, JavaScript, Bootstrap 5 and Chart.js for the front end; Jinja2 for templates.</p>
+<p class="q">2. Why Linear Regression and not a more complex model?</p>
+<p class="a">Fuel use is close to proportional to distance and engine power, so a linear model fits well (R² 0.89). It is simple, fast, and explainable: each coefficient tells how many liters a km or a kW adds — important for a government office that must justify fuel releases.</p>
+<p class="q">3. What database did you use and why?</p>
+<p class="a">Firebase Cloud Firestore — a free cloud NoSQL database with real-time listeners, so changes on one computer appear on all others; data is safe even if the server PC turns off.</p>
+<p class="q">4. What are your independent and dependent variables?</p>
+<p class="a">Independent: distance (km), engine power (kW), fuel type (1 gasoline, 0 diesel) and the Distance × Engine Power interaction. Dependent: fuel consumed per trip (L).</p>
+<p class="q">5. How accurate is your model?</p>
+<p class="a">R² = 0.8877, MAE = 1.98 L, RMSE = 2.89 L on 6,895 test records; 5-fold cross-validation gives R² 0.8879 ± 0.0015, so it is stable and not overfitting.</p>
+<p class="q">6. Why add online data instead of only your own trips?</p>
+<p class="a">The 93 local trips came from one diesel van, too few and too narrow to learn the effect of engine power. Open datasets (Fan &amp; Song 2022; EEA 2024, both CC BY 4.0) with the same variables fill this gap.</p>
+<p class="q">7. How did you handle multicollinearity?</p>
+<p class="a">Distance and engine power are mean-centered before forming the interaction term; all VIFs are 1.01–1.03, below the threshold of 5.</p>
+<p class="q">8. Some assumption tests failed. Is the model still valid?</p>
+<p class="a">Yes for prediction. With over 30,000 records, tiny deviations become "significant". We use HC3 robust standard errors for heteroscedasticity, and accuracy is confirmed on unseen test data and cross-validation.</p>
+<p class="q">9. How does a prediction work in the system?</p>
+<p class="a">Staff choose the vehicle and enter the distance; the system reads the vehicle's engine power and fuel type, applies the same preprocessing, and the Joblib pipeline returns the liters with a ± RMSE range. It is saved as a fuel request for admin approval.</p>
+<p class="q">10. Does the system retrain itself?</p>
+<p class="a">No. Training is done in Google Colab (or <code>train_model.py</code>); the admin uploads the new model and the system validates it before switching.</p>
+<p class="q">11. How is the system secured?</p>
+<p class="a">Hashed passwords (scrypt), CSRF tokens, login and role checks, login lockout, admin approval of accounts, secure session cookies, secret keys outside Git, server-only database access, and daily backups.</p>
+<p class="q">12. How do users access it?</p>
+<p class="a">On the GSO network through the server PC (Waitress, port 5000), or online at gsu-fleetfuel.vercel.app.</p>
+<p class="q">13. What methodology did you follow?</p>
+<p class="a">CRISP-DM: business understanding, data understanding, data preparation, modeling, evaluation and deployment.</p>
+<p class="q">14. What is the meaning of the interaction term's coefficient?</p>
+<p class="a">0.000573 L per km per kW: each extra kW of engine power adds about 0.00057 L to every kilometre travelled — larger engines burn more per km.</p>
+</div>
+
+<p class="small" style="margin-top:14px;border-top:1px solid #ddd;padding-top:6px">Source: the FleetFuel project files (requirements, app.py, db.py, model/, data/, metrics.json, README) as of 15 November 2026.</p>
+</body>
+</html>

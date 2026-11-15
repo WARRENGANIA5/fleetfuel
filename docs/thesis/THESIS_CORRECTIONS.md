@@ -160,10 +160,10 @@ reject fuel requests." with:
 | Part | Source |
 |---|---|
 | Abstract | Draft below |
-| Chapter IV, T7–T16 and T17 results | `docs/THESIS_CHAPTER_IV.md` |
-| Chapter V | `docs/THESIS_CHAPTER_V.md` |
-| [CODE] placeholders (14) | `docs/THESIS_CHAPTER_III_CODE.md` |
-| Project Description name and logo | `docs/THESIS_UPDATE_LOGO.md` |
+| Chapter IV, T7–T16 and T17 results | `docs/thesis/THESIS_CHAPTER_IV.md` |
+| Chapter V | `docs/thesis/THESIS_CHAPTER_V.md` |
+| [CODE] placeholders (14) | `docs/thesis/THESIS_CHAPTER_III_CODE.md` |
+| Project Description name and logo | `docs/thesis/THESIS_UPDATE_LOGO.md` |
 | T2–T6 (planning, title defense, user requirements) | Only the team has these details |
 | Month YYYY, approval date, adviser's date | Only the team has these details |
 
@@ -232,6 +232,6 @@ The current manuscript is `Fuel Consumption Prediction (10) - fix.pdf`; earlier 
 
 ## L. To confirm
 
-- The drafts in `docs/THESIS_CHAPTER_IV.md` and `THESIS_CHAPTER_V.md` say "motorpool staff" where the manuscript says
+- The drafts in `docs/thesis/THESIS_CHAPTER_IV.md` and `THESIS_CHAPTER_V.md` say "motorpool staff" where the manuscript says
   "Transportation Office". Use one name throughout.
 - The README and Colab notebook title say "Government Fleets"; the manuscript title says "Government Fleet".

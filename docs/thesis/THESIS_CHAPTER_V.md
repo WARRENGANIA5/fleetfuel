@@ -1,6 +1,6 @@
 # Chapter V — Summary, Conclusions and Recommendations (draft, November 9, 2026)
 
-Draft text for Chapter V. It is based on the results in Chapter IV (`docs/THESIS_CHAPTER_IV.md`) and follows the
+Draft text for Chapter V. It is based on the results in Chapter IV (`docs/thesis/THESIS_CHAPTER_IV.md`) and follows the
 specific objectives of the study.
 
 ## Summary

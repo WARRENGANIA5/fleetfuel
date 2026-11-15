@@ -8,7 +8,7 @@
 385,158 trips of 395 gasoline cars (15 models) in Beijing, reduced to
 distance, engine power, fuel type and fuel consumed.
 
-Usage: python build_supplementary.py <Vehicle fuel consumption.csv> <output.csv>
+Usage: python data/build/build_supplementary_dataset.py <Vehicle fuel consumption.csv> <output.csv>
 """
 import sys
 

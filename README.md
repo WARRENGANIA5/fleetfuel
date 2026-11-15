@@ -38,9 +38,10 @@ gov-fleets/
 │   ├── cleaned_merged_dataset.csv    Local + online records after cleaning (generated)
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
 │   ├── SUPPLEMENTARY_DATASET_SOURCE.md  Sources, licenses and sampling of the online data
-│   ├── build_supplementary_dataset.py  Builds supplementary_data.csv from Fan & Song (2022)
-│   ├── add_eea_diesel_vans.py        Adds the EEA (2024) diesel vans to supplementary_data.csv
-│   └── build_trip_records_dataset.py  Builds trip_records_dataset.csv (seed 42)
+│   └── build/                        Scripts that built the online data (run once)
+│       ├── build_supplementary_dataset.py  supplementary_data.csv from Fan & Song (2022)
+│       ├── add_eea_diesel_vans.py        Adds the EEA (2024) diesel vans
+│       └── build_trip_records_dataset.py  trip_records_dataset.csv (seed 42)
 ├── colab/
 │   ├── fuel_consumption_linear_regression_AUTO.ipynb  Colab notebook with the data built in
 │   ├── fuel_consumption_linear_regression.ipynb       Colab notebook that asks for the 3 CSV files
@@ -63,7 +64,9 @@ gov-fleets/
 │   ├── install_autostart.bat, uninstall_autostart.bat, fleetfuel_watcher.ps1  Start the app when Windows signs in
 │   └── allow_network_access.bat  One-time firewall rule for LAN access
 ├── docs/
-│   └── THESIS_*.md             Thesis text: Chapter III code, Chapters IV and V, updates
+│   ├── thesis/                 Thesis text: Chapter III code, Chapters IV and V, corrections, updates
+│   ├── diagrams/               The four CRISP-DM diagrams (SVG, PNG, PDF) and the script that draws them
+│   └── reviewer/               Reviewer and Q&A for the defense (HTML + PDF)
 └── api/, public/, vercel.json  Online link on Vercel, auto-deployed from GitHub main (must stay in the root)
 ```
 

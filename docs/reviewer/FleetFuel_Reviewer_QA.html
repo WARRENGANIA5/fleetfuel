@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetFuel Q&amp;A Reviewer</title>
+<style>
+  @page { size: A4; margin: 15mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.8pt; line-height: 1.4; color: #1d2433; background: #fff; margin: 0; }
+  .cover { border: 2px solid #c9a227; border-radius: 8px; padding: 14px 18px; background: #fdf9ef; margin-bottom: 6px; }
+  h1 { font-size: 20pt; margin: 0; color: #7a1f2b; }
+  .sub { color: #555; font-size: 10pt; }
+  h2 { font-size: 12.5pt; color: #fff; background: #7a1f2b; padding: 5px 10px; margin: 16px 0 6px; border-radius: 4px; page-break-after: avoid; }
+  .qa { border: 1px solid #e3dcc6; border-radius: 6px; padding: 6px 10px; margin: 6px 0; page-break-inside: avoid; }
+  .q { font-weight: 700; color: #7a1f2b; }
+  .a { margin-top: 2px; }
+  .a b { background: #fff3c4; padding: 0 3px; border-radius: 3px; }
+  .h { margin-top: 3px; font-size: 9.6pt; color: #3d5a80; font-style: italic; }
+  .h:before { content: "In simple words: "; font-weight: 700; font-style: normal; }
+  .eq { font-family: Cambria, "Times New Roman", serif; font-size: 11.5pt; background: #f6f1e3; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-top: 2px; }
+  .how { font-size: 9.5pt; color: #555; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>FleetFuel Q&amp;A Reviewer</h1>
+  <div class="sub"><b>Performance of Linear Regression Model in Predicting Fuel Consumption for the Government Fleets</b> · Guimaras State University GSO</div>
+  <p class="how">Each item has the <b>question</b>, the <b>short answer</b> to say in the defense, and an <b>In simple words</b> explanation. Memorize the highlighted words.</p>
+</div>
+
+<h2>A. About the System</h2>
+<div class="qa"><div class="q">1. What is your system?</div>
+<div class="a">A <b>web-based fuel consumption prediction system</b> for the GSU General Services Office (GSO) government fleet.</div>
+<div class="h">A website that estimates how many liters of fuel a vehicle will use on a trip.</div></div>
+
+<div class="qa"><div class="q">2. What is the purpose of the system?</div>
+<div class="a">To <b>predict the fuel (liters) needed for a trip</b> so the GSO can release the right amount of fuel and monitor actual use.</div>
+<div class="h">So the fuel given is not too much or too little, and fuel use can be monitored.</div></div>
+
+<div class="qa"><div class="q">3. Who are the users?</div>
+<div class="a"><b>Administrator</b> (one account) and <b>GSO / motorpool staff</b>.</div>
+<div class="h">The admin approves fuel requests and manages accounts; the staff make the predictions.</div></div>
+
+<div class="qa"><div class="q">4. What are the main modules?</div>
+<div class="a"><b>Login/Sign-up, Dashboard, Fuel Prediction, Prediction History, Trip Records, Vehicle Management, Model Performance, User Accounts, Account Settings</b>, and the Notifications bell.</div>
+<div class="h">These are the pages you see in the system's sidebar.</div></div>
+
+<div class="qa"><div class="q">5. How does a prediction work?</div>
+<div class="a">Staff <b>select the vehicle and enter the distance</b>; the system gets the engine power and fuel type from the vehicle record, and the <b>model gives the predicted liters ± range</b>. It becomes a fuel request for admin approval.</div>
+<div class="h">Just pick the vehicle and type the kilometers; the system does the computing.</div></div>
+
+<h2>B. Model / Algorithm</h2>
+<div class="qa"><div class="q">6. What model did you use?</div>
+<div class="a"><b>Multiple Linear Regression.</b></div>
+<div class="h">Only one model is used: Linear Regression. No Random Forest, Decision Tree, SVR or any other model.</div></div>
+
+<div class="qa"><div class="q">7. Why Linear Regression?</div>
+<div class="a">Because fuel use <b>increases in a straight-line way with distance and engine power</b>. It is <b>simple, fast, accurate (R² 0.89)</b> and <b>easy to explain</b>.</div>
+<div class="h">The longer the trip and the bigger the engine, the more fuel is used. The relationship is linear, so Linear Regression fits.</div></div>
+
+<div class="qa"><div class="q">8. What is the equation of your model?</div>
+<div class="a"><span class="eq">ŷ = β<sub>0</sub> + β<sub>1</sub>(Distance) + β<sub>2</sub>(Engine Power) + β<sub>3</sub>(Fuel Type) + β<sub>4</sub>(Distance × Engine Power)</span></div>
+<div class="h">ŷ is the predicted liters; the β values are the numbers the model learned.</div></div>
+
+<div class="qa"><div class="q">9. What is the fitted (final) equation?</div>
+<div class="a"><span class="eq">ŷ = −1.7904 + 0.03263(D) + 0.03167(P) + 0(F) + 0.000573(D × P)</span></div>
+<div class="h">D = distance, P = engine power, F = fuel type. This is what the system uses to compute.</div></div>
+
+<div class="qa"><div class="q">10. What is your dependent variable?</div>
+<div class="a"><b>Fuel consumed per trip (liters).</b></div>
+<div class="h">This is what the model predicts.</div></div>
+
+<div class="qa"><div class="q">11. What are your independent variables?</div>
+<div class="a"><b>Distance (km), Engine Power (kW), Fuel Type</b> (1 = Gasoline, 0 = Diesel), plus the <b>Distance × Engine Power</b> interaction term.</div>
+<div class="h">These are the inputs used to make the prediction.</div></div>
+
+<div class="qa"><div class="q">12. What is the interaction term and why is it there?</div>
+<div class="a"><b>Distance × Engine Power.</b> A bigger engine burns <b>more fuel per kilometre</b>, so the effect of distance depends on engine power.</div>
+<div class="h">A bigger engine uses more fuel per kilometer, so we multiplied the two together.</div></div>
+
+<div class="qa"><div class="q">13. Why is the Fuel Type coefficient 0?</div>
+<div class="a">The final model was trained on the <b>fleet's range only, which is all diesel</b> (30–400 km, 51–177 kW), so there was no gasoline difference to learn.</div>
+<div class="h">All GSU vehicles are diesel, so fuel type has no effect in the final model.</div></div>
+
+<div class="qa"><div class="q">14. What library did you use to build the model?</div>
+<div class="a"><b>scikit-learn</b> (<code>LinearRegression</code> inside a <code>Pipeline</code>).</div>
+<div class="h">A Python library for machine learning.</div></div>
+
+<div class="qa"><div class="q">15. How is the trained model saved and used?</div>
+<div class="a">Saved with <b>Joblib</b> as <code>linear_regression_pipeline.joblib</code>; <b>Flask loads it</b> to predict without retraining.</div>
+<div class="h">The model is saved in one file; the website just reads it for every prediction.</div></div>
+
+<div class="qa"><div class="q">16. Where did you train the model?</div>
+<div class="a">In <b>Google Colab</b> (also possible with <code>train_model.py</code>); the model file is <b>uploaded</b> on the Model Performance page.</div>
+<div class="h">Training is done in Colab, then the model is uploaded to the system.</div></div>
+
+<div class="qa"><div class="q">17. Does the system retrain by itself?</div>
+<div class="a"><b>No.</b> New data does not change the model until a new model is trained and uploaded.</div>
+<div class="h">The model does not change by itself; it must be retrained and uploaded.</div></div>
+
+<div class="qa"><div class="q">18. What methodology did you follow?</div>
+<div class="a"><b>CRISP-DM</b>: Business Understanding → Data Understanding → Data Preparation → Modeling → Evaluation → Deployment.</div>
+<div class="h">Six steps for building a data mining / machine learning project.</div></div>
+
+<h2>C. Data</h2>
+<div class="qa"><div class="q">19. Where did your data come from?</div>
+<div class="a"><b>GSO Monthly Report of Official Travel</b> (93 trips of SFA 4714), the <b>9 fleet vehicle records</b>, and two open online datasets: <b>Fan &amp; Song (2022)</b> and the <b>European Environment Agency (2024)</b>.</div>
+<div class="h">Our own data from the GSO plus two free datasets online.</div></div>
+
+<div class="qa"><div class="q">20. How many records in total?</div>
+<div class="a"><b>100,000</b> = 93 trips + 9 vehicles + 50,508 gasoline trips + 49,390 diesel vans.</div>
+<div class="h">This is all the data we gathered.</div></div>
+
+<div class="qa"><div class="q">21. Why did you add online data?</div>
+<div class="a">The <b>93 local trips were too few</b> and came from <b>one vehicle only</b>, so the model could not learn the effect of different engine sizes.</div>
+<div class="h">Our own data was not enough, so we added online data with the same variables.</div></div>
+
+<div class="qa"><div class="q">22. How many records were used in training?</div>
+<div class="a"><b>34,471</b> after cleaning (fleet range): <b>27,576 training (80%)</b> and <b>6,895 testing (20%)</b>.</div>
+<div class="h">80% is used to teach the model; 20% is used to test it.</div></div>
+
+<div class="qa"><div class="q">23. How did you clean the data?</div>
+<div class="a">Removed <b>missing values</b> and <b>zero distance</b>, removed <b>outliers using the IQR rule</b>, and kept only the fleet's range.</div>
+<div class="h">Wrong, incomplete and extreme records were removed.</div></div>
+
+<div class="qa"><div class="q">24. How were trips and vehicles combined?</div>
+<div class="a">Merged using the <b>plate number</b>.</div>
+<div class="h">The plate number connects each trip to its vehicle.</div></div>
+
+<h2>D. Accuracy / Evaluation</h2>
+<div class="qa"><div class="q">25. How accurate is your model?</div>
+<div class="a"><b>R² = 0.8877</b>, <b>MAE = 1.98 L</b>, <b>RMSE = 2.89 L</b>.</div>
+<div class="h">The model explains about 89% of the changes in fuel use; it is off by only about 2 liters per trip.</div></div>
+
+<div class="qa"><div class="q">26. What does R² mean?</div>
+<div class="a">The <b>percentage of variation in fuel use explained by the model</b> (0 to 1, higher is better). 0.8877 = <b>88.77%</b>.</div>
+<div class="h">How well the model fits. The closer to 1, the better.</div></div>
+
+<div class="qa"><div class="q">27. What do MAE and RMSE mean?</div>
+<div class="a"><b>MAE</b> = average error (1.98 L). <b>RMSE</b> = typical error that punishes big errors (2.89 L). Lower is better.</div>
+<div class="h">How many liters the prediction is off, on average.</div></div>
+
+<div class="qa"><div class="q">28. How did you check that the model is not overfitting?</div>
+<div class="a"><b>5-fold cross-validation</b>: mean R² = <b>0.8879 ± 0.0015</b>, almost the same as the test set.</div>
+<div class="h">We tested on five different parts of the data; the results were the same, so the model is stable.</div></div>
+
+<div class="qa"><div class="q">29. What is the ± range shown in a prediction?</div>
+<div class="a">The prediction <b>± RMSE (2.89 L)</b>. If the actual fuel is outside it, the system <b>flags</b> the trip.</div>
+<div class="h">If the actual fuel used is outside the range, the system marks it.</div></div>
+
+<h2>E. Assumption Tests</h2>
+<div class="qa"><div class="q">30. What tests did you use for the regression assumptions?</div>
+<div class="a"><b>Ramsey RESET</b> (linearity), <b>Durbin-Watson</b> (independence), <b>Jarque-Bera</b> (normality), <b>Breusch-Pagan</b> (equal variance), <b>VIF</b> (multicollinearity).</div>
+<div class="h">Five tests, run with Statsmodels.</div></div>
+
+<div class="qa"><div class="q">31. What is VIF and what is your result?</div>
+<div class="a">Variance Inflation Factor: checks if predictors overlap. Above 5 = problem. Ours: <b>1.01–1.03 → passed</b>.</div>
+<div class="h">Checks whether the inputs repeat the same information. They do not, so it passed.</div></div>
+
+<div class="qa"><div class="q">32. How did you reduce multicollinearity?</div>
+<div class="a">By <b>mean-centering</b> distance and engine power before multiplying them.</div>
+<div class="h">Their average is subtracted first before multiplying; this does not change the prediction.</div></div>
+
+<div class="qa"><div class="q">33. Some tests did not pass. Is the model still valid?</div>
+<div class="a"><b>Yes, for prediction.</b> With over 30,000 records, even tiny deviations become "significant". We used <b>HC3 robust standard errors</b>, and accuracy is confirmed by the test set and cross-validation.</div>
+<div class="h">With a very large dataset, even tiny deviations show up in the tests. The predictions are still good.</div></div>
+
+<h2>F. Technology Used</h2>
+<div class="qa"><div class="q">34. What programming language did you use?</div>
+<div class="a"><b>Python</b> (back end) and <b>HTML, CSS, JavaScript</b> (front end).</div>
+<div class="h">Python runs the server; HTML/CSS/JS is what you see on the screen.</div></div>
+
+<div class="qa"><div class="q">35. What web framework did you use?</div>
+<div class="a"><b>Flask</b> (Python).</div>
+<div class="h">It runs the website and connects it to the model and the database.</div></div>
+
+<div class="qa"><div class="q">36. What database did you use?</div>
+<div class="a"><b>Firebase Cloud Firestore</b> (cloud NoSQL database).</div>
+<div class="h">Google's online database; it stores documents instead of tables.</div></div>
+
+<div class="qa"><div class="q">37. Why Firestore?</div>
+<div class="a">It is <b>free, cloud-based, real-time</b>, and the data is <b>safe even if the server PC turns off</b>.</div>
+<div class="h">A change made on one computer shows up right away on the others.</div></div>
+
+<div class="qa"><div class="q">38. What are the Firestore collections?</div>
+<div class="a"><b>users, vehicles, trip_records, predictions, trip_dataset_changes, notification_dismissals</b>.</div>
+<div class="h">Like tables, but Firestore calls them collections.</div></div>
+
+<div class="qa"><div class="q">39. What front-end libraries did you use?</div>
+<div class="a"><b>Bootstrap 5</b> (design/layout), <b>Chart.js</b> (charts), <b>Font Awesome</b> (icons), <b>Poppins</b> (font).</div>
+<div class="h">They make the website look good and work on any screen size.</div></div>
+
+<div class="qa"><div class="q">40. What Python libraries did you use for data and ML?</div>
+<div class="a"><b>Pandas</b> (data tables), <b>NumPy</b> (math), <b>scikit-learn</b> (model), <b>Joblib</b> (save model), <b>Statsmodels</b> (statistical tests), <b>Matplotlib</b> and <b>Seaborn</b> (graphs).</div>
+<div class="h">These are the tools for processing the data and building the model.</div></div>
+
+<div class="qa"><div class="q">41. What other back-end libraries did you use?</div>
+<div class="a"><b>Werkzeug</b> (password hashing), <b>Flask-WTF</b> (CSRF protection), <b>firebase-admin</b> (connect to Firestore), <b>python-dotenv</b> (secret settings), <b>Waitress</b> (production server).</div>
+<div class="h">For security, the database connection and running the server.</div></div>
+
+<div class="qa"><div class="q">42. What tools did you use in development?</div>
+<div class="a"><b>Visual Studio Code</b>, <b>Git &amp; GitHub</b>, <b>Google Colab</b>, <b>Firebase Console</b>, web browser.</div>
+<div class="h">Where we wrote, stored and tested the code.</div></div>
+
+<h2>G. Security</h2>
+<div class="qa"><div class="q">43. How are passwords protected?</div>
+<div class="a"><b>Hashed with scrypt</b> (Werkzeug); never stored as plain text.</div>
+<div class="h">The password is stored in a form no one can read, not even the admin.</div></div>
+
+<div class="qa"><div class="q">44. What other security features does the system have?</div>
+<div class="a"><b>CSRF protection, login required, role-based access</b> (admin/staff), <b>login lockout</b> (5 wrong tries = 15 minutes), <b>admin approval</b> of new accounts, <b>8-hour sessions</b>, and <b>daily backups</b>.</div>
+<div class="h">So people without permission cannot get in, and data is never lost.</div></div>
+
+<h2>H. Deployment</h2>
+<div class="qa"><div class="q">45. How do users access the system?</div>
+<div class="a">On the <b>GSO network</b> through the server PC (<b>Waitress, port 5000</b>), or online at <b>gsu-fleetfuel.vercel.app</b>.</div>
+<div class="h">In the office through the server PC, or online through the link.</div></div>
+
+<div class="qa"><div class="q">46. What is Vercel?</div>
+<div class="a">A <b>cloud hosting service</b> that runs the online version; it <b>auto-deploys from GitHub</b>.</div>
+<div class="h">This is where the online link of the system is hosted.</div></div>
+
+<div class="qa"><div class="q">47. How is the data backed up?</div>
+<div class="a">Automatic <b>JSON backup every start and every 24 hours</b>; the newest 30 are kept and can be restored.</div>
+<div class="h">A copy of the data is made every day in case something breaks.</div></div>
+
+</body>
+</html>

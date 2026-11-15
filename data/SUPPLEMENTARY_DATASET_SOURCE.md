@@ -69,14 +69,14 @@ naturally uses more fuel and is not an outlier.
 Download `Vehicle fuel consumption.csv` (Fan & Song DOI) and `2024_Vans_Raw.csv` (EEA DOI), then:
 
 ```
-venv\Scripts\python.exe data\build_supplementary_dataset.py "Vehicle fuel consumption.csv" data\supplementary_data.csv
-venv\Scripts\python.exe data\add_eea_diesel_vans.py 2024_Vans_Raw.csv data\supplementary_data.csv
+venv\Scripts\python.exe data\build\build_supplementary_dataset.py "Vehicle fuel consumption.csv" data\supplementary_data.csv
+venv\Scripts\python.exe data\build\add_eea_diesel_vans.py 2024_Vans_Raw.csv data\supplementary_data.csv
 ```
 
 ## Trip Records page — `trip_records_dataset.csv`
 
 Online records are also shown on the **Trip Records** page as trips of the fleet vehicles (built by
-`build_trip_records_dataset.py`), used the way the GSO's own trips show the fleet travels, so with the
+`build/build_trip_records_dataset.py`), used the way the GSO's own trips show the fleet travels, so with the
 93 GSO trips the page lists **7,589 trip records** (7,496 online):
 
 - **How often**: from the GSO trips of SFA 4714 (Jan–Jun 2026): at most one trip a vehicle a day, on

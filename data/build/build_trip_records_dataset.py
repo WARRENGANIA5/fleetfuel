@@ -14,7 +14,7 @@ SUPPLEMENTARY_DATASET_SOURCE.md). Dates and vehicles are assigned:
 Re-running this resets any edits made on the Trip Records page. Training
 still uses supplementary_data.csv, not this file.
 
-Run:  python data/build_trip_records_dataset.py
+Run:  python data/build/build_trip_records_dataset.py
 """
 import os
 from datetime import date, timedelta
@@ -22,7 +22,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # data/
 SOURCE = os.path.join(HERE, "supplementary_data.csv")
 OUTPUT = os.path.join(HERE, "trip_records_dataset.csv")
 

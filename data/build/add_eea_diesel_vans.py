@@ -11,7 +11,7 @@ Filter: diesel, 40-250 kW, 30-1,000 km, 3-40 L/100 km (49,390 rows). Shorter
 distances are mostly new vans idling, so they're dropped. Re-running replaces
 the EEA rows.
 
-Usage: python data/add_eea_diesel_vans.py <2024_Vans_Raw.csv> data/supplementary_data.csv
+Usage: python data/build/add_eea_diesel_vans.py <2024_Vans_Raw.csv> data/supplementary_data.csv
 """
 import hashlib
 import sys

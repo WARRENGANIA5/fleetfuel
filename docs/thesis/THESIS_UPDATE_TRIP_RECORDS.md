@@ -14,7 +14,7 @@ The Trip Records module holds **7,589 trip records**:
 
 For the 7,496 online trips, the **distance traveled (km)** and **fuel consumed (L)** are the values recorded by
 the vehicles' on-board fuel consumption meters (OBFCM) in the EEA dataset, unchanged. The **vehicle** and the
-**date of travel** were assigned by a fixed procedure (`data/build_trip_records_dataset.py`, random seed 42) that
+**date of travel** were assigned by a fixed procedure (`data/build/build_trip_records_dataset.py`, random seed 42) that
 follows the local trips:
 
 1. **Vehicle match.** All nine fleet vehicles use diesel, so only diesel records are used. Each fleet vehicle
