@@ -3,6 +3,7 @@
 {% block page_title %}{{ 'Prediction History &amp; Fuel Requests'|safe if is_admin else 'My Fuel Requests' }}{% endblock %}
 
 {% block content %}
+{% include '_prediction_tabs.html' %}
 <div class="row g-3 mb-3">
 {% set tile_col = "col-6 col-md-3" %}
   <div class="{{ tile_col }}">
@@ -15,7 +16,7 @@
     <div class="metric-tile card-surface"><div class="metric-value" id="histWithActual">{{ summary.with_actual }}</div><div class="metric-label">With Actual Fuel</div></div>
   </div>
   <div class="{{ tile_col }}">
-    <div class="metric-tile card-surface"><div class="metric-value" id="histOutside">{{ summary.outside }}</div><div class="metric-label">Outside Predicted Range</div></div>
+    <div class="metric-tile card-surface"><div class="metric-value" id="histOutside">{{ summary.outside }}</div><div class="metric-label" title="Outside Predicted Range">Outside <span class="d-none d-sm-inline">Predicted </span>Range</div></div>
   </div>
 </div>
 

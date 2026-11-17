@@ -741,9 +741,28 @@ input[type="password"]::-webkit-strong-password-auto-fill-button {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-soft);
   padding: 20px;
+  /* same height as the other tiles in the row, even when a label wraps */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .metric-tile .metric-value { font-size: 30px; font-weight: 800; color: var(--text-dark); }
 .metric-tile .metric-label { font-size: 12.5px; color: var(--text-muted); font-weight: 600; margin-top: 4px; }
+/* New Prediction | History switch at the top of both pages */
+.pred-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+.pred-tabs .btn { display: inline-flex; align-items: center; justify-content: center; }
+.pred-tabs-count { margin-left: 8px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; }
+@media (max-width: 575px) {
+  .pred-tabs .btn { flex: 1 1 0; padding: 9px 8px; font-size: 13px; white-space: nowrap; }
+  .metric-tile { padding: 16px 12px; }
+  .metric-tile .metric-label { line-height: 1.35; }
+}
+@media (max-width: 359px) {
+  .metric-tile { padding: 14px 6px; }
+  .metric-tile .metric-label { font-size: 11.5px; }
+}
 
 .chart-card img { width: 100%; border-radius: 10px; background: #fff; padding: 8px; }
 

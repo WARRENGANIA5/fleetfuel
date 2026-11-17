@@ -3,6 +3,7 @@
 {% block page_title %}Fuel Consumption Prediction{% endblock %}
 
 {% block content %}
+{% include '_prediction_tabs.html' %}
 <div class="alert alert-danger" id="modelUnavailable" {{ 'hidden' if model_available }}>
   <i class="fa-solid fa-triangle-exclamation me-1"></i>
   <strong>Model unavailable.</strong> The administrator trains the model in Google Colab and uploads it

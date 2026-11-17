@@ -1,0 +1,12 @@
+{# Prediction and its history are one menu item; these buttons switch between them #}
+<div class="pred-tabs mb-3" role="tablist">
+  <a href="{{ url_for('prediction') }}" role="tab" aria-selected="{{ 'true' if active == 'prediction' else 'false' }}"
+     class="btn {{ 'btn-blue' if active == 'prediction' else 'btn-outline-navy' }}">
+    <i class="fa-solid fa-gas-pump me-1"></i> New Prediction
+  </a>
+  <a href="{{ url_for('prediction_history') }}" role="tab" aria-selected="{{ 'true' if active == 'prediction_history' else 'false' }}"
+     class="btn {{ 'btn-blue' if active == 'prediction_history' else 'btn-outline-navy' }}">
+    <i class="fa-solid fa-clock-rotate-left me-1"></i> {{ 'Prediction History' if is_admin else 'My Fuel Requests' }}
+    {% if is_admin and pending_requests %}<span class="pred-tabs-count" title="Fuel requests waiting for approval">{{ pending_requests }}</span>{% endif %}
+  </a>
+</div>

@@ -10,7 +10,7 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=95) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=97) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -28,8 +28,10 @@
       <a href="{{ url_for('dashboard') }}" class="nav-link {{ 'active' if active=='dashboard' }}">
         <i class="fa-solid fa-chart-line"></i><span>Dashboard</span>
       </a>
-      <a href="{{ url_for('prediction') }}" class="nav-link {{ 'active' if active=='prediction' }}">
+      {# Prediction History lives inside Prediction (button on the page) #}
+      <a href="{{ url_for('prediction') }}" class="nav-link {{ 'active' if active in ('prediction', 'prediction_history') }}">
         <i class="fa-solid fa-gas-pump"></i><span>Prediction</span>
+        {% if is_admin %}<span class="nav-badge" id="pendingReqBadge" title="Fuel requests waiting for approval" {{ 'hidden' if not pending_requests }}>{{ pending_requests }}</span>{% endif %}
       </a>
       {% if is_admin %}
       <a href="{{ url_for('vehicles') }}" class="nav-link {{ 'active' if active=='vehicles' }}">
@@ -44,10 +46,6 @@
         <i class="fa-solid fa-brain"></i><span>Model Performance</span>
       </a>
       {% endif %}
-      <a href="{{ url_for('prediction_history') }}" class="nav-link {{ 'active' if active=='prediction_history' }}">
-        <i class="fa-solid fa-clock-rotate-left"></i><span>{{ 'Prediction History' if is_admin else 'My Fuel Requests' }}</span>
-        {% if is_admin %}<span class="nav-badge" id="pendingReqBadge" title="Fuel requests waiting for approval" {{ 'hidden' if not pending_requests }}>{{ pending_requests }}</span>{% endif %}
-      </a>
       {% if session.get('role') == 'admin' %}
       <a href="{{ url_for('users') }}" class="nav-link {{ 'active' if active=='users' }}">
         <i class="fa-solid fa-users-gear"></i><span>User Accounts</span>
