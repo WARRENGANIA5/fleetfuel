@@ -12,3 +12,7 @@ firebase-key.json
 *-firebase-adminsdk-*.json
 scripts/
 docs/
+.env
+.env.*
+!.env.example
+__pycache__/
