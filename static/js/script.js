@@ -242,11 +242,26 @@ function initPage() {
 // ---- "Desktop site" mode on phones ----
 // The browser reports ~980px, so re-check the media queries against the real
 // screen width and scale the page to force the phone layout.
+// Some browsers (Samsung Internet, newer Chrome) also report a desktop-sized
+// screen.width in that mode, so take the smallest believable width from
+// several signals; the zoom-out scale (visualViewport) gives the real one.
+function realPhoneWidth() {
+  const vv = window.visualViewport;
+  const seen = [window.screen.width, Math.min(window.screen.width, window.screen.height)];
+  if (vv && vv.scale > 0 && vv.scale < 1) seen.push(vv.width * vv.scale);
+  if (window.outerWidth) seen.push(window.outerWidth);
+  const ok = seen.filter(function (w) { return w >= 240; });
+  return ok.length ? Math.round(Math.min.apply(null, ok)) : window.screen.width;
+}
 function usePhoneLayoutOnDesktopSite() {
-  const touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-  const realWidth = window.screen.width;
-  if (!touch || Math.min(window.screen.width, window.screen.height) > 600) return;
+  const coarse = window.matchMedia && (matchMedia('(pointer: coarse)').matches || matchMedia('(any-pointer: coarse)').matches);
+  const touch = coarse || navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   const root = document.documentElement;
+  let realWidth;
+  if (!root.classList.contains('force-phone')) realWidth = root._fpWidth = realPhoneWidth();
+  else if (Math.min(window.screen.width, window.screen.height) <= 600) realWidth = window.screen.width; // rotated
+  else realWidth = root._fpWidth;
+  if (!touch || !realWidth || realWidth > 600 && !root.classList.contains('force-phone')) return;
   if (!root.classList.contains('force-phone') && window.innerWidth < 900) return;
   const fits = function (text) {
     let ok = true;
@@ -293,6 +308,10 @@ function showDesktopSiteHint() {
   document.body.prepend(bar);
 }
 document.addEventListener('DOMContentLoaded', usePhoneLayoutOnDesktopSite);
+// zoom-out scale is often only known after load
+window.addEventListener('load', function () {
+  if (!document.documentElement.classList.contains('force-phone')) usePhoneLayoutOnDesktopSite();
+});
 window.addEventListener('orientationchange', function () { setTimeout(usePhoneLayoutOnDesktopSite, 300); });
 
 document.addEventListener('DOMContentLoaded', function () {
