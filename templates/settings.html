@@ -225,6 +225,7 @@
   });
   cameraEl.addEventListener('hidden.bs.modal', stopCamera);
   window.addEventListener('pagehide', stopCamera);
+  document.addEventListener('pageleave', function onLeave() { stopCamera(); document.removeEventListener('pageleave', onLeave); });
 
   sheetEl.addEventListener('click', function (e) {
     const item = e.target.closest('[data-avatar]');

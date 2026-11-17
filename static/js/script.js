@@ -4,7 +4,10 @@
 (function () {
   const nativeFetch = window.fetch.bind(window);
   let leaving = false;
-  window.fetch = function () {
+  window.fetch = function (input, init) {
+    // a change was saved: prefetched pages may now be out of date
+    const method = (init && init.method) || (input && input.method) || 'GET';
+    if (!/^(GET|HEAD)$/i.test(method) && window.dropPageCache) window.dropPageCache();
     return nativeFetch.apply(null, arguments).then(function (res) {
       const target = res.headers.get('X-Redirect');
       if (!target) return res;
@@ -322,17 +325,41 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!progress) return;
     progress.classList.add('is-loading');
     clearTimeout(navTimer);
-    navTimer = setTimeout(endNav, 10000);  // failsafe
+    navTimer = setTimeout(endNav, 30000);  // failsafe (Vercel cold starts can take a while)
   };
   const endNav = function () {
     clearTimeout(navTimer);
     if (progress) progress.classList.remove('is-loading');
   };
+
+  // ---- One submit per click ----
+  // A quick second tap would send the form twice (duplicate records).
+  // Buttons are disabled a tick later so the clicked button's name/value is still sent.
+  const releaseForms = function () {
+    document.querySelectorAll('form[data-submitting]').forEach(function (f) {
+      delete f.dataset.submitting;
+      f.querySelectorAll('[data-submit-locked]').forEach(function (b) { b.disabled = false; delete b.dataset.submitLocked; });
+    });
+  };
   document.addEventListener('submit', function (e) {
-    if (!e.defaultPrevented) startNav();
+    const form = e.target;
+    if (e.defaultPrevented) return;
+    if (form.dataset.submitting) { e.preventDefault(); return; }
+    // downloads and new tabs don't leave the page
+    const leaves = form.target !== '_blank' && !/export|\.csv/i.test(form.getAttribute('action') || '');
+    if (!leaves) return;
+    form.dataset.submitting = '1';
+    setTimeout(function () {
+      if (!form.dataset.submitting) return;
+      form.querySelectorAll('button[type="submit"], button:not([type]), input[type="submit"]').forEach(function (b) {
+        if (!b.disabled) { b.disabled = true; b.dataset.submitLocked = '1'; }
+      });
+    }, 0);
+    setTimeout(releaseForms, 30000);  // failsafe if the page never changes
+    startNav();
   });
-  // bfcache restore
-  window.addEventListener('pageshow', endNav);
+  // bfcache restore (Back button): clear the loading bar, overlay and locked buttons
+  window.addEventListener('pageshow', function () { endNav(); hideLoading(); releaseForms(); });
 
   // ---- In-app navigation ----
   // Swap only <main> on internal links and prefetch on hover. Downloads,
@@ -343,6 +370,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageCache = new Map();  // url -> { promise, at }
     const loadedScripts = new Set(Array.from(document.scripts).filter(function (s) { return s.src; }).map(function (s) { return s.src; }));
     let navToken = 0;
+    window.dropPageCache = function () { pageCache.clear(); };
 
     const pageUrl = function (a, e) {
       if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return null;
@@ -379,9 +407,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     };
 
-    const swapPage = function (doc, newMain, finalUrl, push) {
-      // tear down the old page
+    const swapPage = function (doc, newMain, finalUrl, push, token) {
+      // tear down the old page (pages can listen for 'pageleave' to stop cameras etc.)
+      document.dispatchEvent(new Event('pageleave'));
       stopPageTimers();
+      hideLoading();
       window.refreshBeforePrint = undefined;
       if (window.Chart && Chart.instances) Object.values(Chart.instances).forEach(function (c) { c.destroy(); });
       document.querySelectorAll('.modal.show').forEach(function (m) {
@@ -417,6 +447,8 @@ document.addEventListener('DOMContentLoaded', function () {
         .map(function (s) { return s.textContent; }).join('\n;\n');
       return externals.reduce(function (p, s) { return p.then(function () { return loadScript(s.src); }); }, Promise.resolve())
         .then(function () {
+          // another link was tapped while scripts loaded: that page owns the DOM now
+          if (token !== navToken) return;
           if (inline.trim()) {
             const el = document.createElement('script');
             el.textContent = '(function () {\n' + inline + '\n})();';
@@ -430,8 +462,9 @@ document.addEventListener('DOMContentLoaded', function () {
       const token = ++navToken;
       startNav();
       const slow = setTimeout(function () { if (token === navToken) main.classList.add('is-switching'); }, 150);
-      // fall back to a normal load after 8s
-      const stuck = setTimeout(function () { if (token === navToken) { pageCache.delete(url); window.location.href = url; } }, 8000);
+      // fall back to a normal load only if really stuck (a cold start can take 10s+,
+      // and reloading early just starts the slow request again)
+      const stuck = setTimeout(function () { if (token === navToken) { pageCache.delete(url); window.location.href = url; } }, 25000);
       fetchPage(url)
         .then(function (r) {
           pageCache.delete(url);
@@ -440,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
           const doc = new DOMParser().parseFromString(r.html, 'text/html');
           const newMain = doc.querySelector('main.content-area');
           if (!newMain || !doc.getElementById('pageScripts')) { window.location.href = r.url; return; }
-          return swapPage(doc, newMain, r.url, push);
+          return swapPage(doc, newMain, r.url, push, token);
         })
         .catch(function () { if (token === navToken) window.location.href = url; })
         .then(function () {
