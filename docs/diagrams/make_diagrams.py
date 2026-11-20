@@ -45,11 +45,11 @@ def data_pipeline():
          [("Distance (c)", "X1, km", "navy"), ("Engine Power (c)", "X2, kW", "navy"), ("Fuel Type", "X3, 0 = Diesel", "navy"),
           ("Distance × Power", "X4", "navy")]),
         ("Data Split", "Modeling",
-         [("Training Set", "80% · 27,292", "green"), ("Test Set", "20% · 6,824", "green"),
+         [("Training Set", "80% · 27,288", "green"), ("Test Set", "20% · 6,823", "green"),
           ("Cross-Validation", "5 folds", "green")]),
         ("Model Output", "Modeling",
          [("Linear Regression", "weighted least squares", "green"), ("Saved Files", ".joblib + metrics", "green"),
-          ("Results", "R² 0.9020 · MAE 1.91 L", "green")]),
+          ("Results", "R² 0.9008 · MAE 1.87 L", "green")]),
     ]
     LX, CX0, CX1, GAP = 20, 255, W - 22, 16
     y = 128
@@ -74,7 +74,7 @@ def data_pipeline():
         if name == "Cleaning":
             prev_label = y + h + 14
         y += h + 28 + 44
-    s.label((CX0 + CX1) / 2 + 150, prev_label + 28, "34,116 clean records", GREEN, 14)
+    s.label((CX0 + CX1) / 2 + 150, prev_label + 28, "34,111 clean records", GREEN, 14)
     s.save(os.path.join(OUT, "fig1_data_pipeline.svg"), y - 20)
 
 
@@ -92,7 +92,7 @@ def data_model():
 
     mv, mvy = s.table(C[0], 130, TW, "Model Input View", [
         ("", "X1 distance_km", "km"), ("", "X2 engine_power_kw", "kW"), ("", "X3 fuel_type", "0 = Diesel"),
-        ("", "X4 distance × power", "X1·X2"), ("", "Y actual_fuel", "L")], tone="green", note="34,116 clean records")
+        ("", "X4 distance × power", "X1·X2"), ("", "Y actual_fuel", "L")], tone="green", note="34,111 clean records")
     dd, ddy = s.table(C[1], 130, TW, "Dim Date", [
         ("PK", "trip_date", "date"), ("", "month", "int"), ("", "year", "int")], tone="gold",
         note="from the trip date")
@@ -164,9 +164,9 @@ def lifecycle():
     s = SVG(W, "ML Lifecycle and Decision Flow", "CRISP-DM cycle of the project and the decisions in it")
     phases = [("1. Business Understanding", "predict fuel per trip", "maroon"),
               ("2. Data Understanding", "93 GSO + 99,898 online", "gold"),
-              ("3. Data Preparation", "34,116 clean records", "navy"),
+              ("3. Data Preparation", "34,111 clean records", "navy"),
               ("4. Modeling", "Linear Regression", "teal"),
-              ("5. Evaluation", "R² 0.9020, 5-fold CV", "green"),
+              ("5. Evaluation", "R² 0.9008, 5-fold CV", "green"),
               ("6. Deployment", "Flask web system", "maroon")]
     pw = 270
     xs = [40, W / 2 - pw / 2, W - 40 - pw]

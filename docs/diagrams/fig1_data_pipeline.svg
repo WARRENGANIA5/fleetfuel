@@ -119,10 +119,10 @@
 <text x="82.0" y="1319.4" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Modeling</text>
 <rect x="255.0" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
 <text x="370.2" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Training Set</text>
-<text x="370.2" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">80% · 27,292</text>
+<text x="370.2" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">80% · 27,288</text>
 <rect x="501.3" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
 <text x="616.5" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Test Set</text>
-<text x="616.5" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">20% · 6,824</text>
+<text x="616.5" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">20% · 6,823</text>
 <rect x="747.7" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
 <text x="862.8" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Cross-Validation</text>
 <text x="862.8" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">5 folds</text>
@@ -142,9 +142,9 @@
 <text x="616.5" y="1471.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">.joblib + metrics</text>
 <rect x="747.7" y="1406.0" width="230.3" height="137.2" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
 <text x="862.8" y="1439.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Results</text>
-<text x="862.8" y="1471.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.9020 · MAE</text>
-<text x="862.8" y="1497.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">1.91 L</text>
+<text x="862.8" y="1471.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.9008 · MAE</text>
+<text x="862.8" y="1497.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">1.87 L</text>
 <path d="M616.5,1334.0 L616.5,1391.0" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
 <rect x="662.5" y="1019.3" width="208.0" height="25.5" rx="4" fill="#ffffff" opacity="0.96"/>
-<text x="766.5" y="1036.8" font-family="Arial, Helvetica, sans-serif" font-size="17.5" font-weight="bold" fill="#2f6b3f" text-anchor="middle">34,116 clean records</text>
+<text x="766.5" y="1036.8" font-family="Arial, Helvetica, sans-serif" font-size="17.5" font-weight="bold" fill="#2f6b3f" text-anchor="middle">34,111 clean records</text>
 </svg>

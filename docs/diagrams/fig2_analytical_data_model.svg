@@ -6,7 +6,7 @@
 <rect x="20.0" y="130.0" width="310.0" height="249.2" rx="6" fill="#ffffff" stroke="#2f6b3f" stroke-width="1.7"/>
 <path d="M20,202.5 V136 Q20,130 26,130 H324 Q330,130 330,136 V202.5 Z" fill="#2f6b3f"/>
 <text x="175.0" y="161.2" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">Model Input View</text>
-<text x="175.0" y="187.5" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">34,116 clean records</text>
+<text x="175.0" y="187.5" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">34,111 clean records</text>
 <text x="67.5" y="230.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">X1 distance_km</text>
 <text x="321.0" y="230.2" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">km</text>
 <rect x="21" y="240.25" width="308" height="33.75" fill="#e8f3ec"/>

@@ -23,7 +23,7 @@ Secondly, during data understanding, the researchers identified the data needed 
 
 #hd[Data Preparation Phase]
 
-Further, the researchers produced a clean, modeling-ready dataset. They merged the trip and vehicle records using the plate number and combined them with the supplementary dataset. Incomplete records and extreme outliers were removed, only records within the operating range of the fleet were kept, records the equation could not represent were removed, fuel type was encoded into numeric form, distance and engine power were centered, and an interaction term between the two was added. The final dataset holds 34,116 records.
+Further, the researchers produced a clean, modeling-ready dataset. They merged the trip and vehicle records using the plate number and combined them with the supplementary dataset. Incomplete records and extreme outliers were removed, only records within the operating range of the fleet were kept, records the equation could not represent were removed, fuel type was encoded into numeric form, distance and engine power were centered, and an interaction term between the two was added. The final dataset holds 34,111 records.
 
 #hd[Modeling Phase]
 
@@ -170,7 +170,7 @@ The researchers collected the Monthly Report of Official Travel records from the
 #tbl((165pt, 60pt, 211pt,), tc[Source], tc[Records], tc[Description], td[Monthly Report of Official Travel (GSO)], td[93], td[Official trips of SFA 4714, January–June 2026], td[Vehicle records of the university fleet], td[9 vehicles], td[Plate number, vehicle model, fuel type and engine power (kW)], td[Trip records from online datasets], td[7,496], td[Diesel van trips from the European Environment Agency (2025)], td[Other online records], td[92,402], td[50,508 gasoline records (Fan and Song) and the other 41,894 diesel van records (EEA)], td[#strong[Total trip records]], td[#strong[99,991]], td[Each record is used only once])
 ]
 
-#emph[Table 4]; shows the number of records collected from each source. The total of 99,991 counts only trip records. The 9 vehicle records describe the fleet vehicles and are not trips. By the time the model was trained, the system had added 6 trips recorded through completed fuel requests, so 99,997 trip records entered preprocessing.
+#emph[Table 4]; shows the number of records collected from each source. The total of 99,991 counts only trip records. The 9 vehicle records describe the fleet vehicles and are not trips.
 
 #hd[T8. Data Exploration and Quality Verification]
 
@@ -201,22 +201,22 @@ $ z_i = ((y_i - hat(y)_i) sqrt(w_i)) / s $
 #block(breakable: false)[
 #cap[Table 5. #strong[#underline[RECORDS BEFORE AND AFTER PREPROCESSING]];]
 
-#tbl((176pt, 90pt, 90pt, 80pt,), tc[Source], tc[Before], tc[After], tc[Removed], td[Local Trips (GSO)], td[99], td[97], td[2], td[Fleet-matched online records], td[7,496], td[7,098], td[398], td[Supplementary online records], td[92,402], td[26,921], td[65,481], td[#strong[Total]], td[#strong[99,997]], td[#strong[34,116]], td[#strong[65,881]])
+#tbl((176pt, 90pt, 90pt, 80pt,), tc[Source], tc[Before], tc[After], tc[Removed], td[Local Trips (GSO)], td[93], td[93], td[0], td[Fleet-matched online records], td[7,496], td[7,098], td[398], td[Supplementary online records], td[92,402], td[26,920], td[65,482], td[#strong[Total]], td[#strong[99,991]], td[#strong[34,111]], td[#strong[65,880]])
 ]
 
-#emph[Table 5]; shows the records kept after cleaning, outlier removal, and the operating-range filter. The local trips are the 93 trips of the Monthly Report of Official Travel and 6 trips recorded through completed fuel requests. All 93 trips of the Monthly Report passed every check, while 2 short fuel-request trips with an unusually high fuel use per 100 km were removed by the IQR method. The IQR method removed 3,858 records, 61,663 records were outside the operating range of the fleet, including every gasoline record, and the residual check removed 360 records, about 1 percent. Most removed records came from the supplementary data, since many of those vehicles fall outside the fuel type, distance, and engine power range of the university fleet. The final dataset holds 34,116 diesel records.
+#emph[Table 5]; shows the records kept after cleaning, outlier removal, and the operating-range filter. All 93 local trips passed every check. The IQR method removed 3,857 records, 61,663 records were outside the operating range of the fleet, including every gasoline record, and the residual check removed 360 records, about 1 percent. Most removed records came from the supplementary data, since many of those vehicles fall outside the fuel type, distance, and engine power range of the university fleet. The final dataset holds 34,111 diesel records.
 
 #block(breakable: false)[
 #cap[Table 6. #strong[#underline[DESCRIPTIVE STATISTICS OF THE FINAL DATASET]];]
 
-#tbl((126pt, 80pt, 80pt, 75pt, 75pt,), tc[Variable], tc[Mean], tc[Std. Dev.], tc[Minimum], tc[Maximum], td[Distance traveled (km)], td[151.18], td[92.05], td[30.00], td[400.00], td[Engine power (kW)], td[95.23], td[22.03], td[51.00], td[177.00], td[Fuel consumed (L)], td[14.12], td[8.56], td[1.90], td[66.78])
+#tbl((126pt, 80pt, 80pt, 75pt, 75pt,), tc[Variable], tc[Mean], tc[Std. Dev.], tc[Minimum], tc[Maximum], td[Distance traveled (km)], td[151.19], td[92.04], td[30.00], td[400.00], td[Engine power (kW)], td[95.23], td[22.02], td[51.00], td[177.00], td[Fuel consumed (L)], td[14.12], td[8.56], td[1.90], td[66.78])
 ]
 
-#emph[Table 6]; shows the descriptive statistics of the final dataset. The average trip covers 151.18 km and uses 14.12 L of fuel. Distances range from 30 km to 400 km, and engine power ranges from 51 kW to 177 kW. Since every record is diesel, the fuel type is 0 in all 34,116 records.
+#emph[Table 6]; shows the descriptive statistics of the final dataset. The average trip covers 151.19 km and uses 14.12 L of fuel. Distances range from 30 km to 400 km, and engine power ranges from 51 kW to 177 kW. Since every record is diesel, the fuel type is 0 in all 34,111 records.
 
 #hd[T11. Data Splitting and Interaction Term Creation]
 
-The dataset was split into an 80 percent training set of 27,292 records and a 20 percent testing set of 6,824 records. A fixed random seed (42) reproduces the same split in every run. Distance traveled and engine power were then centered on the mean values of the training set, 150.924 km and 95.2289 kW. An interaction term between the centered variables accounts for the higher fuel use per kilometer of larger engines.
+The dataset was split into an 80 percent training set of 27,288 records and a 20 percent testing set of 6,823 records. A fixed random seed (42) reproduces the same split in every run. Distance traveled and engine power were then centered on the mean values of the training set, 151.209 km and 95.3679 kW. An interaction term between the centered variables accounts for the higher fuel use per kilometer of larger engines.
 
 $ "Distance"_c = "Distance" - overline("Distance")_"train" $
 
@@ -240,7 +240,7 @@ Before training, the researchers modeled how the data moves through the study an
 #figcap[Figure 4. #strong[#underline[Data Pipeline Diagram]];]
 ]
 
-#emph[Figure 4]; traces the records from collection to the trained model in eight stages. (1) The data sources are the GSO trip records, which hold the 93 trips of the Monthly Report of Official Travel and the trips of completed fuel requests, the 9 vehicle records, the 7,496 online trip records of European Environment Agency vans, and the other 92,402 online records. (2) The trips, vehicles, and fuel requests are stored in Firebase Firestore, while the online records are kept in CSV files. (3) The administrator exports three CSV files from the Model Performance page, namely the trip records, the vehicle records, and the supplementary data, and loads them into the Google Colab notebook. (4) The notebook joins the trips and vehicles by plate number and merges them with the online data, tagging each record with its data source. (5) Cleaning removes records with missing values or zero distance, removes outliers with the IQR rule within each engine power, keeps only the fleet range of diesel vehicles, 30 to 400 km, and 51 to 177 kW, and removes records with a standardized residual beyond ±3, leaving 34,116 clean records. Pending trips have no fuel figure, so they are dropped in this step. (6) Feature engineering builds the four terms of the model: the centered Distance (X1), the centered Engine Power (X2), Fuel Type (X3, 0 for diesel), and Distance × Engine Power (X4). (7) The data is split into a 27,292-record training set and a 6,824-record test set, with 5-fold cross-validation. (8) The output is the Linear Regression model trained by weighted least squares, saved as a Joblib file with its metrics file, with an R² of 0.9020 and an MAE of 1.91 L.
+#emph[Figure 4]; traces the records from collection to the trained model in eight stages. (1) The data sources are the GSO trip records, which hold the 93 trips of the Monthly Report of Official Travel and the trips of completed fuel requests, the 9 vehicle records, the 7,496 online trip records of European Environment Agency vans, and the other 92,402 online records. (2) The trips, vehicles, and fuel requests are stored in Firebase Firestore, while the online records are kept in CSV files. (3) The administrator exports three CSV files from the Model Performance page, namely the trip records, the vehicle records, and the supplementary data, and loads them into the Google Colab notebook. (4) The notebook joins the trips and vehicles by plate number and merges them with the online data, tagging each record with its data source. (5) Cleaning removes records with missing values or zero distance, removes outliers with the IQR rule within each engine power, keeps only the fleet range of diesel vehicles, 30 to 400 km, and 51 to 177 kW, and removes records with a standardized residual beyond ±3, leaving 34,111 clean records. Pending trips have no fuel figure, so they are dropped in this step. (6) Feature engineering builds the four terms of the model: the centered Distance (X1), the centered Engine Power (X2), Fuel Type (X3, 0 for diesel), and Distance × Engine Power (X4). (7) The data is split into a 27,288-record training set and a 6,823-record test set, with 5-fold cross-validation. (8) The output is the Linear Regression model trained by weighted least squares, saved as a Joblib file with its metrics file, with an R² of 0.9008 and an MAE of 1.87 L.
 
 #hd[Analytical Data Model Schema]
 
@@ -250,7 +250,7 @@ Before training, the researchers modeled how the data moves through the study an
 #figcap[Figure 5. #strong[#underline[Analytical Data Model Schema]];]
 ]
 
-#emph[Figure 5]; shows the analytical data model as a star schema built from the Firestore collections of the system. Fact Trip holds one row per trip of the trip_records collection, with its distance (X1) and actual fuel consumed (Y). It links to Dim Vehicle by vehicle_id, to Dim Date by the date of travel, and to Dim Data Source, which marks each record as local, online trips, or supplementary. Fact Prediction holds one row per fuel request of the predictions collection, with the distance, the predicted fuel ŷ, the approval status, the liters approved for release, and the actual fuel. It links to Dim Vehicle, to Dim User (the staff member or administrator who made the request), and through trip_record_id to the pending trip it creates, so each fuel request has at most one trip. Dim Vehicle supplies the engine power (X2) and fuel type (X3) of every trip and request. The Model Input View is derived from these tables and holds the 34,116 clean records with X1 to X4 and the target Y, the actual fuel consumed in liters.
+#emph[Figure 5]; shows the analytical data model as a star schema built from the Firestore collections of the system. Fact Trip holds one row per trip of the trip_records collection, with its distance (X1) and actual fuel consumed (Y). It links to Dim Vehicle by vehicle_id, to Dim Date by the date of travel, and to Dim Data Source, which marks each record as local, online trips, or supplementary. Fact Prediction holds one row per fuel request of the predictions collection, with the distance, the predicted fuel ŷ, the approval status, the liters approved for release, and the actual fuel. It links to Dim Vehicle, to Dim User (the staff member or administrator who made the request), and through trip_record_id to the pending trip it creates, so each fuel request has at most one trip. Dim Vehicle supplies the engine power (X2) and fuel type (X3) of every trip and request. The Model Input View is derived from these tables and holds the 34,111 clean records with X1 to X4 and the target Y, the actual fuel consumed in liters.
 
 #hd[ML Lifecycle and Decision Flow]
 
@@ -288,7 +288,7 @@ Before training, the researchers measured the correlation among the variables. T
 #figcap[Figure 8. #strong[#underline[Correlation Heatmap of the Variables]];]
 ]
 
-#emph[Figure 8]; shows distance traveled as the strongest predictor of fuel consumed, with a correlation of 0.89. The interaction term follows at 0.22, and engine power at 0.15. Engine power alone has a weak link to fuel consumed. Its effect shows up through the interaction term, since a larger engine burns more fuel for every added kilometer. Fuel type does not appear in the heatmap because it is 0 (diesel) in every record, so it has no variation to correlate. The predictors share little information with one another. Distance and engine power correlate at −0.17. The interaction term correlates at only 0.06 with distance and 0.06 with engine power, which confirms the centering step kept the interaction term separate from its parent variables.
+#emph[Figure 8]; shows distance traveled as the strongest predictor of fuel consumed, with a correlation of 0.89. The interaction term follows at 0.21, and engine power at 0.15. Engine power alone has a weak link to fuel consumed. Its effect shows up through the interaction term, since a larger engine burns more fuel for every added kilometer. Fuel type does not appear in the heatmap because it is 0 (diesel) in every record, so it has no variation to correlate. The predictors share little information with one another. Distance and engine power correlate at −0.17. The interaction term correlates at only 0.06 with distance and 0.06 with engine power, which confirms the centering step kept the interaction term separate from its parent variables.
 
 The researchers then computed the Variance Inflation Factor (VIF) of each predictor. A VIF above 5 signals high collinearity.
 
@@ -306,35 +306,35 @@ $ "VIF"_j = 1 / (1 - R_j^2) $
 
 #hd[T14. Linear Regression Model Training]
 
-The researchers trained the Linear Regression model on the 27,292 records of the training set using Scikit-learn. The model follows the equation below.
+The researchers trained the Linear Regression model on the 27,288 records of the training set using Scikit-learn. The model follows the equation below.
 
 $ hat(y) = & beta_0 + beta_1("Distance"_c) + beta_2("Engine Power"_c) \ & + beta_3("Fuel Type") + beta_4("Distance"_c times "Engine Power"_c) $
 
 #ni[where #emph[ŷ]; is the predicted fuel consumed in liters, #emph[β];#sub[0]; is the intercept, #emph[β];#sub[1]; to #emph[β];#sub[4]; are the coefficients of the predictors, and the subscript #emph[c]; marks a centered variable.]
 
-A first fit by Ordinary Least Squares showed that the errors grow with the fuel a trip uses: the residuals had a standard deviation of about 1.3 L for trips predicted below 10 L and about 5.3 L for trips predicted above 30 L. The researchers therefore estimated the coefficients by Weighted Least Squares (WLS), which is still Linear Regression with the same equation \[12\]. The error variance of each record was modeled from the first fit:
+A first fit by Ordinary Least Squares showed that the errors grow with the fuel a trip uses: the residuals had a standard deviation of about 1.2 L for trips predicted below 10 L and about 5.4 L for trips predicted above 30 L. The researchers therefore estimated the coefficients by Weighted Least Squares (WLS), which is still Linear Regression with the same equation \[12\]. The error variance of each record was modeled from the first fit:
 
 $ log(e_i^2) = gamma_0 + gamma_1 log(hat(y)_i) $
 
-#ni[which gave #emph[γ];#sub[0]; \= −4.48 and #emph[γ];#sub[1]; \= 1.88. Each record received the weight #emph[w];#sub[i]; \= 1 \/ exp(#emph[γ];#sub[0]; \+ #emph[γ];#sub[1]; log #emph[ŷ];#sub[i];), so a long, fuel-heavy trip with a larger error counts less, and the model was fitted again by minimizing the weighted sum of squared residuals:]
+#ni[which gave #emph[γ];#sub[0]; \= −4.46 and #emph[γ];#sub[1]; \= 1.87. Each record received the weight #emph[w];#sub[i]; \= 1 \/ exp(#emph[γ];#sub[0]; \+ #emph[γ];#sub[1]; log #emph[ŷ];#sub[i];), so a long, fuel-heavy trip with a larger error counts less, and the model was fitted again by minimizing the weighted sum of squared residuals:]
 
 $ min_beta sum_(i=1)^n w_i (y_i - hat(y)_i)^2 $
 
 #block(breakable: false)[
 #cap[Table 7. #strong[#underline[COEFFICIENTS OF THE TRAINED MODEL]];]
 
-#tbl((180pt, 90pt, 80pt, 86pt,), tc[Term], tc[Coefficient], tc[Std. Error], tc[p-value], td[Intercept (β#sub[0])], td[14.3283], td[0.0168], td[\< 0.001], td[Distance#sub[c] (β#sub[1])], td[0.0866], td[0.00017], td[\< 0.001], td[Engine Power#sub[c] (β#sub[2])], td[0.1143], td[0.00073], td[\< 0.001], td[Fuel Type (β#sub[3])], td[0.0000], td[–], td[–], td[Distance#sub[c] × Engine Power#sub[c] (β#sub[4])], td[0.000626], td[0.0000077], td[\< 0.001])
+#tbl((180pt, 90pt, 80pt, 86pt,), tc[Term], tc[Coefficient], tc[Std. Error], tc[p-value], td[Intercept (β#sub[0])], td[14.3621], td[0.0168], td[\< 0.001], td[Distance#sub[c] (β#sub[1])], td[0.0866], td[0.00017], td[\< 0.001], td[Engine Power#sub[c] (β#sub[2])], td[0.1142], td[0.00073], td[\< 0.001], td[Fuel Type (β#sub[3])], td[0.0000], td[–], td[–], td[Distance#sub[c] × Engine Power#sub[c] (β#sub[4])], td[0.000625], td[0.0000077], td[\< 0.001])
 ]
 
 #emph[Table 7]; lists the coefficients of the trained model. Each coefficient gives the average change in liters for a one-unit change in its predictor while the other predictors stay constant. The standard errors are heteroskedasticity-robust (HC3), and every term except fuel type is significant at α \= 0.05.
 
-Since both parent variables are centered, the intercept of 14.328 L is the predicted fuel for a trip of average distance (150.9 km) in a vehicle of average engine power (95.2 kW). β#sub[1] means each added kilometer uses about 0.087 L (about 8.7 L per 100 km) for a vehicle of average engine power, and β#sub[2] means each added kilowatt uses about 0.114 L on a trip of average distance. The positive β#sub[4] shows that larger engines use more fuel for every added kilometer. β#sub[3] is 0 because every training record is diesel, so the model learned no difference between gasoline and diesel; the term stays in the equation so that the same pipeline can accept gasoline vehicles if they are added later.
+Since both parent variables are centered, the intercept of 14.362 L is the predicted fuel for a trip of average distance (151.2 km) in a vehicle of average engine power (95.4 kW). β#sub[1] means each added kilometer uses about 0.087 L (about 8.7 L per 100 km) for a vehicle of average engine power, and β#sub[2] means each added kilowatt uses about 0.114 L on a trip of average distance. The positive β#sub[4] shows that larger engines use more fuel for every added kilometer. β#sub[3] is 0 because every training record is diesel, so the model learned no difference between gasoline and diesel; the term stays in the equation so that the same pipeline can accept gasoline vehicles if they are added later.
 
 Written with the original, uncentered values, the same model is:
 
-#eqtext[ŷ \= −0.6283 \+ 0.02696(Distance) \+ 0.01978(Engine Power) \+ 0.000626(Distance × Engine Power)]
+#eqtext[ŷ \= −0.6054 \+ 0.02695(Distance) \+ 0.01966(Engine Power) \+ 0.000625(Distance × Engine Power)]
 
-For example, a 176 km trip of SFA 4714 (diesel, 95 kW) gives about 16.47 liters, close to the 17.5-liter average of its recorded trips. The trained model and the training means were exported with Joblib for use in the web application.
+For example, a 176 km trip of SFA 4714 (diesel, 95 kW) gives about 16.46 liters, close to the 17.6-liter average of its recorded trips. The trained model and the training means were exported with Joblib for use in the web application.
 
 #hd[Evaluation Phase]
 
@@ -348,7 +348,7 @@ After training, the researchers examined the residuals to test the assumptions o
 #figcap[Figure 10. #strong[#underline[Residual Plot of the Standardized Residuals]];]
 ]
 
-#emph[Figure 10]; plots the standardized residuals of the 6,824 test trips against the predicted fuel consumption. The points form an even band around the zero line, between about −2.6 and \+3.0, with no curved pattern and no funnel shape. The spread is the same for short and long trips: the standard deviation of the standardized residuals is 1.04 for trips predicted below 10 L, 0.98 for 10 to 30 L, and 0.95 above 30 L. In liters, a long trip still has a larger error than a short one, and the weights account for this difference. Across five equal groups of predicted fuel, the largest residual variance is 1.27 times the smallest, within the limit of 3 \[50\]. The Breusch-Pagan test gave a statistic of 96.51 with a p-value below 0.001; with 27,292 training records the test reacts to this very small difference, so the variance ratio was used for the decision.
+#emph[Figure 10]; plots the standardized residuals of the 6,823 test trips against the predicted fuel consumption. The points form an even band around the zero line, between about −2.9 and \+3.0, with no curved pattern and no funnel shape. The spread is the same for short and long trips: the standard deviation of the standardized residuals is 1.01 for trips predicted below 10 L, 0.99 for 10 to 30 L, and 0.98 above 30 L. In liters, a long trip still has a larger error than a short one, and the weights account for this difference. Across five equal groups of predicted fuel, the largest residual variance is 1.26 times the smallest, within the limit of 3 \[50\]. The Breusch-Pagan test gave a statistic of 115.28 with a p-value below 0.001; with 27,288 training records the test reacts to this very small difference, so the variance ratio was used for the decision.
 
 #block(breakable: false)[
 #figimg("images/residual_histogram.png", 330pt)
@@ -356,7 +356,7 @@ After training, the researchers examined the residuals to test the assumptions o
 #figcap[Figure 11. #strong[#underline[Histogram of Residuals]];]
 ]
 
-#emph[Figure 11]; shows the distribution of the residuals in liters. The bars form a bell shape centered on zero, and 73.4 percent of the residuals fall between −2.5 L and \+2.5 L. The two tails are nearly balanced: 273 trips have residuals above \+5 L and 239 below −5 L. Only 30 of the 6,824 test trips, or 0.44 percent, have residuals beyond 10 L in either direction.
+#emph[Figure 11]; shows the distribution of the residuals in liters. The bars form a bell shape centered on zero, and 74.4 percent of the residuals fall between −2.5 L and \+2.5 L. The two tails are nearly balanced: 273 trips have residuals above \+5 L and 213 below −5 L. Only 41 of the 6,823 test trips, or 0.60 percent, have residuals beyond 10 L in either direction.
 
 #block(breakable: false)[
 #figimg("images/residual_qq_plot.png", 330pt)
@@ -364,23 +364,23 @@ After training, the researchers examined the residuals to test the assumptions o
 #figcap[Figure 12. #strong[#underline[Normal Q-Q Plot of the Standardized Residuals]];]
 ]
 
-#emph[Figure 12]; compares the standardized residuals with a normal distribution. The points follow the reference line between about −2.5 and \+2.5 theoretical quantiles, which covers almost all of the test trips. The ends level off near −2.6 and \+3.0 because records beyond ±3 were removed during cleaning. The skewness is 0.36 and the excess kurtosis is −0.10, both close to the 0 of a normal distribution and well within the limits of ±2 and ±7 \[48\]. The Jarque-Bera test gave a statistic of 615.27 with a p-value below 0.001; with 27,292 training records it reacts to this small skew, so the skewness and kurtosis were used for the decision.
+#emph[Figure 12]; compares the standardized residuals with a normal distribution. The points follow the reference line between about −2.5 and \+2.5 theoretical quantiles, which covers almost all of the test trips. The ends level off near −2.9 and \+3.0 because records beyond ±3 were removed during cleaning. The skewness is 0.37 and the excess kurtosis is −0.11, both close to the 0 of a normal distribution and well within the limits of ±2 and ±7 \[48\]. The Jarque-Bera test gave a statistic of 623.39 with a p-value below 0.001; with 27,288 training records it reacts to this small skew, so the skewness and kurtosis were used for the decision.
 
-The Ramsey RESET test checked linearity by adding the square of the predicted fuel to the model. It gave F \= 15.49 with a p-value below 0.001, but the added term raised the explained variation by almost nothing: Cohen's f² was 0.0003, far below 0.02, the smallest effect that matters \[49\]. The relationship between the predictors and the fuel consumed is therefore linear.
+The Ramsey RESET test checked linearity by adding the square of the predicted fuel to the model. It gave F \= 21.76 with a p-value below 0.001, but the added term raised the explained variation by almost nothing: Cohen's f² was 0.0003, far below 0.02, the smallest effect that matters \[49\]. The relationship between the predictors and the fuel consumed is therefore linear.
 
-The Durbin-Watson statistic tested the residuals of the 97 local trips, arranged by date of travel. Their average residual of \+1.08 L was removed first, since a constant difference for one vehicle is not a relation between consecutive trips. The statistic was 1.630, inside the range of 1.5 to 2.5, where a value close to 2 indicates independent errors. The errors of consecutive local trips are therefore independent.
+The Durbin-Watson statistic tested the residuals of the 93 local trips, arranged by date of travel. Their average residual of \+1.14 L was removed first, since a constant difference for one vehicle is not a relation between consecutive trips. The statistic was 1.694, inside the range of 1.5 to 2.5, where a value close to 2 indicates independent errors. The errors of consecutive local trips are therefore independent.
 
 #block(breakable: false)[
 #cap[Table 8. #strong[#underline[SUMMARY OF ASSUMPTION CHECKS]];]
 
-#tbl((88pt, 110pt, 108pt, 80pt, 50pt,), tc[Assumption], tc[Test], tc[Result], tc[Rule], tc[Met?], td[Linearity], td[Ramsey RESET test], td[F \= 15.49, p \< 0.001; f² \= 0.0003], td[f² \< 0.02], td[Yes], td[Independence], td[Durbin-Watson (97 local trips by date)], td[1.630], td[1.5 to 2.5], td[Yes], td[Normality], td[Jarque-Bera test], td[skewness 0.36, excess kurtosis −0.10; p \< 0.001], td[skewness and excess kurtosis within ±2 and ±7], td[Yes], td[Equal variance], td[Breusch-Pagan test], td[LM \= 96.51, p \< 0.001; variance ratio \= 1.27], td[variance ratio ≤ 3], td[Yes], td[No multicollinearity], td[Variance Inflation Factor], td[highest VIF \= 1.03], td[every VIF ≤ 5], td[Yes])
+#tbl((88pt, 110pt, 108pt, 80pt, 50pt,), tc[Assumption], tc[Test], tc[Result], tc[Rule], tc[Met?], td[Linearity], td[Ramsey RESET test], td[F \= 21.76, p \< 0.001; f² \= 0.0003], td[f² \< 0.02], td[Yes], td[Independence], td[Durbin-Watson (93 local trips by date)], td[1.694], td[1.5 to 2.5], td[Yes], td[Normality], td[Jarque-Bera test], td[skewness 0.37, excess kurtosis −0.11; p \< 0.001], td[skewness and excess kurtosis within ±2 and ±7], td[Yes], td[Equal variance], td[Breusch-Pagan test], td[LM \= 115.28, p \< 0.001; variance ratio \= 1.26], td[variance ratio ≤ 3], td[Yes], td[No multicollinearity], td[Variance Inflation Factor], td[highest VIF \= 1.03], td[every VIF ≤ 5], td[Yes])
 ]
 
-#emph[Table 8]; summarizes the assumption checks. All five assumptions were met. The removal of the records with standardized residuals beyond ±3 corrected the heavy tails, and weighted least squares corrected the growing spread of the errors, which the earlier ordinary least squares model without the residual check did not meet (variance ratio of 30.27 and excess kurtosis of 9.23). The p-values of the RESET, Jarque-Bera, and Breusch-Pagan tests stay below 0.05 because, with 27,292 training records, they detect departures too small to matter, so the decisions follow the size of each departure. As an added safeguard, the coefficient standard errors in #emph[Table 7]; use the heteroskedasticity-robust HC3 method.
+#emph[Table 8]; summarizes the assumption checks. All five assumptions were met. The removal of the records with standardized residuals beyond ±3 corrected the heavy tails, and weighted least squares corrected the growing spread of the errors, which the earlier ordinary least squares model without the residual check did not meet (variance ratio of 30.27 and excess kurtosis of 9.23). The p-values of the RESET, Jarque-Bera, and Breusch-Pagan tests stay below 0.05 because, with 27,288 training records, they detect departures too small to matter, so the decisions follow the size of each departure. As an added safeguard, the coefficient standard errors in #emph[Table 7]; use the heteroskedasticity-robust HC3 method.
 
 #hd[T16. Model Performance Evaluation and Cross-Validation]
 
-The researchers generated predictions for the 6,824 trips in the testing set and compared them with the actual fuel consumed. Three metrics measured the accuracy of the model. R-Squared (R²) measures how much of the variation in fuel consumed the predictors explain. A value of 1 means the model explains all of the variation. A value of 0 means it performs no better than the average fuel consumed.
+The researchers generated predictions for the 6,823 trips in the testing set and compared them with the actual fuel consumed. Three metrics measured the accuracy of the model. R-Squared (R²) measures how much of the variation in fuel consumed the predictors explain. A value of 1 means the model explains all of the variation. A value of 0 means it performs no better than the average fuel consumed.
 
 $ R^2 = 1 - (sum (y_i - hat(y)_i)^2) / (sum (y_i - overline(y))^2) $
 
@@ -400,7 +400,7 @@ $ "RMSE" = sqrt(1 / n sum_(i=1)^n (y_i - hat(y)_i)^2) $
 #figcap[Figure 13. #strong[#underline[Actual vs Predicted Fuel Consumption]];]
 ]
 
-#emph[Figure 13]; plots the predicted fuel against the actual fuel for each test trip. The model reached an R² of 0.9020 on the testing set, so the predictors explain 90.20 percent of the variation in fuel consumed. The MAE was 1.91 L, so a prediction differs from the actual fuel by about 2 liters on average, and the RMSE was 2.69 L. The RMSE is higher than the MAE because a few trips have larger errors. The points cluster tightly along the line of perfect prediction up to about 35 L and spread more for heavier trips. Above 45 L, 28 of the 32 test trips fall below the line, so the model tends to underestimate the few heaviest trips.
+#emph[Figure 13]; plots the predicted fuel against the actual fuel for each test trip. The model reached an R² of 0.9008 on the testing set, so the predictors explain 90.08 percent of the variation in fuel consumed. The MAE was 1.87 L, so a prediction differs from the actual fuel by about 2 liters on average, and the RMSE was 2.66 L. The RMSE is higher than the MAE because a few trips have larger errors. The points cluster tightly along the line of perfect prediction up to about 35 L and spread more for heavier trips. Above 45 L, 29 of the 30 test trips fall below the line, so the model tends to underestimate the few heaviest trips.
 
 To test whether the accuracy holds for other partitions of the data, the researchers applied 5-fold cross-validation. The dataset was divided into five equal folds. The model was trained on four folds and tested on the fifth, five times, so each fold served once as the test set. The centering step was repeated inside each fold, so each test fold stayed unseen during training.
 
@@ -410,15 +410,15 @@ To test whether the accuracy holds for other partitions of the data, the researc
 #figcap[Figure 14. #strong[#underline[5-Fold Cross-Validation]];]
 ]
 
-#emph[Figure 14]; shows an R² of about 0.90 in every fold: 0.9020, 0.9025, 0.9005, 0.8961, and 0.8999. The mean R² is 0.9002 with a standard deviation of 0.0023. The mean differs from the test-set R² of 0.9020 by only 0.0018. The mean MAE across the folds was 1.902 L (standard deviation 0.018) and the mean RMSE was 2.705 L (standard deviation 0.030). The model gives the same accuracy on every partition of the data. It does not depend on one lucky split and shows no sign of overfitting.
+#emph[Figure 14]; shows an R² of about 0.90 in every fold: 0.9008, 0.9008, 0.8995, 0.9009, and 0.8992. The mean R² is 0.9002 with a standard deviation of 0.0007. The mean differs from the test-set R² of 0.9008 by only 0.0006. The mean MAE across the folds was 1.902 L (standard deviation 0.027) and the mean RMSE was 2.705 L (standard deviation 0.037). The model gives the same accuracy on every partition of the data. It does not depend on one lucky split and shows no sign of overfitting.
 
 #block(breakable: false)[
 #cap[Table 9. #strong[#underline[SUMMARY OF MODEL PERFORMANCE]];]
 
-#tbl((150pt, 70pt, 216pt,), tc[Metric], tc[Result], tc[Interpretation], td[R² (testing set)], td[0.9020], td[The model explains 90.20% of the variation in fuel consumed], td[MAE (testing set)], td[1.91 L], td[Average prediction error per trip], td[RMSE (testing set)], td[2.69 L], td[Typical error with large misses weighted more], td[Mean R² (5-fold CV)], td[0.9002], td[Same accuracy across all five folds], td[Std. dev. of R² (5-fold CV)], td[0.0023], td[Very small spread of R² across folds], td[Mean MAE \/ RMSE (5-fold CV)], td[1.90 L \/ 2.70 L], td[Same error level as the testing set])
+#tbl((150pt, 70pt, 216pt,), tc[Metric], tc[Result], tc[Interpretation], td[R² (testing set)], td[0.9008], td[The model explains 90.08% of the variation in fuel consumed], td[MAE (testing set)], td[1.87 L], td[Average prediction error per trip], td[RMSE (testing set)], td[2.66 L], td[Typical error with large misses weighted more], td[Mean R² (5-fold CV)], td[0.9002], td[Same accuracy across all five folds], td[Std. dev. of R² (5-fold CV)], td[0.0007], td[Very small spread of R² across folds], td[Mean MAE \/ RMSE (5-fold CV)], td[1.90 L \/ 2.70 L], td[Same error level as the testing set])
 ]
 
-#emph[Table 9]; summarizes the performance of the Linear Regression model. The model explains about 90 percent of the variation in fuel consumed with an average error of about 2 liters per trip, and the result holds across every partition of the data. In liters, errors stay small for short and medium trips and are larger for long, fuel-heavy trips. The predicted range in the web application uses the RMSE (plus or minus 2.69 L), so the staff read it as a tighter guide for short trips than for long ones.
+#emph[Table 9]; summarizes the performance of the Linear Regression model. The model explains about 90 percent of the variation in fuel consumed with an average error of about 2 liters per trip, and the result holds across every partition of the data. In liters, errors stay small for short and medium trips and are larger for long, fuel-heavy trips. The predicted range in the web application uses the RMSE (plus or minus 2.66 L), so the staff read it as a tighter guide for short trips than for long ones.
 
 #hd[Deployment Phase]
 
@@ -442,7 +442,7 @@ The researchers designed the web application around the tasks of its two user ro
  td[Notifications], td[Alerts for sign-ups, pending requests, and decisions on requests], td[All users],
 ) }
 
-The trained Linear Regression model was then integrated into the system. Flask loads the Joblib model file and the saved training means when the server starts. When a staff member selects a vehicle and enters the trip distance, the system first checks the input: the distance must be a number greater than 0 and at most 1,000 km, and the vehicle must have an engine power and a fuel type in its record. It then retrieves the engine power and fuel type of the vehicle from Firebase Firestore, applies the same encoding and centering used in training, builds the interaction term, and passes the values to the model. The system returns the predicted fuel in liters with a predicted range of plus or minus the RMSE (2.69 L). It warns the user when the distance or engine power is outside the range the model was trained on (30 to 400 km and 51 to 177 kW), and when the vehicle has no trip records of its own in the Monthly Report of Official Travel. Each prediction is saved to the prediction history.
+The trained Linear Regression model was then integrated into the system. Flask loads the Joblib model file and the saved training means when the server starts. When a staff member selects a vehicle and enters the trip distance, the system first checks the input: the distance must be a number greater than 0 and at most 1,000 km, and the vehicle must have an engine power and a fuel type in its record. It then retrieves the engine power and fuel type of the vehicle from Firebase Firestore, applies the same encoding and centering used in training, builds the interaction term, and passes the values to the model. The system returns the predicted fuel in liters with a predicted range of plus or minus the RMSE (2.66 L). It warns the user when the distance or engine power is outside the range the model was trained on (30 to 400 km and 51 to 177 kW), and when the vehicle has no trip records of its own in the Monthly Report of Official Travel. Each prediction is saved to the prediction history.
 
 Every user holds one of two roles. The administrator of the General Services Office reviews fuel requests, manages the vehicle records, trip records, and user accounts, and uploads the trained model. Staff submit fuel requests and see only their own requests. A new user signs up and logs in only after the administrator approves the account.
 
@@ -461,7 +461,7 @@ The researchers tested each main function of the system against the expected res
  td[3], td[Login], td[Wrong username or password], td[Message “Invalid username or password.” and no access],
  td[4], td[Role restriction], td[Staff opens an administrator page], td[Access is refused; staff see only their own pages and requests],
  td[5], td[Input validation], td[Blank distance, text, 0 km, or more than 1,000 km], td[No prediction is made and the input error is shown],
- td[6], td[Fuel prediction], td[SFA 4714 (diesel, 95 kW), 176 km], td[About 16.47 L, with a range of plus or minus 2.69 L],
+ td[6], td[Fuel prediction], td[SFA 4714 (diesel, 95 kW), 176 km], td[About 16.46 L, with a range of plus or minus 2.66 L],
  td[7], td[Range warning], td[Distance outside 30 to 400 km], td[Prediction is shown with a warning that it is outside the training range],
  td[8], td[No-records warning], td[Vehicle with no Monthly Report trips], td[Prediction is shown with a warning that it is not validated against its own trips],
  td[9], td[Fuel request and pending trip], td[Prediction is saved], td[Fuel request appears in the prediction history and a pending trip in the trip records],
@@ -478,7 +478,7 @@ The researchers tested each main function of the system against the expected res
 #figcap[Figure 15. #strong[#underline[System User Interface]];]
 ]
 
-#emph[Figure 15]; shows the Fuel Prediction page of the system. The staff member selects a vehicle and enters the trip distance, and the page shows the predicted fuel in liters with its predicted range of plus or minus 2.69 L.
+#emph[Figure 15]; shows the Fuel Prediction page of the system. The staff member selects a vehicle and enters the trip distance, and the page shows the predicted fuel in liters with its predicted range of plus or minus 2.66 L.
 
 #hd[Development]
 

@@ -13,13 +13,13 @@
 <text x="500.0" y="223.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">93 GSO + 99,898 online</text>
 <rect x="690.0" y="130.0" width="270.0" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
 <text x="825.0" y="163.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">3. Data Preparation</text>
-<text x="825.0" y="195.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">34,116 clean records</text>
+<text x="825.0" y="195.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">34,111 clean records</text>
 <rect x="690.0" y="391.6" width="270.0" height="111.6" rx="8" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
 <text x="825.0" y="425.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">4. Modeling</text>
 <text x="825.0" y="457.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Linear Regression</text>
 <rect x="365.0" y="391.6" width="270.0" height="111.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
 <text x="500.0" y="425.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">5. Evaluation</text>
-<text x="500.0" y="457.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.9020, 5-fold CV</text>
+<text x="500.0" y="457.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.9008, 5-fold CV</text>
 <rect x="40.0" y="391.6" width="270.0" height="111.6" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
 <text x="175.0" y="425.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">6. Deployment</text>
 <text x="175.0" y="457.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Flask web system</text>
