@@ -419,6 +419,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (inst) inst.hide();
       });
       document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+      // modals moved to <body> belong to the old page
+      document.querySelectorAll('body > .modal[data-moved-modal]').forEach(function (m) {
+        const inst = window.bootstrap && bootstrap.Modal.getInstance(m);
+        if (inst) inst.dispose();
+        m.remove();
+      });
       document.body.classList.remove('modal-open');
       document.body.style.removeProperty('overflow');
       document.body.style.removeProperty('padding-right');
@@ -796,6 +802,17 @@ const PH_TZ = 'Asia/Manila';
 function phToday() {   // YYYY-MM-DD
   return new Intl.DateTimeFormat('en-CA', { timeZone: PH_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
+
+// Open every modal from <body>. In light mode the glass cards (backdrop-filter)
+// and .app-shell (isolation) trap a modal below Bootstrap's backdrop, which
+// sits on <body>, so the dialog could not be clicked or typed in.
+document.addEventListener('show.bs.modal', function (e) {
+  const modal = e.target;
+  if (modal.classList.contains('modal') && modal.parentElement !== document.body) {
+    modal.setAttribute('data-moved-modal', '');
+    document.body.appendChild(modal);
+  }
+});
 
 // prefill today's date on add forms
 document.addEventListener('show.bs.modal', function (e) {
