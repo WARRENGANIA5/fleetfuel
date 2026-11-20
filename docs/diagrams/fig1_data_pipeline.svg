@@ -1,124 +1,150 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1332" viewBox="0 0 1000 1332">
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1595" viewBox="0 0 1000 1595">
 <defs><marker id="a1d2430" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d2430"/></marker></defs>
-<rect x="0" y="0" width="1000" height="1332" fill="#ffffff"/>
+<rect x="0" y="0" width="1000" height="1595" fill="#ffffff"/>
 <text x="500.0" y="52.0" font-family="Arial, Helvetica, sans-serif" font-size="37.5" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Data Pipeline Diagram</text>
 <text x="500.0" y="88.0" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#4a5566" text-anchor="middle" font-style="italic">From the collected records to the trained model</text>
-<rect x="20.0" y="114.0" width="960.0" height="165.2" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="196.6" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="205.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
-<text x="82.0" y="194.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Data Sources</text>
-<text x="82.0" y="223.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Understanding</text>
-<rect x="255.0" y="128.0" width="168.8" height="137.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<rect x="20.0" y="114.0" width="960.0" height="193.2" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="210.6" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="219.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="82.0" y="208.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Data Sources</text>
+<text x="82.0" y="237.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Understanding</text>
+<rect x="255.0" y="128.0" width="168.8" height="165.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
 <text x="339.4" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">GSO Trip</text>
-<text x="339.4" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Reports</text>
-<text x="339.4" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">93 trips</text>
-<rect x="439.8" y="128.0" width="168.8" height="137.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="339.4" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Records</text>
+<text x="339.4" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">93 trips +</text>
+<text x="339.4" y="247.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">completed</text>
+<text x="339.4" y="272.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">requests</text>
+<rect x="439.8" y="128.0" width="168.8" height="165.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
 <text x="524.1" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Vehicle</text>
 <text x="524.1" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Records</text>
 <text x="524.1" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">9 vehicles</text>
-<rect x="624.5" y="128.0" width="168.8" height="137.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
-<text x="708.9" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Fuel</text>
-<text x="708.9" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Requests</text>
-<text x="708.9" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">from GSO</text>
-<text x="708.9" y="247.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">staff</text>
-<rect x="809.2" y="128.0" width="168.8" height="137.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
-<text x="893.6" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Online</text>
-<text x="893.6" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Datasets</text>
-<text x="893.6" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">99,898</text>
-<text x="893.6" y="247.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">records</text>
-<rect x="20.0" y="323.2" width="960.0" height="111.6" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="379.0" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="387.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
-<text x="82.0" y="377.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Storage</text>
-<text x="82.0" y="406.2" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Understanding</text>
-<rect x="255.0" y="337.2" width="353.5" height="83.6" rx="8" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
-<text x="431.8" y="371.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">Firebase Firestore</text>
-<text x="431.8" y="402.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">trips, vehicles, requests</text>
-<rect x="624.5" y="337.2" width="353.5" height="83.6" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
-<text x="801.2" y="371.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">CSV Files</text>
-<text x="801.2" y="402.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">online datasets</text>
-<path d="M616.5,265.2 L616.5,322.2" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="20.0" y="478.8" width="960.0" height="111.6" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="534.6" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="543.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
-<text x="82.0" y="532.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Integration</text>
-<text x="82.0" y="561.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
-<rect x="255.0" y="492.8" width="353.5" height="83.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="431.8" y="526.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Join trips and vehicles</text>
-<text x="431.8" y="558.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">by plate number</text>
-<rect x="624.5" y="492.8" width="353.5" height="83.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="801.2" y="526.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Merge online data</text>
-<text x="801.2" y="558.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">tag the data source</text>
-<path d="M616.5,420.8 L616.5,477.8" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="20.0" y="634.4" width="960.0" height="137.2" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="703.0" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="711.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
-<text x="82.0" y="701.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Cleaning</text>
-<text x="82.0" y="730.2" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
-<rect x="255.0" y="648.4" width="230.3" height="109.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
-<text x="370.2" y="682.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Remove missing</text>
-<text x="370.2" y="710.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">and invalid</text>
-<text x="370.2" y="738.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">values</text>
-<rect x="501.3" y="648.4" width="230.3" height="109.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
-<text x="616.5" y="682.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Remove outliers</text>
-<text x="616.5" y="713.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">IQR rule</text>
-<rect x="747.7" y="648.4" width="230.3" height="109.2" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
-<text x="862.8" y="682.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Keep fleet range</text>
-<text x="862.8" y="713.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Diesel, 30–400 km,</text>
-<text x="862.8" y="739.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">51–177 kW</text>
-<path d="M616.5,576.4 L616.5,633.4" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="20.0" y="815.6" width="960.0" height="139.6" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="885.4" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="894.1" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
-<text x="82.0" y="872.4" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Feature</text>
-<text x="82.0" y="899.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Engineering</text>
-<text x="82.0" y="928.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
-<rect x="255.0" y="829.6" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="339.4" y="863.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Distance</text>
-<text x="339.4" y="895.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X1 (km)</text>
-<rect x="439.8" y="829.6" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="524.1" y="863.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Engine</text>
-<text x="524.1" y="891.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Power</text>
-<text x="524.1" y="923.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X2 (kW)</text>
-<rect x="624.5" y="829.6" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="708.9" y="863.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Fuel Type</text>
-<text x="708.9" y="895.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X3</text>
-<rect x="809.2" y="829.6" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
-<text x="893.6" y="863.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Distance ×</text>
-<text x="893.6" y="891.5" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Power</text>
-<text x="893.6" y="923.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X4</text>
-<path d="M616.5,757.6 L616.5,814.6" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="20.0" y="999.2" width="960.0" height="111.6" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="1055.0" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="1063.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
-<text x="82.0" y="1053.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Data Split</text>
-<text x="82.0" y="1082.2" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Modeling</text>
-<rect x="255.0" y="1013.2" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="370.2" y="1047.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Training Set</text>
-<text x="370.2" y="1078.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">80% · 27,576</text>
-<rect x="501.3" y="1013.2" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="616.5" y="1047.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Test Set</text>
-<text x="616.5" y="1078.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">20% · 6,895</text>
-<rect x="747.7" y="1013.2" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="862.8" y="1047.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Cross-Validation</text>
-<text x="862.8" y="1078.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">5 folds</text>
-<path d="M616.5,941.2 L616.5,998.2" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="20.0" y="1154.8" width="960.0" height="139.6" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
-<circle cx="50.0" cy="1224.6" r="22.5" fill="#1f3a5f"/>
-<text x="50.0" y="1233.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
-<text x="82.0" y="1222.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Model Output</text>
-<text x="82.0" y="1251.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Modeling</text>
-<rect x="255.0" y="1168.8" width="230.3" height="111.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="370.2" y="1202.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Linear</text>
-<text x="370.2" y="1230.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Regression</text>
-<text x="370.2" y="1262.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">trained model</text>
-<rect x="501.3" y="1168.8" width="230.3" height="111.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="616.5" y="1202.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Saved Model</text>
-<text x="616.5" y="1234.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">.joblib file</text>
-<rect x="747.7" y="1168.8" width="230.3" height="111.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
-<text x="862.8" y="1202.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Results</text>
-<text x="862.8" y="1234.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.8877</text>
-<path d="M616.5,1096.8 L616.5,1153.8" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
-<rect x="662.5" y="782.1" width="208.0" height="25.5" rx="4" fill="#ffffff" opacity="0.96"/>
-<text x="766.5" y="799.6" font-family="Arial, Helvetica, sans-serif" font-size="17.5" font-weight="bold" fill="#2f6b3f" text-anchor="middle">34,471 clean records</text>
+<rect x="624.5" y="128.0" width="168.8" height="165.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="708.9" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Online Trip</text>
+<text x="708.9" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Records</text>
+<text x="708.9" y="221.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">7,496 EEA van</text>
+<text x="708.9" y="247.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">trips</text>
+<rect x="809.2" y="128.0" width="168.8" height="165.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="893.6" y="161.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Other</text>
+<text x="893.6" y="189.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Online</text>
+<text x="893.6" y="217.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Records</text>
+<text x="893.6" y="249.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">92,402</text>
+<text x="893.6" y="275.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">records</text>
+<rect x="20.0" y="351.2" width="960.0" height="111.6" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="407.0" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="415.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="82.0" y="405.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Storage</text>
+<text x="82.0" y="434.2" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Understanding</text>
+<rect x="255.0" y="365.2" width="353.5" height="83.6" rx="8" fill="#e5f2f3" stroke="#1f6670" stroke-width="1.7"/>
+<text x="431.8" y="399.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f6670" text-anchor="middle">Firebase Firestore</text>
+<text x="431.8" y="430.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">trips, vehicles, requests</text>
+<rect x="624.5" y="365.2" width="353.5" height="83.6" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
+<text x="801.2" y="399.1" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">CSV Files</text>
+<text x="801.2" y="430.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">online trips, supplementary</text>
+<path d="M616.5,293.2 L616.5,350.2" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="506.8" width="960.0" height="139.6" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="576.6" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="585.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="82.0" y="563.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Export</text>
+<text x="82.0" y="590.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">to Colab</text>
+<text x="82.0" y="620.0" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
+<rect x="255.0" y="520.8" width="230.3" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="370.2" y="554.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Trip Records</text>
+<text x="370.2" y="586.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">CSV file</text>
+<rect x="501.3" y="520.8" width="230.3" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="616.5" y="554.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Vehicle Records</text>
+<text x="616.5" y="586.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">CSV file</text>
+<rect x="747.7" y="520.8" width="230.3" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="862.8" y="554.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Supplementary</text>
+<text x="862.8" y="582.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Data</text>
+<text x="862.8" y="614.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">CSV file</text>
+<path d="M616.5,448.8 L616.5,505.8" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="690.4" width="960.0" height="111.6" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="746.2" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="754.9" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<text x="82.0" y="744.2" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Integration</text>
+<text x="82.0" y="773.4" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
+<rect x="255.0" y="704.4" width="353.5" height="83.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="431.8" y="738.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Join trips and vehicles</text>
+<text x="431.8" y="769.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">by plate number</text>
+<rect x="624.5" y="704.4" width="353.5" height="83.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="801.2" y="738.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Merge online data</text>
+<text x="801.2" y="769.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">tag the data source</text>
+<path d="M616.5,632.4 L616.5,689.4" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="846.0" width="960.0" height="162.8" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="927.4" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="936.1" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<text x="82.0" y="925.4" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Cleaning</text>
+<text x="82.0" y="954.6" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
+<rect x="255.0" y="860.0" width="230.3" height="134.8" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="370.2" y="893.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Remove missing</text>
+<text x="370.2" y="921.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">and zero</text>
+<text x="370.2" y="949.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">distance</text>
+<rect x="501.3" y="860.0" width="230.3" height="134.8" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="616.5" y="893.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Remove outliers</text>
+<text x="616.5" y="925.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">IQR per engine</text>
+<text x="616.5" y="951.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">power, residual |z|</text>
+<text x="616.5" y="976.7" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">&gt; 3</text>
+<rect x="747.7" y="860.0" width="230.3" height="134.8" rx="8" fill="#f7eaec" stroke="#7a1f2b" stroke-width="1.7"/>
+<text x="862.8" y="893.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#7a1f2b" text-anchor="middle">Keep fleet range</text>
+<text x="862.8" y="925.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Diesel, 30–400 km,</text>
+<text x="862.8" y="951.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">51–177 kW</text>
+<path d="M616.5,788.0 L616.5,845.0" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="1052.8" width="960.0" height="139.6" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="1122.6" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="1131.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<text x="82.0" y="1109.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Feature</text>
+<text x="82.0" y="1136.8" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Engineering</text>
+<text x="82.0" y="1166.0" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Data Preparation</text>
+<rect x="255.0" y="1066.8" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="339.4" y="1100.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Distance</text>
+<text x="339.4" y="1128.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">(c)</text>
+<text x="339.4" y="1160.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X1, km</text>
+<rect x="439.8" y="1066.8" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="524.1" y="1100.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Engine</text>
+<text x="524.1" y="1128.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Power (c)</text>
+<text x="524.1" y="1160.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X2, kW</text>
+<rect x="624.5" y="1066.8" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="708.9" y="1100.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Fuel Type</text>
+<text x="708.9" y="1132.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X3, 0 =</text>
+<text x="708.9" y="1157.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">Diesel</text>
+<rect x="809.2" y="1066.8" width="168.8" height="111.6" rx="8" fill="#eaf0f7" stroke="#1f3a5f" stroke-width="1.7"/>
+<text x="893.6" y="1100.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Distance ×</text>
+<text x="893.6" y="1128.7" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Power</text>
+<text x="893.6" y="1160.3" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">X4</text>
+<path d="M616.5,994.8 L616.5,1051.8" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="1236.4" width="960.0" height="111.6" rx="10" fill="#f5f7fa" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="1292.2" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="1300.9" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
+<text x="82.0" y="1290.2" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Data Split</text>
+<text x="82.0" y="1319.4" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Modeling</text>
+<rect x="255.0" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="370.2" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Training Set</text>
+<text x="370.2" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">80% · 27,292</text>
+<rect x="501.3" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="616.5" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Test Set</text>
+<text x="616.5" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">20% · 6,824</text>
+<rect x="747.7" y="1250.4" width="230.3" height="83.6" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="862.8" y="1284.3" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Cross-Validation</text>
+<text x="862.8" y="1315.9" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">5 folds</text>
+<path d="M616.5,1178.4 L616.5,1235.4" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="20.0" y="1392.0" width="960.0" height="165.2" rx="10" fill="#ffffff" stroke="#d6dde6" stroke-width="1.2"/>
+<circle cx="50.0" cy="1474.6" r="22.5" fill="#1f3a5f"/>
+<text x="50.0" y="1483.3" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">8</text>
+<text x="82.0" y="1472.6" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Model Output</text>
+<text x="82.0" y="1501.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#7a1f2b" text-anchor="start" font-style="italic">Modeling</text>
+<rect x="255.0" y="1406.0" width="230.3" height="137.2" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="370.2" y="1439.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Linear</text>
+<text x="370.2" y="1467.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Regression</text>
+<text x="370.2" y="1499.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">weighted least</text>
+<text x="370.2" y="1525.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">squares</text>
+<rect x="501.3" y="1406.0" width="230.3" height="137.2" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="616.5" y="1439.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Saved Files</text>
+<text x="616.5" y="1471.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">.joblib + metrics</text>
+<rect x="747.7" y="1406.0" width="230.3" height="137.2" rx="8" fill="#e8f3ec" stroke="#2f6b3f" stroke-width="1.7"/>
+<text x="862.8" y="1439.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#2f6b3f" text-anchor="middle">Results</text>
+<text x="862.8" y="1471.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">R² 0.9020 · MAE</text>
+<text x="862.8" y="1497.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">1.91 L</text>
+<path d="M616.5,1334.0 L616.5,1391.0" fill="none" stroke="#1d2430" stroke-width="2.4" marker-end="url(#a1d2430)" stroke-linejoin="round"/>
+<rect x="662.5" y="1019.3" width="208.0" height="25.5" rx="4" fill="#ffffff" opacity="0.96"/>
+<text x="766.5" y="1036.8" font-family="Arial, Helvetica, sans-serif" font-size="17.5" font-weight="bold" fill="#2f6b3f" text-anchor="middle">34,116 clean records</text>
 </svg>

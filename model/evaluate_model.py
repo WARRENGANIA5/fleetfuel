@@ -19,6 +19,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
@@ -68,13 +69,27 @@ def main():
     with open(METRICS_PATH, encoding="utf-8") as f:
         metrics = json.load(f)
 
-    frame, source = load_training_frame()
-    df = clean_data(frame)
+    # the dataset the model was trained on (saved by train_model.py), so the
+    # split matches the metrics; otherwise reload and clean
+    cleaned_path = os.path.join(BASE_DIR, "data", "cleaned_merged_dataset.csv")
+    df = pd.read_csv(cleaned_path) if os.path.exists(cleaned_path) else None
+    if df is not None and len(df) == metrics.get("total_records"):
+        source = "saved cleaned training dataset"
+    else:
+        frame, source = load_training_frame()
+        df = clean_data(frame)
     print(f"Evaluating model {metrics.get('model_version')} on {len(df)} records ({source})")
     X, y = df[FEATURE_COLUMNS], df[TARGET_COLUMN]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     y_pred = pipeline.predict(X_test)
     residuals = y_test.values - y_pred
+    # standardized residuals: residual x sqrt(weight) of the WLS fit, scaled to SD 1
+    regressor = pipeline.named_steps["regressor"]
+    if hasattr(regressor, "weights"):
+        scaled = residuals * np.sqrt(regressor.weights(pipeline.named_steps["encoder"].transform(X_test)))
+    else:
+        scaled = residuals.copy()
+    scaled = (scaled - scaled.mean()) / scaled.std()
 
     # 1. Actual vs Predicted
     fig, ax = plt.subplots(figsize=(6.4, 5.2))
@@ -88,15 +103,18 @@ def main():
 
     # 2. Residuals vs fitted
     fig, ax = plt.subplots(figsize=(6.4, 5.2))
-    ax.scatter(y_pred, residuals, alpha=0.55, color=BLUE, edgecolor="white", linewidth=0.3)
+    ax.scatter(y_pred, scaled, alpha=0.55, color=BLUE, edgecolor="white", linewidth=0.3)
     ax.axhline(0, color=NAVY, linestyle="--", linewidth=1.5)
-    ax.set(xlabel="Predicted Fuel Consumption (L)", ylabel="Residual (Actual − Predicted, L)", title="Residual Plot")
+    for level in (-3, 3):
+        ax.axhline(level, color="#888888", linestyle=":", linewidth=1)
+    ax.set(xlabel="Predicted Fuel Consumption (L)", ylabel="Standardized Residual",
+           title="Residual Plot (Standardized Residuals)")
     save(fig, "residual_plot.png")
 
     # 3. Q-Q plot of residuals (normality check)
-    fig = sm.qqplot(residuals, line="s", markerfacecolor=BLUE, markeredgecolor="white", alpha=0.7)
+    fig = sm.qqplot(scaled, line="45", markerfacecolor=BLUE, markeredgecolor=BLUE, markersize=3, alpha=0.6)
     fig.set_size_inches(6.4, 5.2)
-    fig.axes[0].set_title("Normal Q-Q Plot of Residuals")
+    fig.axes[0].set_title("Normal Q-Q Plot of Standardized Residuals")
     save(fig, "residual_qq_plot.png")
 
     # 4. Histogram of residuals (outliers go into the end bins)

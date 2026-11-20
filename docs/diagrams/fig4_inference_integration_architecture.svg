@@ -68,7 +68,8 @@
 <text x="30.0" y="822.0" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#1f3a5f" text-anchor="start">Adding a new model</text>
 <rect x="40.0" y="840.0" width="230.0" height="109.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
 <text x="155.0" y="873.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Google Colab</text>
-<text x="155.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">train and evaluate</text>
+<text x="155.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">exported CSVs:</text>
+<text x="155.0" y="931.1" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">train, evaluate</text>
 <rect x="330.0" y="840.0" width="230.0" height="109.2" rx="8" fill="#fbf3df" stroke="#a87f12" stroke-width="1.7"/>
 <text x="445.0" y="873.9" font-family="Arial, Helvetica, sans-serif" font-size="21.9" font-weight="bold" fill="#a87f12" text-anchor="middle">Upload Model</text>
 <text x="445.0" y="905.5" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#1d2430" text-anchor="middle">admin, Model</text>

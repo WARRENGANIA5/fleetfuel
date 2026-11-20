@@ -29,24 +29,27 @@ def data_pipeline():
     s = SVG(W, "Data Pipeline Diagram", "From the collected records to the trained model")
     rows = [
         ("Data Sources", "Data Understanding",
-         [("GSO Trip Reports", "93 trips", "maroon"), ("Vehicle Records", "9 vehicles", "maroon"),
-          ("Fuel Requests", "from GSO staff", "maroon"), ("Online Datasets", "99,898 records", "gold")]),
+         [("GSO Trip Records", "93 trips + completed requests", "maroon"), ("Vehicle Records", "9 vehicles", "maroon"),
+          ("Online Trip Records", "7,496 EEA van trips", "gold"), ("Other Online Records", "92,402 records", "gold")]),
         ("Storage", "Data Understanding",
-         [("Firebase Firestore", "trips, vehicles, requests", "teal"), ("CSV Files", "online datasets", "gold")]),
+         [("Firebase Firestore", "trips, vehicles, requests", "teal"), ("CSV Files", "online trips, supplementary", "gold")]),
+        ("Export to Colab", "Data Preparation",
+         [("Trip Records", "CSV file", "navy"), ("Vehicle Records", "CSV file", "navy"),
+          ("Supplementary Data", "CSV file", "navy")]),
         ("Integration", "Data Preparation",
          [("Join trips and vehicles", "by plate number", "navy"), ("Merge online data", "tag the data source", "navy")]),
         ("Cleaning", "Data Preparation",
-         [("Remove missing and invalid values", None, "maroon"), ("Remove outliers", "IQR rule", "maroon"),
+         [("Remove missing and zero distance", None, "maroon"), ("Remove outliers", "IQR per engine power, residual |z| > 3", "maroon"),
           ("Keep fleet range", "Diesel, 30–400 km, 51–177 kW", "maroon")]),
         ("Feature Engineering", "Data Preparation",
-         [("Distance", "X1 (km)", "navy"), ("Engine Power", "X2 (kW)", "navy"), ("Fuel Type", "X3", "navy"),
+         [("Distance (c)", "X1, km", "navy"), ("Engine Power (c)", "X2, kW", "navy"), ("Fuel Type", "X3, 0 = Diesel", "navy"),
           ("Distance × Power", "X4", "navy")]),
         ("Data Split", "Modeling",
-         [("Training Set", "80% · 27,576", "green"), ("Test Set", "20% · 6,895", "green"),
+         [("Training Set", "80% · 27,292", "green"), ("Test Set", "20% · 6,824", "green"),
           ("Cross-Validation", "5 folds", "green")]),
         ("Model Output", "Modeling",
-         [("Linear Regression", "trained model", "green"), ("Saved Model", ".joblib file", "green"),
-          ("Results", "R² 0.8877", "green")]),
+         [("Linear Regression", "weighted least squares", "green"), ("Saved Files", ".joblib + metrics", "green"),
+          ("Results", "R² 0.9020 · MAE 1.91 L", "green")]),
     ]
     LX, CX0, CX1, GAP = 20, 255, W - 22, 16
     y = 128
@@ -71,7 +74,7 @@ def data_pipeline():
         if name == "Cleaning":
             prev_label = y + h + 14
         y += h + 28 + 44
-    s.label((CX0 + CX1) / 2 + 150, prev_label + 28, "34,471 clean records", GREEN, 14)
+    s.label((CX0 + CX1) / 2 + 150, prev_label + 28, "34,116 clean records", GREEN, 14)
     s.save(os.path.join(OUT, "fig1_data_pipeline.svg"), y - 20)
 
 
@@ -88,8 +91,8 @@ def data_model():
         s.text(x, y, t, 14, "bold", MAROON, "middle")
 
     mv, mvy = s.table(C[0], 130, TW, "Model Input View", [
-        ("", "X1 distance_km", "km"), ("", "X2 engine_power_kw", "kW"), ("", "X3 fuel_type", "1 = Gas"),
-        ("", "X4 distance × power", "X1·X2"), ("", "Y actual_fuel", "L")], tone="green", note="34,471 clean records")
+        ("", "X1 distance_km", "km"), ("", "X2 engine_power_kw", "kW"), ("", "X3 fuel_type", "0 = Diesel"),
+        ("", "X4 distance × power", "X1·X2"), ("", "Y actual_fuel", "L")], tone="green", note="34,116 clean records")
     dd, ddy = s.table(C[1], 130, TW, "Dim Date", [
         ("PK", "trip_date", "date"), ("", "month", "int"), ("", "year", "int")], tone="gold",
         note="from the trip date")
@@ -112,7 +115,7 @@ def data_model():
     ft, fty = s.table(C[1], Y2, TW, "Fact Trip", [
         ("PK", "trip_id", "int"), ("FK", "vehicle_id", "int"), ("FK", "trip_date", "date"),
         ("FK", "data_source", "text"), ("", "distance_km", "X1"), ("", "actual_fuel_consumption", "Y")], tone="navy",
-        note="one row per trip")
+        note="one row per trip (trip_records)")
     ds, dsy = s.table(C[2], Y2, TW, "Dim Data Source", [
         ("PK", "data_source", "text"), ("", "dataset", "text")], tone="gold",
         note="local · online trips · supplementary")
@@ -120,9 +123,10 @@ def data_model():
     Y3 = max(dv.b, ft.b, ds.b) + 70
     fp, fpy = s.table(C[1], Y3, TW, "Fact Prediction", [
         ("PK", "prediction_id", "int"), ("FK", "vehicle_id", "int"), ("FK", "user_id", "int"),
-        ("FK", "trip_id", "int"), ("", "distance_km", "km"), ("", "predicted_fuel", "ŷ (L)"),
-        ("", "actual_fuel", "L"), ("", "approval_status", "text"), ("", "created_at", "time")], tone="navy",
-        note="one row per fuel request")
+        ("FK", "trip_record_id", "int"), ("", "distance_km", "km"), ("", "predicted_fuel", "ŷ (L)"),
+        ("", "approval_status", "text"), ("", "approved_fuel", "L"), ("", "actual_fuel", "L"),
+        ("", "created_at", "time")], tone="navy",
+        note="one row per fuel request (predictions)")
     du, duy = s.table(C[2], Y3, TW, "Dim User", [
         ("PK", "user_id", "int"), ("", "username", "text"), ("", "full_name", "text"), ("", "role", "admin / staff")],
         tone="gold")
@@ -160,9 +164,9 @@ def lifecycle():
     s = SVG(W, "ML Lifecycle and Decision Flow", "CRISP-DM cycle of the project and the decisions in it")
     phases = [("1. Business Understanding", "predict fuel per trip", "maroon"),
               ("2. Data Understanding", "93 GSO + 99,898 online", "gold"),
-              ("3. Data Preparation", "34,471 clean records", "navy"),
+              ("3. Data Preparation", "34,116 clean records", "navy"),
               ("4. Modeling", "Linear Regression", "teal"),
-              ("5. Evaluation", "R² 0.8877, 5-fold CV", "green"),
+              ("5. Evaluation", "R² 0.9020, 5-fold CV", "green"),
               ("6. Deployment", "Flask web system", "maroon")]
     pw = 270
     xs = [40, W / 2 - pw / 2, W - 40 - pw]
@@ -187,12 +191,12 @@ def lifecycle():
     s.text(30, y0 + 24, "A. Building the model", 17, "bold", NAVY)
     ya = y0 + 50
     nw, dw = 165, 230
-    hA = max(s.node_h(nw, "Prepare the data"), 64)
+    hA = max(s.node_h(nw, "Export training data"), 64)
     d1h = s.diamond_h(dw, "Accurate? VIF ≤ 5?")
-    n1 = s.node(110, ya + 20 + (d1h - hA) / 2, nw, "Prepare the data", "navy", h=hA)
-    n2 = s.node(320, n1.t, nw, "Train the model", "navy", h=hA)
+    n1 = s.node(110, ya + 20 + (d1h - hA) / 2, nw, "Export training data", "navy", h=hA)
+    n2 = s.node(320, n1.t, nw, "Train in Google Colab", "navy", h=hA)
     d1 = s.diamond(560, n1.cy - d1h / 2, dw, "Accurate? VIF ≤ 5?")
-    n3 = s.node(850, n1.t, nw + 20, "Deploy the model", "green", h=hA)
+    n3 = s.node(850, n1.t, nw + 20, "Upload and check model", "green", h=hA)
     s.right(n1, n2, INK)
     s.path([(n2.r, n2.cy), (d1.l - 1, n2.cy)], INK, 2)
     s.path([(d1.r, d1.cy), (n3.l - 1, n3.cy)], INK, 2)
@@ -208,7 +212,7 @@ def lifecycle():
     m1 = s.node(90, yb + 20 + (d3h - hB) / 2, 140, "Fuel request", "navy", h=hB)
     d2h = s.diamond_h(180, "Valid input?")
     d2 = s.diamond(265, m1.cy - d2h / 2, 180, "Valid input?")
-    m2 = s.node(450, m1.t, 150, "Predict the fuel", "navy", h=hB)
+    m2 = s.node(450, m1.t, 150, "Predict and warn", "navy", h=hB)
     d3 = s.diamond(650, m1.cy - d3h / 2, 210, "Admin approves?")
     m3 = s.node(880, m1.t, 170, "Record the actual fuel", "green", h=hB)
     s.path([(m1.r, m1.cy), (d2.l - 1, m1.cy)], INK, 2)
@@ -219,7 +223,7 @@ def lifecycle():
     s.label((d3.r + m3.l) / 2, m1.cy - 10, "Yes", GREEN, 13)
     low = max(d2.b, d3.b) + 34
     e1 = s.node(d2.cx, low, 150, "Show error", "maroon", 15)
-    e2 = s.node(d3.cx, low, 150, "Rejected", "maroon", 15)
+    e2 = s.node(d3.cx, low, 190, "Rejected, trip removed", "maroon", 15)
     s.path([(d2.cx, d2.b), (d2.cx, e1.t - 1)], MAROON, 2)
     s.label(d2.cx + 24, (d2.b + e1.t) / 2 + 5, "No", MAROON, 13)
     s.path([(d3.cx, d3.b), (d3.cx, e2.t - 1)], MAROON, 2)
@@ -282,7 +286,7 @@ def architecture():
     s.text(30, ty + 22, "Adding a new model", 17, "bold", NAVY)
     ty += 40
     th = max(s.box_h(230, "Upload Model", "admin, Model Performance"), s.box_h(230, "Upload Check", "same terms, same results"))
-    t1 = s.box(40, ty, 230, "Google Colab", "train and evaluate", "gold", h=th, center=True)
+    t1 = s.box(40, ty, 230, "Google Colab", "exported CSVs: train, evaluate", "gold", h=th, center=True)
     t2 = s.box(330, ty, 230, "Upload Model", "admin, Model Performance", "gold", h=th, center=True)
     t3 = s.box(620, ty, 230, "Upload Check", "same terms, same results", "gold", h=th, center=True)
     s.right(t1, t2, GOLD)

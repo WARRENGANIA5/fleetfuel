@@ -1,19 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1216" viewBox="0 0 1020 1216">
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1250" viewBox="0 0 1020 1250">
 <defs><marker id="a1d2430" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d2430"/></marker><marker id="a2f6b3f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6b3f"/></marker></defs>
-<rect x="0" y="0" width="1020" height="1216" fill="#ffffff"/>
+<rect x="0" y="0" width="1020" height="1250" fill="#ffffff"/>
 <text x="510.0" y="52.0" font-family="Arial, Helvetica, sans-serif" font-size="37.5" font-weight="bold" fill="#1f3a5f" text-anchor="middle">Analytical Data Model Schema</text>
 <text x="510.0" y="88.0" font-family="Arial, Helvetica, sans-serif" font-size="20.0" font-weight="normal" fill="#4a5566" text-anchor="middle" font-style="italic">Star schema: trips and fuel requests (facts) with their dimensions</text>
 <rect x="20.0" y="130.0" width="310.0" height="249.2" rx="6" fill="#ffffff" stroke="#2f6b3f" stroke-width="1.7"/>
 <path d="M20,202.5 V136 Q20,130 26,130 H324 Q330,130 330,136 V202.5 Z" fill="#2f6b3f"/>
 <text x="175.0" y="161.2" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">Model Input View</text>
-<text x="175.0" y="187.5" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">34,471 clean records</text>
+<text x="175.0" y="187.5" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">34,116 clean records</text>
 <text x="67.5" y="230.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">X1 distance_km</text>
 <text x="321.0" y="230.2" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">km</text>
 <rect x="21" y="240.25" width="308" height="33.75" fill="#e8f3ec"/>
 <text x="67.5" y="264.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">X2 engine_power_kw</text>
 <text x="321.0" y="264.0" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">kW</text>
 <text x="67.5" y="297.8" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">X3 fuel_type</text>
-<text x="321.0" y="297.8" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">1 = Gas</text>
+<text x="321.0" y="297.8" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">0 = Diesel</text>
 <rect x="21" y="307.75" width="308" height="33.75" fill="#e8f3ec"/>
 <text x="67.5" y="331.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">X4 distance × power</text>
 <text x="321.0" y="331.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">X1·X2</text>
@@ -60,7 +60,7 @@
 <rect x="355.0" y="449.2" width="310.0" height="283.0" rx="6" fill="#ffffff" stroke="#1f3a5f" stroke-width="1.7"/>
 <path d="M355,521.75 V455.25 Q355,449.25 361,449.25 H659 Q665,449.25 665,455.25 V521.75 Z" fill="#1f3a5f"/>
 <text x="510.0" y="480.5" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">Fact Trip</text>
-<text x="510.0" y="506.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">one row per trip</text>
+<text x="510.0" y="506.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">one row per trip (trip_records)</text>
 <text x="364.0" y="549.5" font-family="Arial, Helvetica, sans-serif" font-size="15.0" font-weight="bold" fill="#7a1f2b" text-anchor="start">PK</text>
 <text x="402.5" y="549.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#1d2430" text-anchor="start">trip_id</text>
 <text x="656.0" y="549.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">int</text>
@@ -90,10 +90,10 @@
 <rect x="691" y="559.5" width="308" height="33.75" fill="#fbf3df"/>
 <text x="737.5" y="583.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">dataset</text>
 <text x="991.0" y="583.2" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">text</text>
-<rect x="355.0" y="802.2" width="310.0" height="384.2" rx="6" fill="#ffffff" stroke="#1f3a5f" stroke-width="1.7"/>
+<rect x="355.0" y="802.2" width="310.0" height="418.0" rx="6" fill="#ffffff" stroke="#1f3a5f" stroke-width="1.7"/>
 <path d="M355,874.75 V808.25 Q355,802.25 361,802.25 H659 Q665,802.25 665,808.25 V874.75 Z" fill="#1f3a5f"/>
 <text x="510.0" y="833.5" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">Fact Prediction</text>
-<text x="510.0" y="859.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">one row per fuel request</text>
+<text x="510.0" y="859.8" font-family="Arial, Helvetica, sans-serif" font-size="16.2" font-weight="normal" fill="#eef2f7" text-anchor="middle" font-style="italic">one row per fuel request (predictions)</text>
 <text x="364.0" y="902.5" font-family="Arial, Helvetica, sans-serif" font-size="15.0" font-weight="bold" fill="#7a1f2b" text-anchor="start">PK</text>
 <text x="402.5" y="902.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="bold" fill="#1d2430" text-anchor="start">prediction_id</text>
 <text x="656.0" y="902.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">int</text>
@@ -106,20 +106,23 @@
 <text x="656.0" y="970.0" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">int</text>
 <rect x="356" y="980.0" width="308" height="33.75" fill="#eaf0f7"/>
 <text x="364.0" y="1003.8" font-family="Arial, Helvetica, sans-serif" font-size="15.0" font-weight="bold" fill="#1f3a5f" text-anchor="start">FK</text>
-<text x="402.5" y="1003.8" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">trip_id</text>
+<text x="402.5" y="1003.8" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">trip_record_id</text>
 <text x="656.0" y="1003.8" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">int</text>
 <text x="402.5" y="1037.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">distance_km</text>
 <text x="656.0" y="1037.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">km</text>
 <rect x="356" y="1047.5" width="308" height="33.75" fill="#eaf0f7"/>
 <text x="402.5" y="1071.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">predicted_fuel</text>
 <text x="656.0" y="1071.2" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">ŷ (L)</text>
-<text x="402.5" y="1105.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">actual_fuel</text>
-<text x="656.0" y="1105.0" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">L</text>
+<text x="402.5" y="1105.0" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">approval_status</text>
+<text x="656.0" y="1105.0" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">text</text>
 <rect x="356" y="1115.0" width="308" height="33.75" fill="#eaf0f7"/>
-<text x="402.5" y="1138.8" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">approval_status</text>
-<text x="656.0" y="1138.8" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">text</text>
-<text x="402.5" y="1172.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">created_at</text>
-<text x="656.0" y="1172.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">time</text>
+<text x="402.5" y="1138.8" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">approved_fuel</text>
+<text x="656.0" y="1138.8" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">L</text>
+<text x="402.5" y="1172.5" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">actual_fuel</text>
+<text x="656.0" y="1172.5" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">L</text>
+<rect x="356" y="1182.5" width="308" height="33.75" fill="#eaf0f7"/>
+<text x="402.5" y="1206.2" font-family="Arial, Helvetica, sans-serif" font-size="18.8" font-weight="normal" fill="#1d2430" text-anchor="start">created_at</text>
+<text x="656.0" y="1206.2" font-family="Arial, Helvetica, sans-serif" font-size="16.9" font-weight="normal" fill="#4a5566" text-anchor="end">time</text>
 <rect x="690.0" y="802.2" width="310.0" height="190.5" rx="6" fill="#ffffff" stroke="#a87f12" stroke-width="1.7"/>
 <path d="M690,849.75 V808.25 Q690,802.25 696,802.25 H994 Q1000,802.25 1000,808.25 V849.75 Z" fill="#a87f12"/>
 <text x="845.0" y="833.5" font-family="Arial, Helvetica, sans-serif" font-size="21.2" font-weight="bold" fill="#ffffff" text-anchor="middle">Dim User</text>
