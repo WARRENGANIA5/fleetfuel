@@ -984,6 +984,12 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
   }
   .metric-value, .stat-value, .section-title, h1, h2, h3, h4, h5, strong { color: #111111 !important; }
   .metric-label, .text-muted, .label { color: #444444 !important; }
+  /* paper is always light: dark mode's color-scheme painted the page margins black */
+  :root, html { color-scheme: light !important; }
+  .pred-tabs { display: none !important; }
+  /* tables fit the paper width: wrap text instead of a 720px minimum */
+  .table-fleet { min-width: 0 !important; width: 100% !important; font-size: 10.5px; }
+  .table-fleet th, .table-fleet td { white-space: normal !important; padding: 6px 5px !important; }
   .table-fleet { color: #111111 !important; }
   .table-fleet th { background: #f0f0f0 !important; color: #111111 !important; }
   .table-fleet th, .table-fleet td { border-color: #cccccc !important; }
