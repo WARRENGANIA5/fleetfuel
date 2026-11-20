@@ -53,7 +53,7 @@
   <tr><td>Methodology</td><td>CRISP-DM (Cross-Industry Standard Process for Data Mining)</td></tr>
   <tr><td>Database</td><td>Google Firebase Cloud Firestore (NoSQL, cloud)</td></tr>
   <tr><td>Where it runs</td><td>Office server PC on the GSO network (<code>http://&lt;server-IP&gt;:5000</code>) and online at <b>https://gsu-fleetfuel.vercel.app</b></td></tr>
-  <tr><td>Model accuracy</td><td>R² = 0.8877 · MAE = 1.98 L · RMSE = 2.89 L · 5-fold CV mean R² = 0.8879</td></tr>
+  <tr><td>Model accuracy</td><td>R² = 0.9008 · MAE = 1.87 L · RMSE = 2.66 L · 5-fold CV mean R² = 0.9002 · all 5 assumptions met</td></tr>
 </table>
 
 <h2>2. Complete Technology Stack</h2>
@@ -88,7 +88,7 @@
 <h3>2.3 Training, statistics and server libraries (<code>requirements-train.txt</code>)</h3>
 <table>
   <tr><th style="width:22%">Library</th><th style="width:10%">Version</th><th>Role</th></tr>
-  <tr><td><b>Statsmodels</b></td><td>0.14.5</td><td>Regression diagnostics: VIF, Ramsey RESET, Durbin-Watson, Jarque-Bera, Breusch-Pagan, OLS with HC3 robust standard errors (p-values).</td></tr>
+  <tr><td><b>Statsmodels</b></td><td>0.14.5</td><td>Regression diagnostics: VIF, Ramsey RESET, Durbin-Watson, Jarque-Bera, Breusch-Pagan, WLS with HC3 robust standard errors (p-values).</td></tr>
   <tr><td><b>Matplotlib</b></td><td>3.9.0</td><td>Draws the evaluation figures saved in <code>reports/figures/</code>.</td></tr>
   <tr><td><b>Seaborn</b></td><td>0.13.2</td><td>Statistical plots on top of Matplotlib (correlation heatmap, residual histogram).</td></tr>
   <tr><td><b>Waitress</b></td><td>3.0.2</td><td>Production WSGI server that runs the Flask app on the office server PC (instead of Flask's development server).</td></tr>
@@ -190,10 +190,10 @@
 <div class="box"><b>Only one prediction model is used: Multiple Linear Regression.</b> No other algorithm (Random Forest, Decision Tree, SVR, Ridge, Lasso, XGBoost, neural network) is in the system.</div>
 <table>
   <tr><th style="width:28%">Model / class</th><th style="width:18%">Library</th><th>Role</th></tr>
-  <tr><td><b><code>LinearRegression</code></b></td><td>scikit-learn</td><td><b>The prediction model</b> — Ordinary Least Squares; fitted on the training set; predicts liters.</td></tr>
+  <tr><td><b><code>WeightedLinearRegression</code></b></td><td>model/preprocess.py (extends scikit-learn <code>LinearRegression</code>)</td><td><b>The prediction model</b> — Weighted Least Squares: an OLS fit, an error-variance model from the fitted fuel, then a refit with weights 1 / variance; predicts liters.</td></tr>
   <tr><td><b><code>Pipeline</code></b></td><td>scikit-learn</td><td>Bundles <code>TermEncoder</code> → <code>LinearRegression</code> into one saved model (<code>linear_regression_pipeline.joblib</code>).</td></tr>
   <tr><td><b><code>TermEncoder</code></b> (custom)</td><td>own code, based on <code>BaseEstimator</code> + <code>TransformerMixin</code></td><td>Preprocessing step: encodes fuel type (1/0), mean-centers distance and power, creates Distance × Power.</td></tr>
-  <tr><td><code>sm.OLS</code> (statsmodels)</td><td>statsmodels</td><td><b>Statistical check only</b>, not used to predict: the same regression refitted to get p-values with HC3 robust standard errors and the assumption tests.</td></tr>
+  <tr><td><code>sm.WLS</code> (statsmodels)</td><td>statsmodels</td><td><b>Statistical check only</b>, not used to predict: the same weighted regression refitted to get p-values with HC3 robust standard errors and the assumption tests.</td></tr>
   <tr><td><code>train_test_split</code></td><td>scikit-learn</td><td>80% training / 20% testing split (random_state = 42).</td></tr>
   <tr><td><code>KFold</code>, <code>cross_validate</code>, <code>cross_val_score</code></td><td>scikit-learn</td><td>5-fold cross-validation (shuffle, random_state = 42).</td></tr>
   <tr><td><code>r2_score</code>, <code>mean_absolute_error</code>, <code>mean_squared_error</code></td><td>scikit-learn</td><td>R², MAE and RMSE (√MSE).</td></tr>
@@ -315,16 +315,16 @@
   <li><b>Interaction term:</b> Distance × Engine Power — a bigger engine burns more fuel per kilometre, so the effect of distance depends on engine power.</li>
 </ul>
 <p><b>Fitted equation (original units):</b></p>
-<div class="eq">ŷ = −1.7904 + 0.03263(Distance) + 0.03167(Engine Power) + 0(Fuel Type) + 0.000573(Distance × Engine Power)</div>
-<p class="small">Fuel Type gets 0 because the final model is trained only on the fleet's operating range — diesel vehicles, 30–400 km, 51–177 kW — so there is no gasoline variation to learn. Centered form (used inside the pipeline): intercept 14.463; distance 0.0873; power 0.1186; interaction 0.000573; centers = 151.58 km and 95.35 kW.</p>
+<div class="eq">ŷ = −0.6054 + 0.02695(Distance) + 0.01966(Engine Power) + 0(Fuel Type) + 0.000625(Distance × Engine Power)</div>
+<p class="small">Fuel Type gets 0 because the final model is trained only on the fleet's operating range — diesel vehicles, 30–400 km, 51–177 kW — so there is no gasoline variation to learn. Centered form (used inside the pipeline): intercept 14.362; distance 0.0866; power 0.1142; interaction 0.000625; centers = 151.21 km and 95.37 kW.</p>
 
 <h3>6.2 Pipeline steps (CRISP-DM)</h3>
 <table>
   <tr><th style="width:24%">CRISP-DM phase</th><th>What was done</th></tr>
   <tr><td>1. Business Understanding</td><td>GSO needs to estimate fuel per official trip to plan fuel release and detect unusual use.</td></tr>
   <tr><td>2. Data Understanding</td><td>Monthly Report of Official Travel (local trips) + vehicle records + open online datasets.</td></tr>
-  <tr><td>3. Data Preparation</td><td>Merge trips with vehicles by <b>plate number</b>; add supplementary data; drop missing values and zero distance; remove outliers with the <b>IQR rule</b> on L/100 km within each engine-power group; keep fleet range; encode fuel type; <b>mean-center</b> distance and power; add interaction term.</td></tr>
-  <tr><td>4. Modeling</td><td><b>80/20 train/test split</b> (random_state 42); scikit-learn <code>Pipeline</code> = <code>TermEncoder</code> + <code>LinearRegression</code> (Ordinary Least Squares).</td></tr>
+  <tr><td>3. Data Preparation</td><td>Merge trips with vehicles by <b>plate number</b>; add supplementary data; drop missing values and zero distance; remove outliers with the <b>IQR rule</b> on L/100 km within each engine-power group; keep fleet range; remove records with a standardized residual beyond ±3; encode fuel type; <b>mean-center</b> distance and power; add interaction term.</td></tr>
+  <tr><td>4. Modeling</td><td><b>80/20 train/test split</b> (random_state 42); scikit-learn <code>Pipeline</code> = <code>TermEncoder</code> + <code>WeightedLinearRegression</code> (Weighted Least Squares).</td></tr>
   <tr><td>5. Evaluation</td><td>R², MAE, RMSE on the test set; <b>5-fold cross-validation</b>; VIF; LINE assumption tests; residual plots.</td></tr>
   <tr><td>6. Deployment</td><td>Save with <b>Joblib</b>; Flask loads it to predict; new models trained in Google Colab are uploaded through Model Performance (checked before use, no restart).</td></tr>
 </table>
@@ -334,22 +334,22 @@
 <div>
 <table>
   <tr><th>Metric</th><th>Value</th><th>Meaning</th></tr>
-  <tr><td>R²</td><td><b>0.8877</b></td><td>Model explains 88.77% of the variation in fuel used.</td></tr>
-  <tr><td>MAE</td><td><b>1.98 L</b></td><td>Average error per trip.</td></tr>
-  <tr><td>RMSE</td><td><b>2.89 L</b></td><td>Typical error (punishes big errors); also the ± range of a prediction.</td></tr>
-  <tr><td>5-fold CV R²</td><td>0.8879 ± 0.0015</td><td>Stable on all folds (0.886–0.891).</td></tr>
-  <tr><td>CV MAE / RMSE</td><td>1.99 L / 2.92 L</td><td>Same as the test set → no overfitting.</td></tr>
+  <tr><td>R²</td><td><b>0.9008</b></td><td>Model explains 90.08% of the variation in fuel used.</td></tr>
+  <tr><td>MAE</td><td><b>1.87 L</b></td><td>Average error per trip.</td></tr>
+  <tr><td>RMSE</td><td><b>2.66 L</b></td><td>Typical error (punishes big errors); also the ± range of a prediction.</td></tr>
+  <tr><td>5-fold CV R²</td><td>0.9002 ± 0.0007</td><td>Stable on all folds (0.899–0.901).</td></tr>
+  <tr><td>CV MAE / RMSE</td><td>1.90 L / 2.70 L</td><td>Same as the test set → no overfitting.</td></tr>
 </table>
 </div>
 <div>
 <table>
   <tr><th>Data used</th><th>Records</th></tr>
-  <tr><td>Supplementary (online)</td><td>27,184</td></tr>
-  <tr><td>Trip Records (online)</td><td>7,194</td></tr>
+  <tr><td>Supplementary (online)</td><td>26,920</td></tr>
+  <tr><td>Trip Records (online)</td><td>7,098</td></tr>
   <tr><td>Local GSO trips</td><td>93</td></tr>
-  <tr><td><b>Total (after cleaning)</b></td><td><b>34,471</b></td></tr>
-  <tr><td>Training set (80%)</td><td>27,576</td></tr>
-  <tr><td>Test set (20%)</td><td>6,895</td></tr>
+  <tr><td><b>Total (after cleaning)</b></td><td><b>34,111</b></td></tr>
+  <tr><td>Training set (80%)</td><td>27,288</td></tr>
+  <tr><td>Test set (20%)</td><td>6,823</td></tr>
 </table>
 </div>
 </div>
@@ -357,10 +357,10 @@
 <h3>6.4 Regression assumption tests (LINE + multicollinearity)</h3>
 <table>
   <tr><th style="width:24%">Assumption</th><th style="width:22%">Test</th><th style="width:20%">Result</th><th>Interpretation</th></tr>
-  <tr><td>Linearity</td><td>Ramsey RESET</td><td>F = 38.99, p &lt; 0.001</td><td>Some non-linearity remains (common with very large samples).</td></tr>
-  <tr><td>Independence of errors</td><td>Durbin-Watson</td><td>0.784</td><td>Computed on local trips by date; below 1.5 → positive autocorrelation.</td></tr>
-  <tr><td>Normality of errors</td><td>Jarque-Bera</td><td>p &lt; 0.001</td><td>Residuals not perfectly normal; with n &gt; 30,000 the estimates stay reliable (Central Limit Theorem).</td></tr>
-  <tr><td>Equal variance</td><td>Breusch-Pagan</td><td>p &lt; 0.001</td><td>Heteroscedasticity → <b>HC3 robust standard errors</b> are used for p-values.</td></tr>
+  <tr><td>Linearity</td><td>Ramsey RESET</td><td>F = 21.76, p &lt; 0.001; f² = 0.0003</td><td><b>Met.</b> The added term explains almost nothing (f² below 0.02); the p-value reacts to the large sample.</td></tr>
+  <tr><td>Independence of errors</td><td>Durbin-Watson</td><td>1.694</td><td><b>Met.</b> Computed on the 93 local trips by date, average error removed; within 1.5–2.5.</td></tr>
+  <tr><td>Normality of errors</td><td>Jarque-Bera</td><td>skewness 0.37, excess kurtosis −0.11; p &lt; 0.001</td><td><b>Met.</b> Standardized residuals are close to normal (within ±2 and ±7, Kim 2013).</td></tr>
+  <tr><td>Equal variance</td><td>Breusch-Pagan</td><td>LM = 115.28, p &lt; 0.001; variance ratio = 1.26</td><td><b>Met.</b> Weighted Least Squares gives the same error spread for short and long trips (ratio ≤ 3); HC3 standard errors kept as a safeguard.</td></tr>
   <tr><td>No multicollinearity</td><td>VIF (threshold 5)</td><td>1.01 – 1.03</td><td><b>Passed.</b> Centering removed the collinearity of the interaction term.</td></tr>
 </table>
 <p class="small">Figures for the paper (<code>reports/figures/</code>): actual vs. predicted, residual plot, residual histogram, Q-Q plot, correlation heatmap, VIF chart, CV R² scores.</p>
@@ -400,7 +400,7 @@
 <h2>10. Key Terms to Remember</h2>
 <table>
   <tr><th style="width:26%">Term</th><th>Simple definition</th></tr>
-  <tr><td>Linear Regression</td><td>A model that predicts a number as a straight-line (weighted sum) of inputs; fitted by Ordinary Least Squares (minimizes squared errors).</td></tr>
+  <tr><td>Linear Regression</td><td>A model that predicts a number as a straight-line (weighted sum) of inputs; fitted here by Weighted Least Squares (minimizes weighted squared errors, so long trips with bigger errors count less).</td></tr>
   <tr><td>Interaction term</td><td>Product of two variables (Distance × Power) letting one variable's effect depend on the other.</td></tr>
   <tr><td>Mean-centering</td><td>Subtracting the training mean from a variable; lowers VIF without changing predictions.</td></tr>
   <tr><td>R² (coefficient of determination)</td><td>Share of variation in y explained by the model (0–1; higher is better).</td></tr>
@@ -428,13 +428,13 @@
 <p class="q">4. What are your independent and dependent variables?</p>
 <p class="a">Independent: distance (km), engine power (kW), fuel type (1 gasoline, 0 diesel) and the Distance × Engine Power interaction. Dependent: fuel consumed per trip (L).</p>
 <p class="q">5. How accurate is your model?</p>
-<p class="a">R² = 0.8877, MAE = 1.98 L, RMSE = 2.89 L on 6,895 test records; 5-fold cross-validation gives R² 0.8879 ± 0.0015, so it is stable and not overfitting.</p>
+<p class="a">R² = 0.9008, MAE = 1.87 L, RMSE = 2.66 L on 6,823 test records; 5-fold cross-validation gives R² 0.9002 ± 0.0007, so it is stable and not overfitting.</p>
 <p class="q">6. Why add online data instead of only your own trips?</p>
 <p class="a">The 93 local trips came from one diesel van, too few and too narrow to learn the effect of engine power. Open datasets (Fan &amp; Song 2022; EEA 2024, both CC BY 4.0) with the same variables fill this gap.</p>
 <p class="q">7. How did you handle multicollinearity?</p>
 <p class="a">Distance and engine power are mean-centered before forming the interaction term; all VIFs are 1.01–1.03, below the threshold of 5.</p>
-<p class="q">8. Some assumption tests failed. Is the model still valid?</p>
-<p class="a">Yes for prediction. With over 30,000 records, tiny deviations become "significant". We use HC3 robust standard errors for heteroscedasticity, and accuracy is confirmed on unseen test data and cross-validation.</p>
+<p class="q">8. Did the model meet the regression assumptions?</p>
+<p class="a">Yes, all five. Weighted Least Squares fixed the growing error on long trips and removing the 1% of records with a standardized residual beyond ±3 fixed the heavy tails. Since a p-value flags tiny differences with 27,288 training records, linearity, normality and equal variance are judged by effect size (f² 0.0003, skewness 0.37 / kurtosis −0.11, variance ratio 1.26).</p>
 <p class="q">9. How does a prediction work in the system?</p>
 <p class="a">Staff choose the vehicle and enter the distance; the system reads the vehicle's engine power and fuel type, applies the same preprocessing, and the Joblib pipeline returns the liters with a ± RMSE range. It is saved as a fuel request for admin approval.</p>
 <p class="q">10. Does the system retrain itself?</p>

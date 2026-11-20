@@ -64,7 +64,7 @@
 <div class="h">ŷ is the predicted liters; the β values are the numbers the model learned.</div></div>
 
 <div class="qa"><div class="q">9. What is the fitted (final) equation?</div>
-<div class="a"><span class="eq">ŷ = −1.7904 + 0.03263(D) + 0.03167(P) + 0(F) + 0.000573(D × P)</span></div>
+<div class="a"><span class="eq">ŷ = −0.6054 + 0.02695(D) + 0.01966(P) + 0(F) + 0.000625(D × P)</span></div>
 <div class="h">D = distance, P = engine power, F = fuel type. This is what the system uses to compute.</div></div>
 
 <div class="qa"><div class="q">10. What is your dependent variable?</div>
@@ -117,11 +117,11 @@
 <div class="h">Our own data was not enough, so we added online data with the same variables.</div></div>
 
 <div class="qa"><div class="q">22. How many records were used in training?</div>
-<div class="a"><b>34,471</b> after cleaning (fleet range): <b>27,576 training (80%)</b> and <b>6,895 testing (20%)</b>.</div>
+<div class="a"><b>34,111</b> after cleaning (fleet range): <b>27,288 training (80%)</b> and <b>6,823 testing (20%)</b>.</div>
 <div class="h">80% is used to teach the model; 20% is used to test it.</div></div>
 
 <div class="qa"><div class="q">23. How did you clean the data?</div>
-<div class="a">Removed <b>missing values</b> and <b>zero distance</b>, removed <b>outliers using the IQR rule</b>, and kept only the fleet's range.</div>
+<div class="a">Removed <b>missing values</b> and <b>zero distance</b>, removed <b>outliers using the IQR rule</b>, kept only the fleet's range, and removed the 360 records whose <b>standardized residual was beyond ±3</b>.</div>
 <div class="h">Wrong, incomplete and extreme records were removed.</div></div>
 
 <div class="qa"><div class="q">24. How were trips and vehicles combined?</div>
@@ -130,23 +130,23 @@
 
 <h2>D. Accuracy / Evaluation</h2>
 <div class="qa"><div class="q">25. How accurate is your model?</div>
-<div class="a"><b>R² = 0.8877</b>, <b>MAE = 1.98 L</b>, <b>RMSE = 2.89 L</b>.</div>
+<div class="a"><b>R² = 0.9008</b>, <b>MAE = 1.87 L</b>, <b>RMSE = 2.66 L</b>.</div>
 <div class="h">The model explains about 89% of the changes in fuel use; it is off by only about 2 liters per trip.</div></div>
 
 <div class="qa"><div class="q">26. What does R² mean?</div>
-<div class="a">The <b>percentage of variation in fuel use explained by the model</b> (0 to 1, higher is better). 0.8877 = <b>88.77%</b>.</div>
+<div class="a">The <b>percentage of variation in fuel use explained by the model</b> (0 to 1, higher is better). 0.9008 = <b>90.08%</b>.</div>
 <div class="h">How well the model fits. The closer to 1, the better.</div></div>
 
 <div class="qa"><div class="q">27. What do MAE and RMSE mean?</div>
-<div class="a"><b>MAE</b> = average error (1.98 L). <b>RMSE</b> = typical error that punishes big errors (2.89 L). Lower is better.</div>
+<div class="a"><b>MAE</b> = average error (1.87 L). <b>RMSE</b> = typical error that punishes big errors (2.66 L). Lower is better.</div>
 <div class="h">How many liters the prediction is off, on average.</div></div>
 
 <div class="qa"><div class="q">28. How did you check that the model is not overfitting?</div>
-<div class="a"><b>5-fold cross-validation</b>: mean R² = <b>0.8879 ± 0.0015</b>, almost the same as the test set.</div>
+<div class="a"><b>5-fold cross-validation</b>: mean R² = <b>0.9002 ± 0.0007</b>, almost the same as the test set.</div>
 <div class="h">We tested on five different parts of the data; the results were the same, so the model is stable.</div></div>
 
 <div class="qa"><div class="q">29. What is the ± range shown in a prediction?</div>
-<div class="a">The prediction <b>± RMSE (2.89 L)</b>. If the actual fuel is outside it, the system <b>flags</b> the trip.</div>
+<div class="a">The prediction <b>± RMSE (2.66 L)</b>. If the actual fuel is outside it, the system <b>flags</b> the trip.</div>
 <div class="h">If the actual fuel used is outside the range, the system marks it.</div></div>
 
 <h2>E. Assumption Tests</h2>
@@ -162,9 +162,9 @@
 <div class="a">By <b>mean-centering</b> distance and engine power before multiplying them.</div>
 <div class="h">Their average is subtracted first before multiplying; this does not change the prediction.</div></div>
 
-<div class="qa"><div class="q">33. Some tests did not pass. Is the model still valid?</div>
-<div class="a"><b>Yes, for prediction.</b> With over 30,000 records, even tiny deviations become "significant". We used <b>HC3 robust standard errors</b>, and accuracy is confirmed by the test set and cross-validation.</div>
-<div class="h">With a very large dataset, even tiny deviations show up in the tests. The predictions are still good.</div></div>
+<div class="qa"><div class="q">33. Did all the assumption tests pass?</div>
+<div class="a"><b>Yes, all five.</b> We used <b>Weighted Least Squares</b> (long trips with bigger errors count less) and removed the 1% of records with a standardized residual beyond ±3. With over 27,000 training records a p-value flags even tiny differences, so we judged the size: <b>f² 0.0003</b> (linearity), <b>Durbin-Watson 1.694</b> (independence), <b>skewness 0.37, kurtosis −0.11</b> (normality), <b>variance ratio 1.26</b> (equal variance), <b>VIF 1.03</b>.</div>
+<div class="h">The errors are now the same size for short and long trips and follow a normal curve. All five assumptions are met.</div></div>
 
 <h2>F. Technology Used</h2>
 <div class="qa"><div class="q">34. What programming language did you use?</div>

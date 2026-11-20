@@ -188,13 +188,15 @@ free plan.
 
 1. Merge the trip records with the vehicle records by plate number; add the supplementary dataset
 2. Clean: drop records with missing values or zero distance; remove outliers with the IQR rule on
-   fuel used per 100 km, within each engine-power group
+   fuel used per 100 km, within each engine-power group; keep the fleet range (diesel, 30-400 km, 51-177 kW);
+   drop records with a standardized residual beyond ±3
 3. Encode fuel type (1 = Gasoline, 0 = Diesel); mean-center distance and engine power and add the interaction term Distance × Engine Power
 4. Check multicollinearity with the Variance Inflation Factor (above 5 = high collinearity)
 5. 80/20 train/test split
-6. Train Linear Regression inside a scikit-learn `Pipeline` (encoding + model bundled)
+6. Train Linear Regression by weighted least squares (`WeightedLinearRegression`: OLS fit, error variance
+   modeled from the fitted fuel, refit with weights 1 / variance) inside a scikit-learn `Pipeline`
 7. Evaluate with R², MAE and RMSE on the test set and with 5-fold cross-validation
-8. Residual plot and residual histogram; Durbin-Watson on the local trips arranged by date of travel
+8. Assumption checks on the standardized residuals (see below); Durbin-Watson on the local trips arranged by date
 9. Save the fitted pipeline via Joblib and metrics to `model/metrics.json`
 10. Prediction: staff select the vehicle and enter the distance; the system takes the vehicle's engine
     power and fuel type from its record, predicts the fuel, and stores the prediction in the history.
@@ -225,8 +227,10 @@ Distance and engine power are **mean-centered** (training-set means) before the 
 this removes the collinearity between the interaction and its components without changing any prediction, and
 the fitted equation is also shown in the original units. Training reports the **VIF** of every term (above 5 =
 high collinearity), uses **HC3 robust standard errors** for the coefficient p-values, and tests the LINE
-conditions on the residuals: Ramsey RESET (linearity), Durbin-Watson (independence), Jarque-Bera (normality),
-Breusch-Pagan (equal variance) and VIF (multicollinearity). Results appear on **Model Performance** and in the
+conditions on the standardized (weighted) residuals: Ramsey RESET (linearity), Durbin-Watson (independence),
+Jarque-Bera (normality), Breusch-Pagan (equal variance) and VIF (multicollinearity). With more than 300 records
+the p-values flag even trivial departures, so linearity, normality and equal variance are decided by effect size:
+Cohen's f² < 0.02, |skewness| ≤ 2 and |excess kurtosis| ≤ 7, and a residual variance ratio ≤ 3. Results appear on **Model Performance** and in the
 Colab notebook. `python model/evaluate_model.py` saves print-ready
 figures to `reports/figures/`.
 

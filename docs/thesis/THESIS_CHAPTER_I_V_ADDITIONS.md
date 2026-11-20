@@ -1,3 +1,5 @@
+> **Updated 2026-11-20 — the numbers in this file are superseded.** The model was retrained with weighted least squares and residual-outlier removal: 34,111 records (27,288 training / 6,823 testing), R² 0.9008, MAE 1.87 L, RMSE 2.66 L, 5-fold CV R² 0.9002 ± 0.0007, and all five assumption checks met. The current text is `docs/thesis/typst/main.typ` (PDF: `docs/thesis/typst/thesis.pdf`).
+
 # Additions to Chapters I–V (from "Fuel Consumption Prediction (10) - fix.pdf")
 
 Each item says where it goes in the manuscript. Everything is based on the current system.

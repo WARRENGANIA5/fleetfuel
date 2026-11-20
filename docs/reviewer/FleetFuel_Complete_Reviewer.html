@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetFuel Complete Reviewer</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --maroon:#7a1f2b; --gold:#b8860b; --ink:#1d2330; --muted:#5b6475; --line:#d9dee7; --soft:#f5f2ea; --blue:#1f4e8c; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.42; margin: 0; background:#fff; }
+  h1 { font-size: 23pt; color: var(--maroon); margin: 0 0 4px; }
+  h2 { font-size: 14.5pt; color: #fff; background: var(--maroon); padding: 6px 10px; border-radius: 4px; margin: 22px 0 10px; break-after: avoid; }
+  h3 { font-size: 11.5pt; color: var(--maroon); border-bottom: 2px solid var(--gold); padding-bottom: 2px; margin: 16px 0 8px; break-after: avoid; }
+  .cover { border: 3px double var(--gold); padding: 22px 24px; border-radius: 6px; margin-bottom: 14px; }
+  .sub { color: var(--muted); font-size: 11pt; margin: 2px 0; }
+  .how { background: var(--soft); border-left: 4px solid var(--gold); padding: 8px 12px; margin: 12px 0; font-size: 10pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.6pt; break-inside: auto; }
+  th, td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { background: #f0e7d4; color: #4a3510; }
+  tr { break-inside: avoid; }
+  .qa { border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px 7px; margin: 0 0 7px; break-inside: avoid; }
+  .q { font-weight: 700; color: var(--blue); }
+  .q .n { display: inline-block; min-width: 30px; color: var(--maroon); }
+  .a { margin-top: 2px; padding-left: 30px; }
+  .tip { margin-top: 3px; padding-left: 30px; color: #6a4a00; font-size: 9.4pt; }
+  .tip::before { content: "Tip: "; font-weight: 700; }
+  .hard { border-left: 4px solid #b3261e; }
+  .eq { font-family: Cambria, "Times New Roman", serif; font-size: 11.5pt; background: #f3f6fb; border: 1px solid #d4def0; padding: 6px 10px; border-radius: 4px; margin: 6px 0; }
+  b.k { color: var(--maroon); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .box { border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; break-inside: avoid; }
+  .box h4 { margin: 0 0 4px; color: var(--maroon); font-size: 10.5pt; }
+  ul, ol { margin: 4px 0 6px; padding-left: 20px; }
+  li { margin: 1px 0; }
+  .small { font-size: 9pt; color: var(--muted); }
+  .pb { break-before: page; }
+  code { font-family: Consolas, monospace; font-size: 9.2pt; background: #f2f2f2; padding: 0 3px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>FleetFuel Complete Reviewer</h1>
+  <p class="sub"><b>Performance of Linear Regression Model in Predicting Fuel Consumption for Government Fleet</b></p>
+  <p class="sub">GSU FleetFuel — Fuel Consumption Prediction System · Guimaras State University, College of Science and Technology (BSIT)</p>
+  <p class="sub">Prepared 17 November 2026 · for the oral defense</p>
+  <div class="how">
+    <b>How to use this reviewer.</b> Part I is the one-page cheat sheet: memorize those numbers. Part II has the
+    possible panel questions grouped by topic, each with a short, simple answer you can say aloud. Questions with a
+    <span style="color:#b3261e;font-weight:700">red left border</span> are the hard or "trap" questions the panel is most
+    likely to press on. Part III is the demo script, the formulas and the glossary. All numbers come from the
+    final paper (Fuel Consumption Prediction (10)) and the system's <code>model/metrics.json</code>.
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Part I · Cheat Sheet (memorize this page)</h2>
+
+<table>
+<tr><th style="width:32%">Item</th><th>Answer</th></tr>
+<tr><td>System name</td><td><b>GSU FleetFuel</b> — Fuel Consumption Prediction System</td></tr>
+<tr><td>Researchers / roles</td><td>Aleah M. Casuyon (Project Manager / Technical Writer), Warren G. Gania (Programmer), Ace Ryan A. Erandio (Field Researcher / Data Analyst); Adviser: Divon G. Tamdang, MIT</td></tr>
+<tr><td>Problem</td><td>GSO approves fuel requests from experience and past records; excess fuel use is found only at liquidation, after the fuel is already used.</td></tr>
+<tr><td>Solution</td><td>A Linear Regression model that predicts liters per trip, inside a web application used before a fuel request is approved.</td></tr>
+<tr><td>Users</td><td>One Administrator (<code>admin1114</code>) and staff of the General Services Office (GSO) and Transportation Office</td></tr>
+<tr><td>Methodology</td><td><b>CRISP-DM</b>: Business Understanding → Data Understanding → Data Preparation → Modelling → Evaluation → Deployment</td></tr>
+<tr><td>Algorithm</td><td><b>Multiple Linear Regression</b> (Weighted Least Squares) with one interaction term — the only model in the system</td></tr>
+<tr><td>Dependent variable (y)</td><td>Fuel consumed per trip, in liters</td></tr>
+<tr><td>Predictors (x)</td><td>Distance traveled (km), Engine power (kW), Distance × Engine Power. Fuel type is encoded (1 Gasoline, 0 Diesel) but is 0 in every final record, so its coefficient is 0.</td></tr>
+<tr><td>Final equation</td><td><b>ŷ = −0.6054 + 0.02695(Distance) + 0.01966(Engine Power) + 0.000625(Distance × Engine Power)</b></td></tr>
+<tr><td>Data collected</td><td>93 local trips (SFA 4714, Jan–Jun 2026) + 9 fleet vehicles + 7,496 online trip records + 92,402 other online records = <b>99,991 trip records</b> (+ 9 vehicles = 100,000 records)</td></tr>
+<tr><td>Online sources (CC BY 4.0)</td><td>Fan &amp; Song (2022): 50,508 gasoline trips · European Environment Agency (EEA): 49,390 diesel vans</td></tr>
+<tr><td>After cleaning</td><td><b>34,111</b> diesel records (IQR removed 3,857; outside fleet range 61,663; standardized residual beyond ±3 removed 360; all 93 local trips kept)</td></tr>
+<tr><td>Fleet operating range</td><td>Diesel · 30–400 km · 51–177 kW</td></tr>
+<tr><td>Split</td><td>80/20 → <b>27,288</b> training / <b>6,823</b> testing (random_state = 42)</td></tr>
+<tr><td>Results (test set)</td><td><b>R² = 0.9008</b> · <b>MAE = 1.87 L</b> · <b>RMSE = 2.66 L</b></td></tr>
+<tr><td>5-fold cross-validation</td><td>Mean R² <b>0.9002</b>, SD <b>0.0007</b> (folds 0.9008, 0.9008, 0.8995, 0.9009, 0.8992) · MAE 1.902 L · RMSE 2.705 L</td></tr>
+<tr><td>VIF</td><td>Distance 1.03 · Engine power 1.03 · Interaction 1.01 → all below 5 (passed)</td></tr>
+<tr><td>Assumption tests</td><td>All five met · Linearity: RESET f² = 0.0003 (&lt; 0.02) · Independence: Durbin-Watson 1.694 (1.5–2.5) · Normality: skewness 0.37, excess kurtosis −0.11 (within ±2 / ±7) · Equal variance: variance ratio 1.26 (≤ 3) · VIF 1.03 (≤ 5)</td></tr>
+<tr><td>Correlations with fuel</td><td>Distance r = 0.88 (strong) · Engine power r = 0.15 (weak)</td></tr>
+<tr><td>Tech stack</td><td>Python · Flask · HTML/CSS/JavaScript · Jinja2 · Bootstrap 5 · Chart.js · Firebase Firestore · Pandas · NumPy · scikit-learn · Joblib · Statsmodels · Matplotlib · Seaborn · Google Colab · VS Code</td></tr>
+<tr><td>Where it runs</td><td>GSO office server PC (Waitress, port 5000) and online at <b>https://gsu-fleetfuel.vercel.app</b>; both use the same Firestore database</td></tr>
+<tr><td>Fleet (9 diesel vehicles)</td><td>SFA 4714 (95 kW) · SFA 4713 (95) · SFA 4712 (95) · SFA 1173 (128) · SFA 1172 (130) · SFA 1741 (177) · SGF 810 (63) · SJC 955 (62) · SEF 535 (51)</td></tr>
+</table>
+
+<div class="eq">Worked example (SFA 4714, 95 kW, 176 km):<br>
+ŷ = −0.6054 + 0.02695(176) + 0.01966(95) + 0.000625(176 × 95) = −0.6054 + 4.743 + 1.868 + 10.455 ≈ <b>16.46 L</b><br>
+Range shown = 16.46 ± 2.66 (RMSE) → about 13.80 to 19.12 L. The recorded average of SFA 4714 is 17.6 L per trip.</div>
+
+<!-- ============================================================ -->
+<h2 class="pb">Part II · Possible Questions and Answers</h2>
+<div class="how">Short, simple answers. Say them with confidence, then stop. Red-bordered questions are the ones the panel is most likely to press on.</div>
+<h3>A. Title, Problem and Objectives</h3>
+<div class="qa"><div class="q"><span class="n">1.</span>Explain your title.</div><div class="a">It means we measured how accurately a Linear Regression model predicts the fuel a GSU vehicle uses per trip. "Performance" is measured by R², MAE and RMSE.</div></div>
+<div class="qa"><div class="q"><span class="n">2.</span>What problem does your study solve?</div><div class="a">Fuel requests are approved by experience, and overuse is found only at liquidation, after the fuel is gone. Our system gives a computed fuel figure <b>before</b> the trip.</div></div>
+<div class="qa"><div class="q"><span class="n">3.</span>What is your general objective?</div><div class="a">To develop and evaluate a Linear Regression model that predicts fuel consumption from the fleet's travel records, and integrate it into a web application.</div></div>
+<div class="qa"><div class="q"><span class="n">4.</span>What are your specific objectives?</div><div class="a">Collect the data; clean and prepare it; build the model with an 80/20 split; evaluate it with R², MAE, RMSE and 5-fold cross-validation; build the web app; integrate the model; and implement it for users.</div></div>
+<div class="qa"><div class="q"><span class="n">5.</span>Did you meet all your objectives?</div><div class="a">Yes. We collected 99,991 trip records, cleaned them to 34,111, trained the model with R² 0.9008, built and integrated the web app, and deployed it at gsu-fleetfuel.vercel.app.</div></div>
+<div class="qa"><div class="q"><span class="n">6.</span>What is the scope of your study?</div><div class="a">The GSU fleet's diesel vehicles, trips of 30–400 km and engines of 51–177 kW, using a Linear Regression model inside a web application.</div></div>
+<div class="qa"><div class="q"><span class="n">7.</span>What are your limitations?</div><div class="a">Our local records cover only one vehicle (SFA 4714) for six months, and its fuel follows a rule of 1 liter per 10 km. We only tested Linear Regression, and the system needs internet.</div></div>
+<div class="qa"><div class="q"><span class="n">8.</span>Who benefits from your study?</div><div class="a">GSU, the General Services Office, the Transportation Office, the Chief Administration Office, the researchers, and future researchers.</div></div>
+<div class="qa"><div class="q"><span class="n">9.</span>What is the research gap?</div><div class="a">Past studies used sensor or industrial data. None used manually written government travel records like the Monthly Report of Official Travel.</div></div>
+<div class="qa"><div class="q"><span class="n">10.</span>Explain your conceptual framework.</div><div class="a">Input: travel records, vehicle records and online data. Process: data preparation, model development, evaluation and system development. Output: the trained model and the web application.</div></div>
+<div class="qa"><div class="q"><span class="n">11.</span>Why collect the date of travel if it is not a predictor?</div><div class="a">We use it to arrange the 93 local trips in order for the Durbin-Watson test.</div></div>
+<h3>B. The System and Its Users</h3>
+<div class="qa"><div class="q"><span class="n">12.</span>What is your system?</div><div class="a">GSU FleetFuel, a website where staff choose a vehicle, type the distance, and get the predicted liters of fuel for the trip.</div></div>
+<div class="qa"><div class="q"><span class="n">13.</span>What are the modules?</div><div class="a">Login and Sign-up, Dashboard, Prediction with Prediction History, Trip Records, Vehicle Management, Model Performance, User Accounts, Account Settings and Notifications.</div></div>
+<div class="qa"><div class="q"><span class="n">14.</span>Who are the users?</div><div class="a">One Administrator, and the staff of the General Services Office and Transportation Office.</div></div>
+<div class="qa"><div class="q"><span class="n">15.</span>What can the Administrator do?</div><div class="a">Approve or reject fuel requests, manage vehicles, trips and user accounts, and upload a new trained model.</div></div>
+<div class="qa"><div class="q"><span class="n">16.</span>What can the staff do?</div><div class="a">Make fuel predictions, record the actual fuel after the trip, and view the dashboard and records.</div></div>
+<div class="qa"><div class="q"><span class="n">17.</span>How does a fuel request work?</div><div class="a">Staff make a prediction, it becomes a pending request, the admin approves or rejects it, and after the trip the staff record the actual fuel used.</div></div>
+<div class="qa"><div class="q"><span class="n">18.</span>Why do users enter only the vehicle and the distance?</div><div class="a">The engine power and fuel type are already in the vehicle record, so the system fills them in. This avoids typing mistakes.</div></div>
+<div class="qa"><div class="q"><span class="n">19.</span>What does the "±" range on the result mean?</div><div class="a">It is the prediction plus or minus 2.66 liters, the model's typical error. If the actual fuel falls outside it, the system flags the trip.</div></div>
+<div class="qa"><div class="q"><span class="n">20.</span>What if the distance is outside 30–400 km?</div><div class="a">The system still predicts but shows a warning, because the model was trained only within that range.</div></div>
+<div class="qa"><div class="q"><span class="n">21.</span>Only SFA 4714 has local trips. What about the other vehicles?</div><div class="a">They can still be used because the model learned from many engine sizes, but the system warns that they are not yet validated with their own trips.</div></div>
+<div class="qa"><div class="q"><span class="n">22.</span>Can it be used on a phone?</div><div class="a">Yes, through the phone's browser. The design adjusts to any screen size.</div></div>
+<h3>C. Technology Used</h3>
+<div class="qa"><div class="q"><span class="n">23.</span>What programming language did you use?</div><div class="a">Python for the back end and the model, and HTML, CSS and JavaScript for the pages.</div></div>
+<div class="qa"><div class="q"><span class="n">24.</span>Why Python?</div><div class="a">Python is the standard language for machine learning. Our model and our website are in the same language, so the website can use the model directly.</div></div>
+<div class="qa"><div class="q"><span class="n">25.</span>Why Flask?</div><div class="a">Flask is a lightweight Python web framework. It is simple, fits a small system like ours, and runs the model in the same program.</div></div>
+<div class="qa"><div class="q"><span class="n">26.</span>Why not Django or PHP?</div><div class="a">Django has many features we do not need. PHP cannot run our Python model directly. Flask is the simplest fit.</div></div>
+<div class="qa"><div class="q"><span class="n">27.</span>What database did you use?</div><div class="a">Firebase Firestore, a free cloud database by Google.</div></div>
+<div class="qa"><div class="q"><span class="n">28.</span>Why Firestore and not MySQL?</div><div class="a">It is free, online and real-time. A change on one computer shows on all computers right away, and the data is safe even if the office PC is turned off.</div></div>
+<div class="qa"><div class="q"><span class="n">29.</span>What is NoSQL?</div><div class="a">A database that stores data as documents instead of tables with rows and columns.</div></div>
+<div class="qa"><div class="q"><span class="n">30.</span>What is Bootstrap?</div><div class="a">A design toolkit that makes the pages neat and fit on any screen size.</div></div>
+<div class="qa"><div class="q"><span class="n">31.</span>What is Chart.js?</div><div class="a">A JavaScript library that draws the charts on the Dashboard and Model Performance pages.</div></div>
+<div class="qa"><div class="q"><span class="n">32.</span>What is Google Colab?</div><div class="a">A free online Python notebook from Google. We used it to clean the data, train the model and test it.</div></div>
+<div class="qa"><div class="q"><span class="n">33.</span>What Python libraries did you use?</div><div class="a">Pandas and NumPy for data, scikit-learn for the model, Joblib to save the model, Statsmodels for the statistical tests, and Matplotlib and Seaborn for the graphs.</div></div>
+<div class="qa"><div class="q"><span class="n">34.</span>Why scikit-learn and Statsmodels?</div><div class="a">scikit-learn builds and tests the model. Statsmodels gives the statistical tests and p-values.</div></div>
+<div class="qa"><div class="q"><span class="n">35.</span>What is Joblib?</div><div class="a">It saves the trained model into one file. The website loads that file to predict without retraining.</div></div>
+<div class="qa"><div class="q"><span class="n">36.</span>What is Waitress?</div><div class="a">The server program that runs our website on the office computer, safe for many users.</div></div>
+<div class="qa"><div class="q"><span class="n">37.</span>What is Vercel?</div><div class="a">A cloud hosting service where our online version runs at gsu-fleetfuel.vercel.app.</div></div>
+<div class="qa"><div class="q"><span class="n">38.</span>What tools did you use to develop it?</div><div class="a">Visual Studio Code, Git and GitHub, Google Colab, the Firebase Console and a web browser.</div></div>
+<h3>D. Data</h3>
+<div class="qa"><div class="q"><span class="n">39.</span>Where did your data come from?</div><div class="a">From the GSO's Monthly Report of Official Travel (93 trips), the records of the 9 fleet vehicles, and two free online datasets: Fan &amp; Song (2022) and the European Environment Agency.</div></div>
+<div class="qa"><div class="q"><span class="n">40.</span>What data does the travel report give?</div><div class="a">The date of travel, the distance in kilometers and the fuel used in liters.</div></div>
+<div class="qa"><div class="q"><span class="n">41.</span>Why did you use online data?</div><div class="a">Our 93 local trips come from one vehicle only. The online data has the same variables and lets the model learn the effect of different engine sizes.</div></div>
+<div class="qa hard"><div class="q"><span class="n">42.</span>Your local fuel follows 1 liter per 10 km. Is that real data?</div><div class="a">It is the GSO's allocation, not a measured value, and we state this in our limitations. That is why we added measured online data, and the system now records the actual fuel after every trip.</div></div>
+<div class="qa hard"><div class="q"><span class="n">43.</span>Are the 7,496 online trip records real GSU trips?</div><div class="a">No. They are real diesel van records from the EEA, matched to a fleet vehicle with a similar engine. We label them clearly as online data.</div></div>
+<div class="qa"><div class="q"><span class="n">44.</span>How many records do you have?</div><div class="a">99,991 trip records plus 9 vehicle records, a total of 100,000. After cleaning, 34,111 remained.</div></div>
+<div class="qa"><div class="q"><span class="n">45.</span>Are you allowed to use the online data?</div><div class="a">Yes. Both are under the CC BY 4.0 license, which allows use as long as we cite them, and we did.</div></div>
+<div class="qa"><div class="q"><span class="n">46.</span>How did you combine trips and vehicles?</div><div class="a">We merged them using the plate number.</div></div>
+<div class="qa"><div class="q"><span class="n">47.</span>How did you clean the data?</div><div class="a">We removed missing values, zero distances and outliers, and kept only the fleet's range: diesel, 30–400 km, 51–177 kW.</div></div>
+<div class="qa"><div class="q"><span class="n">48.</span>What is the IQR method?</div><div class="a">A way to find outliers. A value is removed if it is far below the first quartile or far above the third quartile, by 1.5 times the IQR.</div></div>
+<div class="qa"><div class="q"><span class="n">49.</span>Why apply IQR by engine power group?</div><div class="a">So big engines are compared only with big engines. Otherwise they would look like outliers just because they use more fuel.</div></div>
+<div class="qa"><div class="q"><span class="n">50.</span>How many records were removed?</div><div class="a">65,520 records: 3,857 outliers and 61,663 outside the fleet's range. All 93 local trips were kept.</div></div>
+<div class="qa hard"><div class="q"><span class="n">51.</span>Why remove all the gasoline records?</div><div class="a">All nine GSU vehicles are diesel, so gasoline data would describe vehicles the GSO does not have.</div></div>
+<div class="qa"><div class="q"><span class="n">52.</span>Why 30–400 km and 51–177 kW?</div><div class="a">51 kW is the smallest engine in the fleet and 177 kW is the biggest. Local trips run from 32 to 372 km.</div></div>
+<div class="qa"><div class="q"><span class="n">53.</span>Why not use speed, road condition or cargo?</div><div class="a">The travel report does not record them. We recommend adding them in future studies.</div></div>
+<h3>E. The Model</h3>
+<div class="qa"><div class="q"><span class="n">54.</span>What is Linear Regression?</div><div class="a">A model that predicts a number using a straight-line formula of the inputs.</div></div>
+<div class="qa"><div class="q"><span class="n">55.</span>Why Linear Regression and not Random Forest or neural networks?</div><div class="a">Fuel use goes up almost in a straight line with distance, so it fits well with R² 0.89. It is also simple and easy to explain: each number shows how many liters a kilometer adds.</div></div>
+<div class="qa"><div class="q"><span class="n">56.</span>How does it learn the coefficients?</div><div class="a">By Weighted Least Squares: it finds the line with the smallest total squared error, but long trips (which have bigger errors in liters) count less, so every trip is treated fairly.</div></div>
+<div class="qa"><div class="q"><span class="n">57.</span>What is your equation?</div><div class="a">ŷ = −0.6054 + 0.02695(Distance) + 0.01966(Engine Power) + 0.000625(Distance × Engine Power)</div></div>
+<div class="qa"><div class="q"><span class="n">58.</span>What are your dependent and independent variables?</div><div class="a">Dependent: fuel used per trip in liters. Independent: distance, engine power and their interaction.</div></div>
+<div class="qa"><div class="q"><span class="n">59.</span>What do the coefficients mean?</div><div class="a">Each kilometer adds about 0.087 liters, about 8.7 liters per 100 km. Bigger engines add more fuel per kilometer.</div></div>
+<div class="qa"><div class="q"><span class="n">60.</span>What is the interaction term?</div><div class="a">Distance multiplied by engine power. It shows that a bigger engine uses more fuel for every kilometer.</div></div>
+<div class="qa hard"><div class="q"><span class="n">61.</span>Why is the intercept negative?</div><div class="a">The intercept is the value at 0 km and 0 kW, which is outside our data. Within 30–400 km all predictions are positive.</div></div>
+<div class="qa"><div class="q"><span class="n">62.</span>What is mean-centering?</div><div class="a">We subtract the average from distance and engine power before multiplying them. It removes overlap between the variables without changing the predictions.</div></div>
+<div class="qa hard"><div class="q"><span class="n">63.</span>Why is the Fuel Type coefficient zero?</div><div class="a">All our final records are diesel, so fuel type never changes and has no effect.</div></div>
+<div class="qa"><div class="q"><span class="n">64.</span>Which predictor is the strongest?</div><div class="a">Distance, with a correlation of 0.88 to fuel used.</div></div>
+<div class="qa"><div class="q"><span class="n">65.</span>What is a Pipeline?</div><div class="a">It packs the preprocessing steps and the model into one file, so every prediction follows the same steps as training.</div></div>
+<div class="qa"><div class="q"><span class="n">66.</span>Does the system retrain by itself?</div><div class="a">No. A new model is trained in Google Colab, checked, then uploaded on the Model Performance page.</div></div>
+<div class="qa"><div class="q"><span class="n">67.</span>Why not retrain automatically?</div><div class="a">So no new model is used before someone checks its accuracy.</div></div>
+<h3>F. Accuracy and Evaluation</h3>
+<div class="qa"><div class="q"><span class="n">68.</span>How accurate is your model?</div><div class="a">R² is 0.9008, MAE is 1.87 liters and RMSE is 2.66 liters.</div></div>
+<div class="qa"><div class="q"><span class="n">69.</span>What does R² 0.9008 mean?</div><div class="a">The model explains about 90% of the changes in fuel use.</div></div>
+<div class="qa"><div class="q"><span class="n">70.</span>What do MAE and RMSE mean?</div><div class="a">MAE: the prediction is off by about 2 liters on average. RMSE: about 2.9 liters, which gives more weight to big errors.</div></div>
+<div class="qa"><div class="q"><span class="n">71.</span>Why is RMSE higher than MAE?</div><div class="a">Some long trips have bigger errors than the usual trip.</div></div>
+<div class="qa"><div class="q"><span class="n">72.</span>Why an 80/20 split?</div><div class="a">80% to train the model and 20% to test it on data it has never seen. It is the common standard.</div></div>
+<div class="qa"><div class="q"><span class="n">73.</span>What is cross-validation?</div><div class="a">We split the data into 5 parts and tested 5 times, each part once. The average R² was 0.9002.</div></div>
+<div class="qa"><div class="q"><span class="n">74.</span>Is your model overfitting?</div><div class="a">No. The test R² (0.9008) and the cross-validation R² (0.9002) are almost the same.</div></div>
+<div class="qa"><div class="q"><span class="n">75.</span>What is random_state 42?</div><div class="a">A fixed seed so we get the same split and the same results every time.</div></div>
+<div class="qa hard"><div class="q"><span class="n">76.</span>Your accuracy is tested mostly on online data. Does it work for GSU?</div><div class="a">For a typical SFA 4714 trip of 176 km it predicts 16.46 liters, close to the recorded 17.6 liters. More local trips will make it more accurate.</div></div>
+<h3>G. Assumption Tests</h3>
+<div class="qa"><div class="q"><span class="n">77.</span>What are the assumptions of linear regression?</div><div class="a">Linearity, independent errors, normal errors, equal variance, and no multicollinearity.</div></div>
+<div class="qa"><div class="q"><span class="n">78.</span>What tests did you use?</div><div class="a">Ramsey RESET, Durbin-Watson, Jarque-Bera, Breusch-Pagan and VIF.</div></div>
+<div class="qa"><div class="q"><span class="n">79.</span>What were the results?</div><div class="a">All five passed: linearity, independence (Durbin-Watson 1.694), normality, equal variance and no multicollinearity (VIF 1.03).</div></div>
+<div class="qa hard"><div class="q"><span class="n">80.</span>Some p-values are still below 0.05. Why do you say the tests passed?</div><div class="a">With 27,288 training records, a p-value flags even differences too small to matter. So for linearity, normality and equal variance we judged the size of the difference: Cohen's f² 0.0003 (below 0.02), skewness 0.37 and kurtosis −0.11 (within ±2 and ±7), and a variance ratio of 1.26 (at most 3). These are standard rules for large samples (Kim, 2013; Cohen, 1988; Dean &amp; Voss, 1999).</div></div>
+<div class="qa"><div class="q"><span class="n">81.</span>What is VIF?</div><div class="a">It checks whether the predictors repeat the same information. Above 5 is a problem; ours is only 1.03.</div></div>
+<div class="qa"><div class="q"><span class="n">82.</span>What is heteroskedasticity, and how did you fix it?</div><div class="a">The errors in liters are bigger for long trips. We fixed it with Weighted Least Squares: each trip is weighted by 1 ÷ its expected error variance, so the weighted errors have the same spread for short and long trips. We also removed the 360 records (about 1%) whose standardized error was beyond ±3.</div></div>
+<div class="qa hard"><div class="q"><span class="n">83.</span>What does Durbin-Watson 1.694 mean?</div><div class="a">It is between 1.5 and 2.5, so the errors of consecutive local trips (arranged by date) are independent. We removed their average error of +1.14 L first, because a constant difference for one vehicle is not a relation between trips.</div></div>
+<div class="qa"><div class="q"><span class="n">84.</span>What is a residual?</div><div class="a">The actual value minus the predicted value.</div></div>
+<div class="qa"><div class="q"><span class="n">85.</span>What does p &lt; 0.05 mean?</div><div class="a">The result is statistically significant. All our coefficients have p below 0.001.</div></div>
+<h3>H. How the System Uses the Model</h3>
+<div class="qa"><div class="q"><span class="n">86.</span>How does a prediction work inside the system?</div><div class="a">Flask loads the saved model, gets the vehicle's engine power from the database, applies the same steps as training, and shows the liters.</div></div>
+<div class="qa"><div class="q"><span class="n">87.</span>What is your system architecture?</div><div class="a">Three layers: the browser (the pages), Flask with the model (the processing), and Firestore (the data).</div></div>
+<div class="qa"><div class="q"><span class="n">88.</span>How do pages update without reloading?</div><div class="a">JavaScript asks the server for new data every few seconds.</div></div>
+<h3>I. Database</h3>
+<div class="qa"><div class="q"><span class="n">89.</span>What collections are in your database?</div><div class="a">users, vehicles, trip_records, predictions, trip_dataset_changes and notification_dismissals.</div></div>
+<div class="qa"><div class="q"><span class="n">90.</span>What links trips and vehicles?</div><div class="a">The plate number.</div></div>
+<div class="qa"><div class="q"><span class="n">91.</span>How is the data real-time?</div><div class="a">Firestore sends every change to the server immediately, so all users see the same data.</div></div>
+<div class="qa"><div class="q"><span class="n">92.</span>Is Firestore free?</div><div class="a">Yes, the free plan allows 50,000 reads a day, and our system stays within it.</div></div>
+<div class="qa"><div class="q"><span class="n">93.</span>What if the internet is down?</div><div class="a">The system needs internet, as stated in our limitations. The data is still safe in the cloud.</div></div>
+<div class="qa"><div class="q"><span class="n">94.</span>How is the data backed up?</div><div class="a">The system backs up the whole database every time it starts and every 24 hours.</div></div>
+<h3>J. Security</h3>
+<div class="qa"><div class="q"><span class="n">95.</span>How are passwords protected?</div><div class="a">They are hashed with scrypt, so no one can read them, not even the admin.</div></div>
+<div class="qa"><div class="q"><span class="n">96.</span>What other security features does it have?</div><div class="a">Login is required for every page, staff cannot open admin pages, logins lock after 5 wrong tries, new accounts need admin approval, and forms are protected against CSRF.</div></div>
+<div class="qa"><div class="q"><span class="n">97.</span>What is CSRF?</div><div class="a">An attack where another website submits a form using your login. A secret token on every form blocks it.</div></div>
+<div class="qa hard"><div class="q"><span class="n">98.</span>Can staff inflate the distance to get more fuel?</div><div class="a">Every request is recorded and reviewed by the admin, and the actual fuel is compared after the trip. Unusual use is flagged.</div></div>
+<h3>K. Deployment</h3>
+<div class="qa"><div class="q"><span class="n">99.</span>How do users open the system?</div><div class="a">In the office through the server computer, or online at gsu-fleetfuel.vercel.app. Both use the same database.</div></div>
+<div class="qa"><div class="q"><span class="n">100.</span>How is the online version updated?</div><div class="a">When we push code to GitHub, Vercel updates the site automatically.</div></div>
+<div class="qa"><div class="q"><span class="n">101.</span>What do users need?</div><div class="a">Only a web browser and an internet connection.</div></div>
+<h3>L. Methodology</h3>
+<div class="qa"><div class="q"><span class="n">102.</span>What methodology did you use?</div><div class="a">CRISP-DM: Business Understanding, Data Understanding, Data Preparation, Modelling, Evaluation and Deployment.</div></div>
+<div class="qa"><div class="q"><span class="n">103.</span>Why CRISP-DM?</div><div class="a">It is the standard process for data and machine learning projects, and it lets us go back to earlier steps when needed.</div></div>
+<div class="qa"><div class="q"><span class="n">104.</span>Give an example of going back to an earlier phase.</div><div class="a">After seeing all GSU vehicles are diesel, we went back to data preparation, kept only the fleet's range, and retrained the model.</div></div>
+<h3>M. Conclusions and Recommendations</h3>
+<div class="qa"><div class="q"><span class="n">105.</span>What is your main conclusion?</div><div class="a">Linear Regression predicts the fleet's fuel use well, explaining about 89% with about 2 liters of error, and gives the GSO a computed basis for approving fuel.</div></div>
+<div class="qa"><div class="q"><span class="n">106.</span>What are your recommendations?</div><div class="a">Record the actual fuel of every trip, collect records from all nine vehicles, retrain the model regularly, and let future researchers add more variables and compare other models.</div></div>
+<h3>N. Hard Panel Questions</h3>
+<div class="qa hard"><div class="q"><span class="n">107.</span>What is your contribution?</div><div class="a">We showed that the GSO's paper travel records, combined with open data, can power a working fuel prediction system, and we give a baseline for future studies.</div></div>
+<div class="qa hard"><div class="q"><span class="n">108.</span>Does the system approve the fuel?</div><div class="a">No. The prediction is only a reference; the administrator makes the decision.</div></div>
+<div class="qa hard"><div class="q"><span class="n">109.</span>Your data is mostly foreign. Why should it apply to Guimaras?</div><div class="a">We kept only diesel vehicles with the same engine sizes as our fleet. More distance and bigger engines mean more fuel anywhere. Local trips will make it more accurate over time.</div></div>
+<div class="qa hard"><div class="q"><span class="n">110.</span>Why is the prediction lower than SFA 4714's records?</div><div class="a">The records follow the 1 L per 10 km allocation. Measured data shows similar vans use about 8.7 L per 100 km, so the allocation may be a little generous.</div></div>
+<div class="qa hard"><div class="q"><span class="n">111.</span>What if a new vehicle is added?</div><div class="a">If it is diesel with 51–177 kW, the admin just adds it and it works right away. Otherwise the model should be retrained.</div></div>
+<div class="qa hard"><div class="q"><span class="n">112.</span>How did you test the system?</div><div class="a">We tested every feature in actual use: predictions, approvals, actual fuel recording and sign-ups, both in the office and online. A user survey can be a future recommendation.</div></div>
+<div class="qa hard"><div class="q"><span class="n">113.</span>Who will maintain it after you?</div><div class="a">The GSO admin manages everything through the website. Retraining is documented step by step, and backups run automatically.</div></div>
+<div class="qa hard"><div class="q"><span class="n">114.</span>What would you improve?</div><div class="a">Collect measured fuel from all nine vehicles, add variables like speed and load, and compare with other models.</div></div>
+
+<h2 class="pb">Part III · Demo Script, Formulas and Glossary</h2>
+
+<h3>Suggested live demo (5 minutes)</h3>
+<ol>
+<li><b>Login</b> as staff → show the Dashboard (live cards and charts).</li>
+<li><b>Prediction</b> → select SFA 4714 → enter 176 km → result ≈ 16.46 L ± 2.66 L. Point out that engine power and fuel type came from the vehicle record.</li>
+<li>Try a vehicle without local trips (e.g., SFA 1741) → show the "not validated" warning. Try 450 km → show the out-of-range warning.</li>
+<li>Switch to the <b>admin</b> → bell shows the new request → Prediction History → approve and set the liters to release.</li>
+<li>Back as staff → bell shows "approved" → record the actual fuel → show the "outside the predicted range" flag if it differs by more than 2.66 L.</li>
+<li><b>Trip Records</b> → the Pending trip added by the request; the 93 SFA 4714 trips.</li>
+<li><b>Model Performance</b> → R², MAE, RMSE, CV, VIF, assumption tests, charts; mention the Colab upload.</li>
+<li><b>User Accounts</b> → approve a sign-up; mention password hashing and lockout.</li>
+</ol>
+
+<h3>Formulas</h3>
+<div class="two">
+<div class="box"><h4>R² (coefficient of determination)</h4>R² = 1 − Σ(yᵢ − ŷᵢ)² / Σ(yᵢ − ȳ)²</div>
+<div class="box"><h4>MAE</h4>MAE = (1/n) Σ |yᵢ − ŷᵢ|</div>
+<div class="box"><h4>RMSE</h4>RMSE = √[ (1/n) Σ (yᵢ − ŷᵢ)² ]</div>
+<div class="box"><h4>VIF</h4>VIF<sub>j</sub> = 1 / (1 − R<sub>j</sub>²) · above 5 = high collinearity</div>
+<div class="box"><h4>IQR outlier rule</h4>IQR = Q3 − Q1 · keep Q1 − 1.5·IQR ≤ x ≤ Q3 + 1.5·IQR (on L/100 km, per engine-power group)</div>
+<div class="box"><h4>Centering</h4>D<sub>c</sub> = D − 151.209 · P<sub>c</sub> = P − 95.3679 · interaction = D<sub>c</sub> × P<sub>c</sub></div>
+<div class="box"><h4>Residual</h4>eᵢ = yᵢ − ŷᵢ (actual − predicted)</div>
+<div class="box"><h4>Weighted Least Squares</h4>minimize Σ wᵢ(yᵢ − ŷᵢ)² · wᵢ = 1 / exp(γ₀ + γ₁ log ŷᵢ) (γ₀ = −4.46, γ₁ = 1.87)</div>
+<div class="box"><h4>Standardized residual</h4>zᵢ = (yᵢ − ŷᵢ)√wᵢ / s · records with |zᵢ| &gt; 3 removed</div>
+<div class="box"><h4>Fuel per 100 km</h4>L/100 km = fuel ÷ distance × 100</div>
+</div>
+
+<h3>Glossary</h3>
+<table>
+<tr><th style="width:28%">Term</th><th>Simple definition</th></tr>
+<tr><td>Dependent variable</td><td>What the model predicts: fuel consumed (L).</td></tr>
+<tr><td>Independent variable / predictor</td><td>Inputs used to predict: distance, engine power (and the interaction).</td></tr>
+<tr><td>Coefficient (β)</td><td>How much the prediction changes per 1-unit increase in a predictor.</td></tr>
+<tr><td>Intercept (β₀)</td><td>Prediction when all predictors are 0 (or at their means, in the centered form).</td></tr>
+<tr><td>OLS</td><td>Ordinary Least Squares — finds coefficients that minimize squared errors.</td></tr>
+<tr><td>WLS</td><td>Weighted Least Squares — like OLS, but each record has a weight; used here so long trips with bigger errors count less.</td></tr>
+<tr><td>Interaction term</td><td>Product of two predictors so one's effect depends on the other.</td></tr>
+<tr><td>Multicollinearity</td><td>Predictors carrying the same information; measured by VIF.</td></tr>
+<tr><td>Heteroskedasticity</td><td>Error spread not constant (grows on long trips). Fixed with Weighted Least Squares.</td></tr>
+<tr><td>Autocorrelation</td><td>Errors of consecutive records related to each other (Durbin-Watson).</td></tr>
+<tr><td>Overfitting</td><td>Model memorizes training data and fails on new data.</td></tr>
+<tr><td>Cross-validation</td><td>Repeated train/test on different parts of the data to check stability.</td></tr>
+<tr><td>Outlier</td><td>An extreme value far from the rest; removed with the IQR rule.</td></tr>
+<tr><td>Encoding</td><td>Turning categories (Gasoline/Diesel) into numbers (1/0).</td></tr>
+<tr><td>Pipeline</td><td>Preprocessing + model chained into one saved object.</td></tr>
+<tr><td>Joblib</td><td>Library that saves and loads the trained model file.</td></tr>
+<tr><td>Flask / WSGI / Waitress</td><td>Python web framework / standard app-server interface / production server.</td></tr>
+<tr><td>Firestore / NoSQL</td><td>Google cloud database storing documents in collections, without tables.</td></tr>
+<tr><td>Snapshot listener</td><td>Firestore feature that pushes every change to the server instantly.</td></tr>
+<tr><td>CSRF</td><td>Attack submitting forms as the user; blocked by a secret token.</td></tr>
+<tr><td>Hashing (scrypt)</td><td>One-way scrambling of passwords so they cannot be read back.</td></tr>
+<tr><td>Serverless (Vercel)</td><td>Code runs on demand in the cloud without managing a server.</td></tr>
+<tr><td>CRISP-DM</td><td>Six-phase standard process for data mining projects.</td></tr>
+<tr><td>CC BY 4.0</td><td>Open license allowing reuse with attribution.</td></tr>
+</table>
+
+<h3>Last-minute reminders</h3>
+<ul>
+<li>Say "the predicted figure is a <b>reference</b>; the administrator decides."</li>
+<li>Be open about the limitations (one local vehicle, 1 L/10 km allocation, large-sample p-values) — then explain how you handled each.</li>
+<li>Know the four numbers by heart: <b>0.9008 · 1.87 L · 2.66 L · 0.9002 ± 0.0007</b>.</li>
+<li>Know the data path by heart: <b>99,991 → 34,111 → 27,288 / 6,823</b>.</li>
+</ul>
+
+<p class="small">Source: the final paper (Fuel Consumption Prediction (10)), <code>model/metrics.json</code> (model v20261109210623), and the project files as of 17 November 2026.</p>
+
+</body>
+</html>
