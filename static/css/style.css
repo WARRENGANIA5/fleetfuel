@@ -1007,7 +1007,7 @@ a.notif-item:hover { background: rgba(255,255,255,0.04); }
   /* faint logo on every page; above the white cards so they don't hide it, too faint to affect reading */
   .print-watermark {
     display: block !important; position: fixed; top: 50%; left: 50%; width: 125mm; height: 125mm;
-    transform: translate(-50%, -50%); opacity: 0.07; z-index: 9999; pointer-events: none;
+    transform: translate(-50%, -50%); opacity: 0.13; z-index: 9999; pointer-events: none;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .print-org { font-size: 11px; color: #444444; letter-spacing: 0.02em; }
