@@ -17,3 +17,6 @@ model/*.tmp
 # Firebase service account key (secret)
 firebase-key.json
 *-firebase-adminsdk-*.json
+
+# Licensed fonts (Times New Roman, Consolas) used only to compile the thesis locally
+docs/thesis/typst/fonts/
