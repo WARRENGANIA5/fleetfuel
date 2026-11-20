@@ -10,11 +10,13 @@
 <link href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/style.css', v=98) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v=99) }}" rel="stylesheet">
 {% block extra_head %}{% endblock %}
 </head>
 <body>
 <div class="page-progress" id="pageProgress" aria-hidden="true"></div>
+{# faint system logo behind every printed page #}
+<img class="print-watermark" src="{{ url_for('static', filename='images/seal.svg', v=17) }}" alt="" aria-hidden="true">
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
