@@ -5,9 +5,15 @@ use the same features.
     y^ = b0 + b1(Distance) + b2(Engine Power) + b3(Fuel Type) + b4(Distance x Engine Power)
 
 Fuel type: 1 = Gasoline, 0 = Diesel. Output is liters per trip.
+
+The coefficients are fitted by weighted least squares (WLS): the error of a
+trip grows with the fuel it uses, so each record is weighted by 1 / its
+estimated error variance (feasible GLS), which gives equal-variance errors.
 """
+import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.linear_model import LinearRegression
 
 FUEL_TYPES = ("Diesel", "Gasoline")
 FUEL_TYPE_CODES = {"Diesel": 0, "Gasoline": 1}
@@ -76,6 +82,59 @@ def build_feature_encoder():
     return TermEncoder()
 
 
+class WeightedLinearRegression(LinearRegression):
+    """Linear regression fitted by feasible weighted least squares.
+
+    1. ordinary least squares fit;
+    2. error variance modeled as  log(e^2) = g0 + g1 log(y^)  (the error grows
+       with the fuel a trip uses);
+    3. refit with weights 1 / variance.
+    Predictions use the same linear equation as LinearRegression."""
+
+    MIN_FITTED = 0.5  # liters; keeps log(y^) defined for very short trips
+
+    def fit(self, X, y, sample_weight=None):
+        y = np.asarray(y, dtype=float)
+        LinearRegression.fit(self, X, y)
+        self.first_coef_, self.first_intercept_ = self.coef_.copy(), float(self.intercept_)
+        fitted = self._first_stage(X)
+        log_sq = np.log((y - fitted) ** 2 + 1e-6)
+        design = np.column_stack([np.ones(len(fitted)), np.log(fitted)])
+        self.variance_params_ = np.linalg.lstsq(design, log_sq, rcond=None)[0]
+        LinearRegression.fit(self, X, y, sample_weight=self.weights(X))
+        return self
+
+    def _first_stage(self, X):
+        return np.clip(np.asarray(pd.DataFrame(X), dtype=float) @ self.first_coef_ + self.first_intercept_,
+                       self.MIN_FITTED, None)
+
+    def weights(self, X):
+        """1 / estimated error variance of each record."""
+        g0, g1 = self.variance_params_
+        return 1.0 / np.exp(g0 + g1 * np.log(self._first_stage(X)))
+
+
+def remove_residual_outliers(df, limit=3.0, max_rounds=20):
+    """Drop records whose standardized (weighted) residual is beyond +/- `limit`,
+    refitting until none is left: trips the equation cannot represent
+    (recording errors, unusual driving)."""
+    df = df.copy()
+    for _ in range(max_rounds):
+        if len(df) < 10:
+            break
+        terms = encode_features(df[FEATURE_COLUMNS], centers=(df["distance_km"].mean(), df["engine_power_kw"].mean()))
+        y = df[TARGET_COLUMN].to_numpy(dtype=float)
+        model = WeightedLinearRegression().fit(terms, y)
+        w = model.weights(terms)
+        z = (y - model.predict(terms)) * np.sqrt(w)
+        z = z / np.sqrt(np.sum(z ** 2) / max(len(z) - terms.shape[1] - 1, 1))
+        outlier = np.abs(z) > limit
+        if not outlier.any():
+            break
+        df = df[~outlier]
+    return df
+
+
 def raw_equation(intercept, coefficients, centers):
     """Convert the centered coefficients back to original units:
     y = b0 + b1(D - d) + b2(P - p) + b3 F + b4(D - d)(P - p)
@@ -131,7 +190,8 @@ def load_and_merge_datasets(historical_path, supplementary_path, extra_df=None, 
 
 def clean_data(df):
     """Drop missing/zero-distance rows, then IQR outliers on L/100 km per
-    engine-power group, then keep the fleet's operating range."""
+    engine-power group, keep the fleet's operating range, then drop records
+    with a standardized residual beyond +/- 3."""
     df = df.copy()
     for col in ("distance_km", "engine_power_kw", TARGET_COLUMN):
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -150,6 +210,7 @@ def clean_data(df):
     keep = per_100km.groupby(df["engine_power_kw"], group_keys=False).apply(within_iqr)
     df = df[keep.reindex(df.index).fillna(False).astype(bool)]
     df = df[fleet_range_mask(df)]
+    df = remove_residual_outliers(df)
     return df.reset_index(drop=True)
 
 

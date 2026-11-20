@@ -1792,14 +1792,21 @@ def build_model_charts():
     if residuals.max() > edges[-1]:
         labels[-1] = f"{fmt(round(edges[-2], 2))} or more"
 
-    # Q-Q plot: every tail point, thinned in the middle; line through mean with slope std
+    # Q-Q plot of the standardized residuals (residual x sqrt(weight), the ones
+    # the normality check uses): every tail point, thinned in the middle
     from scipy import stats
-    ordered = np.sort(residuals)
+    regressor = pipeline.named_steps.get("regressor")
+    if hasattr(regressor, "weights"):
+        scaled = residuals * np.sqrt(regressor.weights(pipeline.named_steps["encoder"].transform(X_test)))
+    else:
+        scaled = residuals
+    scaled = (scaled - scaled.mean()) / (scaled.std() or 1.0)
+    ordered = np.sort(scaled)
     n = len(ordered)
     theoretical = stats.norm.ppf(np.arange(1, n + 1) / (n + 1))
     keep = np.unique(np.concatenate([np.arange(min(40, n)), np.linspace(0, n - 1, min(300, n)).astype(int),
                                      np.arange(max(n - 40, 0), n)]))
-    qq_slope, qq_mean = float(residuals.std()), float(residuals.mean())
+    qq_slope, qq_mean = 1.0, 0.0
     qq_ends = [float(theoretical[0]), float(theoretical[-1])]
 
     # correlation heatmap; constant columns are skipped

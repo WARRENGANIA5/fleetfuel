@@ -101,7 +101,7 @@
   <div class="col-12">
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-list-ol text-primary"></i> Regression Coefficients</div>
-      <p class="diag-note">Distance and engine power are centered on the training means. Standard errors are heteroskedasticity-robust (HC3).</p>
+      <p class="diag-note">Fitted by weighted least squares (each trip weighted by 1 / its estimated error variance, because the error grows with the fuel a trip uses). Distance and engine power are centered on the training means. Standard errors are heteroskedasticity-robust (HC3).</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Term</th><th>Coefficient (centered)</th><th>Std. Error</th><th>p-value</th></tr></thead>
         <tbody id="coefBody"></tbody>
@@ -111,7 +111,7 @@
   <div class="col-12">
     <div class="card-surface h-100">
       <div class="section-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Assumption Tests</div>
-      <p class="diag-note">The Durbin-Watson statistic uses the residuals of the local trips arranged by date of travel.</p>
+      <p class="diag-note">The tests use the standardized (weighted) residuals. With more than 300 records a p-value flags even trivial departures, so linearity, normality and equal variance are decided by the size of the departure (Cohen's f², skewness and kurtosis, variance ratio); the p-values are shown for reference. The Durbin-Watson statistic uses the residuals of the local trips arranged by date of travel.</p>
       <div class="table-wrap"><table class="table-fleet diag-table">
         <thead><tr><th>Assumption</th><th>Test</th><th>Result</th><th>Rule</th><th>Met?</th></tr></thead>
         <tbody id="diagBody"></tbody>
@@ -141,7 +141,7 @@
   </div>
   <div class="col-md-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-wave-square text-primary"></i> Q-Q Plot of Residuals</div>
+      <div class="section-title"><i class="fa-solid fa-wave-square text-primary"></i> Q-Q Plot of Standardized Residuals</div>
       <canvas id="qqChart" height="240"></canvas>
     </div>
   </div>
@@ -310,9 +310,9 @@ function drawCharts(c) {
       ] },
       options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
                  plugins: { legend: { display: true }, tooltip: { filter: onlyPoints, callbacks: { label: function (item) {
-                   return ['Theoretical: ' + item.raw.x, 'Residual: ' + signed(item.raw.y) + ' L'];
+                   return ['Theoretical: ' + item.raw.x, 'Standardized residual: ' + signed(item.raw.y)];
                  } } } },
-                 scales: { x: axis('Theoretical Quantiles'), y: axis('Sample Quantiles (L)') } }
+                 scales: { x: axis('Theoretical Quantiles'), y: axis('Standardized Residual Quantiles') } }
     });
   } else {
     avpChart.data.datasets[0].data = c.avp_points;
@@ -420,9 +420,13 @@ function renderDiagnostics(m) {
   if (diagBody && (diag.tests || []).length) {
     const result = function (t) {
       const stat = Number(t.statistic).toLocaleString('en-US', { maximumFractionDigits: 3 });
-      if (t.key === 'linearity') return 'F = ' + Number(t.statistic).toFixed(2) + ', ' + pNum(t.p_value);
-      if (t.key === 'normality') return ((t.meaning.match(/skew [^)]*/) || [stat])[0]) + ', ' + pNum(t.p_value);
-      if (t.key === 'equal_variance') return Number(t.statistic).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ', ' + pNum(t.p_value);
+      if (t.key === 'linearity') return 'F = ' + Number(t.statistic).toFixed(2) + ', ' + pNum(t.p_value) +
+        (t.effect != null ? '; f² = ' + Number(t.effect).toFixed(4) : '');
+      if (t.key === 'normality') return (t.skewness != null
+        ? 'skew ' + Number(t.skewness).toFixed(2) + ', kurtosis ' + Number(t.excess_kurtosis).toFixed(2)
+        : (t.meaning.match(/skew [^)]*/) || [stat])[0]) + '; ' + pNum(t.p_value);
+      if (t.key === 'equal_variance') return Number(t.statistic).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ', ' + pNum(t.p_value) +
+        (t.effect != null ? '; ratio = ' + Number(t.effect).toFixed(2) : '');
       if (t.key === 'multicollinearity') return 'highest ' + Number(t.statistic).toFixed(2);
       return stat;
     };

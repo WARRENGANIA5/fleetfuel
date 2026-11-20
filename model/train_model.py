@@ -11,7 +11,6 @@ import sys
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.pipeline import Pipeline
@@ -24,6 +23,7 @@ from model.preprocess import (
     FEATURE_COLUMNS,
     MODEL_TERMS,
     TARGET_COLUMN,
+    WeightedLinearRegression,
     build_feature_encoder,
     clean_data,
     raw_equation,
@@ -57,7 +57,7 @@ def _replace_with_retry(src, dst, attempts=40, delay=0.05):
 
 def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     """Clean `df`, fit and evaluate the pipeline, then save it with metrics.json."""
-    log("[2/6] Removing records with missing values or zero distance, and IQR outliers per engine power...")
+    log("[2/6] Removing records with missing values or zero distance, IQR outliers per engine power, and residual outliers (|z| > 3)...")
     df = clean_data(df)
     log(f"      Usable records after cleaning: {len(df)}")
     df.to_csv(CLEANED_PATH + ".tmp", index=False)
@@ -82,9 +82,10 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     correlations = {c: round(float(terms[c].corr(y)), 3) for c in MODEL_TERMS if terms[c].std() > 0}
 
     log("[4/6] Training Linear Regression: fuel = b0 + b1 Distance + b2 Engine Power + b3 Fuel Type + b4 Distance x Power")
+    log("      Fitted by weighted least squares (weights = 1 / estimated error variance)")
     pipeline = Pipeline(steps=[
         ("encoder", build_feature_encoder()),
-        ("regressor", LinearRegression()),
+        ("regressor", WeightedLinearRegression()),
     ])
     pipeline.fit(X_train, y_train)
 
@@ -118,7 +119,9 @@ def train_and_save(df, extra_metrics=None, log=print, excluded_features=()):
     if not local.empty:
         local = local.assign(_date=pd.to_datetime(local["trip_date"], errors="coerce")).sort_values(["_date"], kind="stable")
         local_resid = (local[TARGET_COLUMN] - pipeline.predict(local[FEATURE_COLUMNS])).to_numpy()
-    diagnostics = regression_diagnostics(encoder.transform(X_train), y_train, vif, local_resid)
+    train_terms = pipeline.named_steps["encoder"].transform(X_train)
+    weights = pipeline.named_steps["regressor"].weights(train_terms)
+    diagnostics = regression_diagnostics(train_terms, y_train, vif, local_resid, weights=weights)
     for t in diagnostics["tests"]:
         log(f"        {t['assumption']:<26} {t['test']:<26} {'PASS' if t['passed'] else 'NOT MET'}")
 

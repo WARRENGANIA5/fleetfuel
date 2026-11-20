@@ -56,7 +56,7 @@ Download the three files from the web application: **Model Performance → Uploa
 * **supplementary_data.csv** — the other online records, with the same variables.'''
 
 DW_TEXT = '''## 7. Regression assumption checks (LINE conditions)
-Durbin-Watson is computed on the residuals of the GSO's own trips (data_source "local") arranged by date of travel. Coefficient standard errors and p-values are heteroskedasticity-robust (HC3).'''
+The model is fitted by weighted least squares (each record weighted by 1 / its estimated error variance) and the checks use the standardized residuals. With more than 300 records a p-value flags even trivial departures, so linearity, normality and equal variance are decided by the size of the departure (Cohen's f² < 0.02; |skew| ≤ 2 and |excess kurtosis| ≤ 7; variance ratio ≤ 3). Durbin-Watson is computed on the residuals of the GSO's own trips (data_source "local") arranged by date of travel, with their average removed. Coefficient standard errors and p-values are heteroskedasticity-robust (HC3).'''
 
 
 def lines(text):
