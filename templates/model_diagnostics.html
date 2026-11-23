@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Model Performance{% endblock %}
-{% block page_title %}Linear Regression Model Performance{% endblock %}
+{% block title %}Model Diagnostics{% endblock %}
+{% block page_title %}Model Diagnostics (Developer){% endblock %}
 
 {# model is trained in Colab and uploaded here #}
 {% macro upload_card() %}
@@ -33,6 +33,35 @@
       <button type="submit" class="btn btn-blue w-100"><i class="fa-solid fa-upload me-1"></i> Upload</button>
     </div>
   </form>
+  <p class="diag-note mt-2 mb-0">Only .joblib (max 1 MB) and .json (max 256 KB) files are accepted. The model file is opened with
+    a restricted loader that refuses anything but the scikit-learn pipeline, then checked against the results file before it
+    replaces the active model. The active model is backed up first.</p>
+  {% endif %}
+</div>
+<div class="card-surface mb-3">
+  <div class="section-title"><i class="fa-solid fa-clock-rotate-left text-primary"></i> Previous Models (Roll Back)</div>
+  {% if backups %}
+  <div class="table-wrap"><table class="table-fleet diag-table">
+    <thead><tr><th>Saved</th><th>Version</th><th>Trained</th><th>R&sup2;</th><th>MAE</th><th></th></tr></thead>
+    <tbody>
+    {% for b in backups %}
+      <tr><td>{{ b.name }}</td><td>{{ b.version }}</td><td>{{ b.trained_at }}</td><td>{{ b.r2_score }}</td>
+        <td>{{ b.mae }} L</td>
+        <td class="text-end">
+          {% if not serverless %}
+          <form method="POST" action="{{ url_for('rollback_model') }}" class="m-0"
+                onsubmit="return confirm('Replace the active model with {{ b.version }}? The active model is kept in model/backups.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="backup" value="{{ b.name }}">
+            <button type="submit" class="btn btn-sm btn-outline-navy"><i class="fa-solid fa-rotate-left me-1"></i> Restore</button>
+          </form>
+          {% endif %}
+        </td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p class="text-muted small mb-0">No previous model saved yet. Each upload backs up the active model here (model/backups/).</p>
   {% endif %}
 </div>
 {% endmacro %}
@@ -129,8 +158,18 @@
   </div>
   <div class="col-md-6">
     <div class="card-surface h-100">
-      <div class="section-title"><i class="fa-solid fa-braille text-primary"></i> Residual Plot</div>
+      <div class="section-title"><i class="fa-solid fa-braille text-primary"></i> Residual Plot (Standardized Weighted Residuals)</div>
+      <canvas id="stdResidualChart" height="240"></canvas>
+      <p class="diag-note mb-0 mt-2">The residuals the assumption tests use: training split, residual &times; &radic;weight
+        (<span id="stdResidNote">a sample of the records</span>). An even band from left to right means equal variance.</p>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-braille text-primary"></i> Raw Residual Plot (Liters)</div>
       <canvas id="residualChart" height="240"></canvas>
+      <p class="diag-note mb-0 mt-2">Unweighted residuals of the test set, in liters. They fan out because longer trips have
+        larger errors; the weighted least squares fit accounts for this, so the equal-variance test uses the weighted residuals.</p>
     </div>
   </div>
   <div class="col-md-6">
@@ -190,7 +229,7 @@ const axis = function (title) {
   return { grid: { color: gridColor }, ticks: { color: chartColors.text },
            title: { display: true, text: title, color: chartColors.text } };
 };
-let avpChart = null, residualChart = null, distChart = null, qqChart = null, cvChart = null;
+let avpChart = null, residualChart = null, stdResidualChart = null, distChart = null, qqChart = null, cvChart = null;
 // no tooltips on reference lines
 function onlyPoints(item) { return item.datasetIndex === 0; }
 function signed(v) { return (v > 0 ? '+' : '') + Number(v).toFixed(2); }
@@ -272,7 +311,22 @@ function drawCharts(c) {
                    return ['Predicted: ' + p.x + ' L', 'Actual: ' + (p.x + p.y).toFixed(2) + ' L',
                            'Residual: ' + signed(p.y) + ' L (' + (p.y > 0 ? 'under-predicted' : p.y < 0 ? 'over-predicted' : 'exact') + ')'];
                  } } } },
-                 scales: { x: axis('Predicted Fuel Consumption (L)'), y: axis('Residual (Actual − Predicted)') } }
+                 scales: { x: axis('Predicted Fuel Consumption (L)'), y: axis('Raw Residual (Actual − Predicted, L)') } }
+    });
+    stdResidualChart = new Chart(document.getElementById('stdResidualChart'), {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'Standardized weighted residuals', data: c.std_residual_points, borderColor: '#2697ff',
+          backgroundColor: 'rgba(38,151,255,0.45)', pointRadius: 2.5 },
+        { label: 'Zero', type: 'line',
+          data: [{ x: c.std_residual_range[0], y: 0 }, { x: c.std_residual_range[1], y: 0 }],
+          borderColor: '#26e5c5', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+      ] },
+      options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+                 plugins: { legend: { display: true }, tooltip: { filter: onlyPoints, callbacks: { label: function (item) {
+                   return ['Fitted: ' + item.raw.x + ' L', 'Standardized weighted residual: ' + signed(item.raw.y)];
+                 } } } },
+                 scales: { x: axis('Fitted Fuel Consumption (L)'), y: axis('Standardized Weighted Residual (e × √w)') } }
     });
     distChart = new Chart(document.getElementById('distChart'), {
       type: 'bar',
@@ -321,6 +375,9 @@ function drawCharts(c) {
     residualChart.data.datasets[0].data = c.residual_points;
     residualChart.data.datasets[1].data = [{ x: c.residual_range[0], y: 0 }, { x: c.residual_range[1], y: 0 }];
     residualChart.update();
+    stdResidualChart.data.datasets[0].data = c.std_residual_points;
+    stdResidualChart.data.datasets[1].data = [{ x: c.std_residual_range[0], y: 0 }, { x: c.std_residual_range[1], y: 0 }];
+    stdResidualChart.update();
     distChart.data.labels = c.resid_labels;
     distChart.data.datasets[0].data = c.resid_counts;
     distChart.data.datasets[1].data = c.resid_counts;
@@ -330,6 +387,8 @@ function drawCharts(c) {
     qqChart.update();
   }
   renderHeatmap(c);
+  const s = c.std_residual_stats, note = document.getElementById('stdResidNote');
+  if (s && note) note.textContent = s.shown.toLocaleString('en-US') + ' of ' + s.records.toLocaleString('en-US') + ' training records shown';
 }
 
 function drawCvChart(m) {
@@ -442,7 +501,7 @@ function renderDiagnostics(m) {
 // ---- auto-refresh every 10s ----
 let lastChartsKey = null;
 function refreshModelPerformance() {
-  return fetch('/api/model-performance-data')
+  return fetch('/api/model-diagnostics-data')
     .then(function (res) { return res.json(); })
     .then(function (data) {
       const m = data.metrics;

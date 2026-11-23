@@ -124,14 +124,14 @@
       <a href="{{ url_for('vehicles') }}" class="btn btn-outline-navy"><i class="fa-solid fa-truck me-1"></i> Manage Vehicles</a>
       <hr>
       <div class="section-title d-flex align-items-center gap-2" style="font-size:14px;"><i class="fa-solid fa-brain text-primary"></i> Model Status
-        <a href="{{ url_for('model_performance') }}" class="ms-auto small fw-normal">Details</a></div>
-      <div id="modelSummaryBox" class="model-summary-link" role="link" tabindex="0" data-href="{{ url_for('model_performance') }}"
-           title="Open Model Performance" {{ 'hidden' if not model_summary }}>
-        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">R&sup2; Score</span><strong id="modelR2">{{ model_summary.r2_score if model_summary }}</strong></div>
-        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">MAE</span><strong><span id="modelMae">{{ model_summary.mae if model_summary }}</span> L</strong></div>
-        <div class="d-flex justify-content-between small"><span class="text-muted">RMSE</span><strong><span id="modelRmse">{{ model_summary.rmse if model_summary }}</span> L</strong></div>
+        <a href="{{ url_for('prediction_accuracy') }}" class="ms-auto small fw-normal">Details</a></div>
+      <div id="modelSummaryBox" class="model-summary-link" role="link" tabindex="0" data-href="{{ url_for('prediction_accuracy') }}"
+           title="Open Prediction Accuracy" {{ 'hidden' if not model_summary }}>
+        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">Accuracy</span><strong><span id="modelAccuracy">{{ model_summary.accuracy if model_summary }}</span>%</strong></div>
+        <div class="d-flex justify-content-between small mb-1"><span class="text-muted">Typical error</span><strong>about <span id="modelError">{{ model_summary.typical_error if model_summary }}</span> L</strong></div>
+        <div class="d-flex justify-content-between small"><span class="text-muted">Last updated</span><strong id="modelUpdated">{{ model_summary.updated if model_summary }}</strong></div>
       </div>
-      <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>Scores appear here once the trained model is uploaded under Model Performance.</p>
+      <p class="text-muted small mb-0" id="modelNone" {{ 'hidden' if model_summary }}>The accuracy appears here once the trained model is installed.</p>
       {% else %}
       <a href="{{ url_for('prediction') }}" class="btn btn-blue mb-2"><i class="fa-solid fa-gas-pump me-1"></i> Request Fuel (New Prediction)</a>
       <a href="{{ url_for('prediction_history') }}" class="btn btn-outline-navy"><i class="fa-solid fa-clock-rotate-left me-1"></i> My Fuel Requests</a>
@@ -308,9 +308,9 @@ function refreshDashboard() {
       const summaryBox = document.getElementById('modelSummaryBox');   // admin only
       if (summaryBox) { summaryBox.hidden = !data.model_summary; document.getElementById('modelNone').hidden = !!data.model_summary; }
       if (summaryBox && data.model_summary) {
-        setText('modelR2', data.model_summary.r2_score);
-        setText('modelMae', data.model_summary.mae);
-        setText('modelRmse', data.model_summary.rmse);
+        setText('modelAccuracy', data.model_summary.accuracy);
+        setText('modelError', data.model_summary.typical_error);
+        setText('modelUpdated', data.model_summary.updated);
       }
 
       lastDashboardData = data;
@@ -340,7 +340,7 @@ function refreshDashboard() {
     .catch(function () { /* silent retry on next interval */ });
 }
 setInterval(refreshDashboard, 5000);
-// model status -> Model Performance
+// model status -> Prediction Accuracy
 const modelBox = document.getElementById('modelSummaryBox');
 if (modelBox) {
   const openModel = function () {

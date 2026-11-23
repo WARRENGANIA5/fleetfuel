@@ -24,7 +24,7 @@ if __name__ == "__main__":
 import joblib
 import numpy as np
 import pandas as pd
-from flask import (Flask, Response, flash, g, redirect, render_template,
+from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                     request, session, url_for)
 from flask_wtf import CSRFProtect
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -175,11 +175,36 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
 
 # Only one admin account (GSO, role "admin"); everyone else is staff.
 # ADMIN_ACCOUNT is its username when init_db.py creates it.
+# "developer" accounts (made by create_developer.py) see the technical Model
+# Diagnostics page and upload trained models; otherwise they act like staff.
 ADMIN_ACCOUNT = "admin1114"
+FIXED_ROLES = ("admin", "developer")  # not editable on the User Accounts page
 
 
 def effective_role(user):
-    return "admin" if user["role"] == "admin" else "staff"
+    return user["role"] if user["role"] in FIXED_ROLES else "staff"
+
+
+def developer_required(view):
+    """Developer-only route: 403 for everyone else, even with the URL typed in."""
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if session.get("role") != "developer":
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def accuracy_required(view):
+    """Prediction Accuracy: the administrator and developers."""
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if session.get("role") not in ("admin", "developer"):
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
 
 
 def admin_required(view):
@@ -231,6 +256,7 @@ def inject_globals():
         "org": get_org(),
         "today": today_local().isoformat(),
         "is_admin": session.get("role") == "admin",
+        "is_developer": session.get("role") == "developer",
         "current_year": today_local().year,
         "notif_count": g.get("notif_count", 0),
         "pending_accounts": pending["accounts"],
@@ -684,7 +710,7 @@ def build_dashboard_context():
     avp_missing = sum(a is None for a in avp_actual)
     avp_urls = [url_for("prediction_result", prediction_id=r["id"]) for r in avp_rows]  # click a point -> that request
 
-    model_summary = get_metrics() if is_admin else None
+    model_summary = accuracy_summary(get_metrics()) if is_admin else None  # plain words only
 
     return {
         "stats": {"total_vehicles": total_vehicles, "total_trips": total_trips,
@@ -1750,7 +1776,7 @@ def start_backup_scheduler():
 
 
 def build_model_charts():
-    """Chart data for Model Performance, same 80/20 split as training.
+    """Chart data for Prediction Accuracy and Model Diagnostics, same 80/20 split as training.
     Cached per model version."""
     from sklearn.model_selection import train_test_split
     from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, clean_data
@@ -1809,16 +1835,43 @@ def build_model_charts():
     qq_slope, qq_mean = 1.0, 0.0
     qq_ends = [float(theoretical[0]), float(theoretical[-1])]
 
+    # Standardized (weighted) residuals vs fitted values: the residuals the
+    # assumption tests use (training split, e x sqrt(weight)); a sample is drawn
+    # so the chart stays light.
+    train_terms = pipeline.named_steps["encoder"].transform(X_train)
+    train_fitted = pipeline.predict(X_train)
+    train_resid = np.asarray(y_train, dtype=float) - train_fitted
+    if hasattr(regressor, "weights"):
+        std_resid = train_resid * np.sqrt(regressor.weights(train_terms))
+    else:
+        std_resid = train_resid / (train_resid.std() or 1.0)
+    sample = np.sort(np.random.default_rng(42).choice(len(std_resid), min(2000, len(std_resid)), replace=False))
+
     # correlation heatmap; constant columns are skipped
     terms = pipeline.named_steps["encoder"].transform(df[FEATURE_COLUMNS]).assign(**{TARGET_COLUMN: df[TARGET_COLUMN].astype(float)})
     corr_cols = [c for c in MODEL_TERMS if terms[c].nunique() > 1] + [TARGET_COLUMN]
     corr = terms[corr_cols].corr().round(2).fillna(0)
+
+    # "What affects fuel use": how much each term moves the prediction across
+    # the trips (|coefficient| x spread of the centered term), as a share.
+    names = list(getattr(regressor, "feature_names_in_", MODEL_TERMS))
+    coef = dict(zip(names, np.ravel(regressor.coef_)))
+    effect = {t: abs(float(coef.get(t, 0.0))) * float(terms[t].std()) for t in
+              ("distance_km", "engine_power_kw", "distance_x_power") if t in terms}
+    total_effect = sum(effect.values()) or 1.0
+    influence = sorted(({"key": t, "share": round(v / total_effect * 100, 1)} for t, v in effect.items() if v > 0),
+                       key=lambda r: -r["share"])
 
     data = {
         "avp_points": [{"x": a, "y": p} for a, p in zip(actual, predicted)],
         "avp_line": [{"x": round(lo, 2), "y": round(lo, 2)}, {"x": round(hi, 2), "y": round(hi, 2)}],
         "residual_points": [{"x": p, "y": round(a - p, 2)} for a, p in zip(actual, predicted)],
         "residual_range": [round(min(predicted), 2), round(max(predicted), 2)],
+        "std_residual_points": [{"x": round(float(train_fitted[i]), 2), "y": round(float(std_resid[i]), 3)}
+                                for i in sample],
+        "std_residual_range": [round(float(train_fitted.min()), 2), round(float(train_fitted.max()), 2)],
+        "std_residual_stats": {"records": int(len(std_resid)), "shown": int(len(sample))},
+        "influence": influence,
         "resid_labels": labels,
         "resid_counts": [int(c) for c in counts],
         "resid_stats": {
@@ -1840,11 +1893,82 @@ def build_model_charts():
     return data
 
 
+def recent_accuracy_trips(limit=10):
+    """Latest fuel requests that have both a predicted and an actual fuel value."""
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    trips_by_id = {t["id"]: t for t in db.records("trip_records")}
+    rows = []
+    for p in db.records("predictions"):
+        if p["predicted_fuel"] is None or p["actual_fuel"] is None:
+            continue
+        trip = trips_by_id.get(p["trip_record_id"]) or {}
+        when = trip.get("trip_date") or (p["created_at"].date() if p["created_at"] else None)
+        if isinstance(when, str):
+            try:
+                when = date.fromisoformat(when)
+            except ValueError:
+                when = None
+        rows.append((when or date.min, p["id"], p))
+    rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
+    out = []
+    for when, _, p in rows[:limit]:
+        v = vehicles_by_id.get(p["vehicle_id"])
+        predicted, actual = float(p["predicted_fuel"]), float(p["actual_fuel"])
+        diff = round(actual - predicted, 2)
+        out.append({"vehicle": f"{v['plate_number']} ({v['brand_model']})" if v else "Vehicle deleted",
+                    "date": when.strftime("%b %d, %Y") if when != date.min else "",
+                    "predicted": f"{predicted:.2f}", "actual": f"{actual:.2f}",
+                    "difference": ("+" if diff > 0 else "") + f"{diff:.2f}"})
+    return out
+
+
+def accuracy_summary(metrics):
+    """Plain-language numbers for the Prediction Accuracy page."""
+    if not metrics:
+        return None
+    try:
+        updated = datetime.fromisoformat(metrics["trained_at"]).strftime("%B %d, %Y")
+    except (KeyError, ValueError, TypeError):
+        updated = metrics.get("trained_at") or "—"
+    r2, mae = metrics.get("r2_score"), metrics.get("mae")
+    return {"accuracy": round(float(r2) * 100, 1) if r2 is not None else None,
+            "typical_error": round(float(mae), 1) if mae is not None else None,
+            "records": f"{int(metrics.get('total_records') or 0):,}",
+            "updated": updated, "model_version": metrics.get("model_version")}
+
+
+def prediction_accuracy_data():
+    charts = build_model_charts() or {}
+    return {"summary": accuracy_summary(get_metrics()),
+            "avp_points": charts.get("avp_points", []), "avp_line": charts.get("avp_line", []),
+            "influence": charts.get("influence", []), "recent": recent_accuracy_trips()}
+
+
+@app.route("/prediction-accuracy")
+@accuracy_required
+def prediction_accuracy():
+    return render_template("prediction_accuracy.html", active="prediction_accuracy",
+                           summary=accuracy_summary(get_metrics()), recent=recent_accuracy_trips())
+
+
+@app.route("/api/prediction-accuracy-data")
+@accuracy_required
+def api_prediction_accuracy_data():
+    return prediction_accuracy_data()
+
+
 @app.route("/model-performance")
-@admin_required
+@login_required
 def model_performance():
-    return render_template("model_performance.html", active="model_performance", metrics=get_metrics(),
-                           serverless=app.config["SERVERLESS"])
+    """Old address of Prediction Accuracy (bookmarks)."""
+    return redirect(url_for("prediction_accuracy"))
+
+
+@app.route("/developer/model-diagnostics")
+@developer_required
+def model_diagnostics():
+    return render_template("model_diagnostics.html", active="model_diagnostics", metrics=get_metrics(),
+                           serverless=app.config["SERVERLESS"], backups=list_model_backups())
 
 
 def training_dataset_csv(name):
@@ -1870,14 +1994,14 @@ def training_dataset_csv(name):
     return None
 
 
-@app.route("/model-performance/dataset/<name>.csv")
-@admin_required
+@app.route("/developer/model-diagnostics/dataset/<name>.csv")
+@developer_required
 def export_training_dataset(name):
     """Download one of the three CSV files of training_dataset_csv()."""
     body = training_dataset_csv(name)
     if body is None:
         flash("Unknown dataset.", "danger")
-        return redirect(url_for("model_performance"))
+        return redirect(url_for("model_diagnostics"))
     return Response(body, mimetype="text/csv",  # Flask adds "; charset=utf-8"
                     headers={"Content-Disposition": f"attachment; filename={name}.csv"})
 
@@ -1894,9 +2018,9 @@ def api_model_status():
     }
 
 
-@app.route("/api/model-performance-data")
-@admin_required
-def api_model_performance_data():
+@app.route("/api/model-diagnostics-data")
+@developer_required
+def api_model_diagnostics_data():
     return {"metrics": get_metrics(), "charts": build_model_charts()}
 
 
@@ -1913,8 +2037,9 @@ def check_uploaded_model(pipeline, metrics):
     from sklearn.linear_model import LinearRegression
     from sklearn.pipeline import Pipeline
     from model.preprocess import MODEL_TERMS, TermEncoder, build_prediction_frame
-    steps = pipeline.named_steps if isinstance(pipeline, Pipeline) else {}
-    if not (isinstance(steps.get("encoder"), TermEncoder) and isinstance(steps.get("regressor"), LinearRegression)):
+    steps = pipeline.named_steps if type(pipeline) is Pipeline else {}
+    if not (list(steps) == ["encoder", "regressor"] and type(steps["encoder"]) is TermEncoder
+            and isinstance(steps["regressor"], LinearRegression)):
         return ["The model file is not the Linear Regression model saved by the Google Colab notebook "
                 "(linear_regression_pipeline.joblib)."]
     if not isinstance(metrics, dict):
@@ -1975,33 +2100,121 @@ def complete_uploaded_metrics(metrics):
     return {**metrics, **extra}
 
 
-@app.route("/model-performance/upload", methods=["POST"])
-@admin_required
+MODEL_UPLOAD_MAX_BYTES = 1024 * 1024        # a trained pipeline is ~2 KB
+METRICS_UPLOAD_MAX_BYTES = 256 * 1024       # metrics_colab.json is ~5 KB
+MODEL_BACKUPS_KEPT = 10
+ROLLED_BACK_PREFIX = "rolled-back-"         # models replaced by a rollback (kept, never offered again)
+
+
+def model_backup_dir():
+    return os.path.join(os.path.dirname(app.config["MODEL_PATH"]), "backups")
+
+
+def list_model_backups():
+    """Saved previous models, newest first."""
+    root = model_backup_dir()
+    try:
+        names = sorted((n for n in os.listdir(root) if not n.startswith(ROLLED_BACK_PREFIX)
+                        and os.path.isdir(os.path.join(root, n))), reverse=True)
+    except FileNotFoundError:
+        return []
+    out = []
+    for name in names:
+        folder = os.path.join(root, name)
+        try:
+            with open(os.path.join(folder, "metrics.json")) as f:
+                m = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not os.path.exists(os.path.join(folder, "model.joblib")):
+            continue
+        try:
+            trained = datetime.fromisoformat(m["trained_at"]).strftime("%B %d, %Y %I:%M %p")
+        except (KeyError, ValueError, TypeError):
+            trained = m.get("trained_at", "")
+        out.append({"name": name, "version": m.get("model_version", ""), "trained_at": trained,
+                    "r2_score": m.get("r2_score"), "mae": m.get("mae")})
+    return out
+
+
+def backup_current_model(prefix=""):
+    """Copy the active model + metrics into model/backups/<prefix><timestamp>/."""
+    import shutil
+    if not (os.path.exists(app.config["MODEL_PATH"]) and os.path.exists(app.config["METRICS_PATH"])):
+        return None
+    folder = os.path.join(model_backup_dir(), prefix + now_local().strftime("%Y%m%d-%H%M%S"))
+    os.makedirs(folder, exist_ok=True)
+    shutil.copyfile(app.config["MODEL_PATH"], os.path.join(folder, "model.joblib"))
+    shutil.copyfile(app.config["METRICS_PATH"], os.path.join(folder, "metrics.json"))
+    if not prefix:  # keep the newest MODEL_BACKUPS_KEPT
+        for old in list_model_backups()[MODEL_BACKUPS_KEPT:]:
+            shutil.rmtree(os.path.join(model_backup_dir(), old["name"]), ignore_errors=True)
+    return folder
+
+
+def install_model(pipeline, metrics):
+    """Swap in a new model + metrics atomically (re-saved with the local libraries)."""
+    from model.train_model import _replace_with_retry
+    joblib.dump(pipeline, app.config["MODEL_PATH"] + ".tmp")
+    _replace_with_retry(app.config["MODEL_PATH"] + ".tmp", app.config["MODEL_PATH"])
+    with open(app.config["METRICS_PATH"] + ".tmp", "w") as f:
+        json.dump(metrics, f, indent=2)
+    _replace_with_retry(app.config["METRICS_PATH"] + ".tmp", app.config["METRICS_PATH"])
+    _MODEL_CHARTS_CACHE.update(key=None, data=None)
+
+
+def read_limited(file_storage, max_bytes):
+    """File bytes, or None when larger than max_bytes."""
+    data = file_storage.read(max_bytes + 1)
+    return None if len(data) > max_bytes else data
+
+
+@app.route("/developer/model-diagnostics/upload", methods=["POST"])
+@developer_required
 def upload_model():
     """Upload a model trained in Colab (Joblib + results) to replace the
-    current one. Admin only, since Joblib files are unpickled."""
-    from model.train_model import _replace_with_retry
+    current one. Developer only: a .joblib file is a pickle, so it is read with
+    an allowlist loader (model/safe_load.py) and checked before it is used."""
+    from model.safe_load import UnsafeModelFile, safe_load_joblib
+    back = redirect(url_for("model_diagnostics"))
     if app.config["SERVERLESS"]:  # read-only file system
         flash("The online link cannot save files. Upload the trained model on the GSO computer "
               "(http://127.0.0.1:5000), then deploy it to the online link.", "warning")
-        return redirect(url_for("model_performance"))
+        return back
     model_file, metrics_file = request.files.get("model_file"), request.files.get("metrics_file")
     if not (model_file and model_file.filename and metrics_file and metrics_file.filename):
         flash("Choose both files from Google Colab: linear_regression_pipeline.joblib and metrics_colab.json.", "danger")
-        return redirect(url_for("model_performance"))
+        return back
+    if not model_file.filename.lower().endswith(".joblib"):
+        flash("Model not uploaded: the model file must be a .joblib file (linear_regression_pipeline.joblib).", "danger")
+        return back
+    if not metrics_file.filename.lower().endswith(".json"):
+        flash("Model not uploaded: the results file must be a .json file (metrics_colab.json).", "danger")
+        return back
+    model_bytes = read_limited(model_file, MODEL_UPLOAD_MAX_BYTES)
+    metrics_bytes = read_limited(metrics_file, METRICS_UPLOAD_MAX_BYTES)
+    if model_bytes is None or metrics_bytes is None:
+        flash(f"Model not uploaded: the model file may be at most {MODEL_UPLOAD_MAX_BYTES // 1024} KB and the "
+              f"results file at most {METRICS_UPLOAD_MAX_BYTES // 1024} KB.", "danger")
+        return back
     try:
-        pipeline = joblib.load(io.BytesIO(model_file.read()))
+        pipeline = safe_load_joblib(model_bytes)
+    except UnsafeModelFile as e:
+        app.logger.warning("Refused an uploaded model file: %s", e)
+        flash("Model not uploaded: " + str(e) + " Upload the linear_regression_pipeline.joblib saved by the "
+              "Google Colab notebook.", "danger")
+        return back
     except Exception:
         app.logger.exception("Uploaded model could not be read")
         flash("The model file could not be read. Upload the linear_regression_pipeline.joblib saved by the "
               "Google Colab notebook.", "danger")
-        return redirect(url_for("model_performance"))
+        return back
     try:
-        metrics = json.loads(metrics_file.read().decode("utf-8-sig"))
+        metrics = json.loads(metrics_bytes.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         flash("The results file could not be read. Upload the metrics_colab.json saved by the Google Colab notebook.",
               "danger")
-        return redirect(url_for("model_performance"))
+        return back
     try:
         problems = check_uploaded_model(pipeline, metrics)
     except Exception:
@@ -2010,18 +2223,48 @@ def upload_model():
                     "saved by the Google Colab notebook."]
     if problems:
         flash("Model not uploaded: " + " ".join(problems), "danger")
-        return redirect(url_for("model_performance"))
+        return back
     metrics = complete_uploaded_metrics(metrics)
-    # re-save with local libraries, then swap the file in atomically
-    joblib.dump(pipeline, app.config["MODEL_PATH"] + ".tmp")
-    _replace_with_retry(app.config["MODEL_PATH"] + ".tmp", app.config["MODEL_PATH"])
-    with open(app.config["METRICS_PATH"] + ".tmp", "w") as f:
-        json.dump(metrics, f, indent=2)
-    _replace_with_retry(app.config["METRICS_PATH"] + ".tmp", app.config["METRICS_PATH"])
-    _MODEL_CHARTS_CACHE.update(key=None, data=None)
+    backup_current_model()
+    install_model(pipeline, metrics)
     flash(f"Trained model uploaded: R² {metrics['r2_score']}, MAE {metrics['mae']} L, RMSE {metrics['rmse']} L. "
-          "Predictions now use this model.", "success")
-    return redirect(url_for("model_performance"))
+          "Predictions now use this model. The previous model was backed up.", "success")
+    return back
+
+
+@app.route("/developer/model-diagnostics/rollback", methods=["POST"])
+@developer_required
+def rollback_model():
+    """Restore a backup (the newest unless one is chosen). The model it
+    replaces is kept under model/backups/rolled-back-<time>/."""
+    import shutil
+    from model.safe_load import safe_load_joblib
+    back = redirect(url_for("model_diagnostics"))
+    if app.config["SERVERLESS"]:
+        flash("The online link cannot save files. Roll back on the GSO computer (http://127.0.0.1:5000).", "warning")
+        return back
+    backups = list_model_backups()
+    wanted = request.form.get("backup") or (backups[0]["name"] if backups else "")
+    chosen = next((b for b in backups if b["name"] == wanted), None)
+    if not chosen:
+        flash("There is no saved previous model to roll back to.", "warning")
+        return back
+    folder = os.path.join(model_backup_dir(), chosen["name"])
+    try:
+        with open(os.path.join(folder, "model.joblib"), "rb") as f:
+            pipeline = safe_load_joblib(f.read())
+        with open(os.path.join(folder, "metrics.json")) as f:
+            metrics = json.load(f)
+    except Exception:
+        app.logger.exception("Backup model %s could not be read", chosen["name"])
+        flash("That backup could not be read, so nothing was changed.", "danger")
+        return back
+    backup_current_model(prefix=ROLLED_BACK_PREFIX)
+    install_model(pipeline, metrics)
+    shutil.rmtree(folder, ignore_errors=True)
+    flash(f"Rolled back to model {metrics.get('model_version', '')} (R² {metrics.get('r2_score')}). "
+          "Predictions now use it.", "success")
+    return back
 
 
 # ------------------------------------------------------------------
@@ -2187,7 +2430,7 @@ def password_problem(password, username=""):
 def user_record(u, num):
     return {"id": u["id"], "num": num, "username": u["username"], "full_name": u["full_name"],
             "email": u["email"] or "", "role": effective_role(u), "status": u["status"],
-            "locked": u["role"] == "admin",
+            "locked": u["role"] in FIXED_ROLES,
             "created_at": u["created_at"].strftime("%b %d, %Y") if u["created_at"] else "",
             "is_self": u["id"] == session.get("user_id")}
 
@@ -2259,8 +2502,8 @@ def edit_user(user_id):
     if not target:
         flash("That account no longer exists.", "danger")
         return redirect(url_for("users"))
-    if target["role"] == "admin":
-        flash("The administrator account is fixed and cannot be changed here.", "danger")
+    if target["role"] in FIXED_ROLES:
+        flash(f"The {target['role'].replace('admin', 'administrator')} account is fixed and cannot be changed here.", "danger")
         return redirect(url_for("users"))
     f = request.form
     errors, full_name, email = validate_user_form(f, user_id)
@@ -2305,8 +2548,9 @@ def reset_user_password(user_id):
     if not target:
         flash("That account no longer exists.", "danger")
         return redirect(url_for("users"))
-    if target["role"] == "admin":
-        flash("The administrator changes its own password under Account Settings.", "danger")
+    if target["role"] in FIXED_ROLES:
+        flash(f"The {target['role'].replace('admin', 'administrator')} account changes its own password under "
+              "Account Settings.", "danger")
         return redirect(url_for("users"))
     password = request.form.get("password", "")
     problem = password_problem(password, target["username"])
@@ -2350,6 +2594,14 @@ def handle_too_large(e):
     flash("The uploaded data is too large (maximum 5 MB).", "danger")
     ref = request.referrer or ""
     return redirect(ref if ref.startswith(request.host_url) else url_for("index"))
+
+
+@app.errorhandler(403)
+def handle_forbidden(e):
+    if _wants_json():
+        return {"error": "forbidden"}, 403
+    return render_template("error.html", code=403, title="Access denied",
+                           message="This page is not available for your account."), 403
 
 
 @app.errorhandler(404)

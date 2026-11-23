@@ -6,8 +6,8 @@
 {% include '_prediction_tabs.html' %}
 <div class="alert alert-danger" id="modelUnavailable" {{ 'hidden' if model_available }}>
   <i class="fa-solid fa-triangle-exclamation me-1"></i>
-  <strong>Model unavailable.</strong> The administrator trains the model in Google Colab and uploads it
-  under Model Performance. Predictions turn on here by themselves as soon as it is uploaded.
+  <strong>Model unavailable.</strong> The system developer trains the model in Google Colab and uploads it
+  under Model Diagnostics. Predictions turn on here by themselves as soon as it is uploaded.
 </div>
 
 {% if errors %}

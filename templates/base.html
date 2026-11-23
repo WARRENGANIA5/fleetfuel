@@ -43,9 +43,14 @@
       <a href="{{ url_for('trips') }}" class="nav-link {{ 'active' if active=='trips' }}">
         <i class="fa-solid fa-road"></i><span>Trip Records</span>
       </a>
-      {% if is_admin %}
-      <a href="{{ url_for('model_performance') }}" class="nav-link {{ 'active' if active=='model_performance' }}">
-        <i class="fa-solid fa-brain"></i><span>Model Performance</span>
+      {% if is_admin or is_developer %}
+      <a href="{{ url_for('prediction_accuracy') }}" class="nav-link {{ 'active' if active=='prediction_accuracy' }}">
+        <i class="fa-solid fa-bullseye"></i><span>Prediction Accuracy</span>
+      </a>
+      {% endif %}
+      {% if is_developer %}
+      <a href="{{ url_for('model_diagnostics') }}" class="nav-link {{ 'active' if active=='model_diagnostics' }}">
+        <i class="fa-solid fa-flask"></i><span>Model Diagnostics</span>
       </a>
       {% endif %}
       {% if session.get('role') == 'admin' %}

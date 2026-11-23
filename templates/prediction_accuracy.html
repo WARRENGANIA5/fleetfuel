@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Prediction Accuracy{% endblock %}
+{% block page_title %}Prediction Accuracy{% endblock %}
+
+{% block content %}
+{% if not summary %}
+<div class="card-surface text-center py-5">
+  <i class="fa-solid fa-hourglass-half text-primary mb-2" style="font-size:28px;"></i>
+  <h5 class="mb-1" id="noModelText">The prediction model is not ready yet</h5>
+  <p class="text-muted mb-0">This page fills in on its own once the trained model is installed.</p>
+</div>
+{% else %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface h-100">
+      <div class="metric-value"><span id="paAccuracy">{{ summary.accuracy }}</span>%</div>
+      <div class="metric-label">Accuracy</div>
+      <p class="metric-caption">The model explains <span class="paAccuracyText">{{ summary.accuracy }}</span>% of the differences in fuel use between trips.</p>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface h-100">
+      <div class="metric-value"><span id="paError">{{ summary.typical_error }}</span> L</div>
+      <div class="metric-label">Typical Error</div>
+      <p class="metric-caption">Predictions are usually within about <span class="paErrorText">{{ summary.typical_error }}</span> liters of the actual fuel used.</p>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface h-100">
+      <div class="metric-value" id="paRecords">{{ summary.records }}</div>
+      <div class="metric-label">Trip Records Used</div>
+      <p class="metric-caption">Past trips the model learned from.</p>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="metric-tile card-surface h-100">
+      <div class="metric-value metric-value-date" id="paUpdated">{{ summary.updated }}</div>
+      <div class="metric-label">Last Updated</div>
+      <p class="metric-caption">When the model was last trained.</p>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-chart-line text-primary"></i> Actual vs Predicted</div>
+      <canvas id="avpScatterChart" height="240"></canvas>
+      <p class="metric-caption text-start mt-2 mb-0">Each dot is a trip. The closer the dots are to the line, the more accurate the prediction.</p>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card-surface h-100">
+      <div class="section-title"><i class="fa-solid fa-gauge-high text-primary"></i> What Affects Fuel Use</div>
+      <div id="influenceList" class="influence-list"></div>
+      <p class="metric-caption text-start mt-2 mb-0">A longer bar means a bigger effect on how much fuel a trip needs.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card-surface mb-3">
+  <div class="section-title"><i class="fa-solid fa-list-check text-primary"></i> Recent Trips: Predicted vs Actual</div>
+  <div id="recentEmpty" class="text-center text-muted py-4" {{ 'hidden' if recent }}>
+    <i class="fa-regular fa-clipboard mb-2" style="font-size:24px;"></i>
+    <div>No trips to compare yet.</div>
+    <div class="small">Once the actual fuel used is recorded for a fuel request, it will appear here next to its prediction.</div>
+  </div>
+  <div class="table-wrap" id="recentWrap" {{ 'hidden' if not recent }}>
+    <table class="table-fleet">
+      <thead><tr><th>Vehicle</th><th>Date</th><th class="text-end">Predicted (L)</th><th class="text-end">Actual (L)</th><th class="text-end">Difference (L)</th></tr></thead>
+      <tbody id="recentBody">
+      {% for t in recent %}
+        <tr><td>{{ t.vehicle }}</td><td>{{ t.date }}</td><td class="text-end">{{ t.predicted }}</td>
+          <td class="text-end">{{ t.actual }}</td><td class="text-end">{{ t.difference }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="metric-caption text-start mt-2 mb-0" id="recentNote" {{ 'hidden' if not recent }}>Difference = actual − predicted. A plus sign means the trip used more fuel than predicted.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not summary %}
+<script>
+// no model yet: reload once one is installed
+setInterval(function () {
+  fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
+    if (st.model_version) window.location.reload();
+  }).catch(function () {});
+}, 5000);
+</script>
+{% else %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script>
+Chart.defaults.font.family = "Poppins, sans-serif";
+Chart.defaults.color = window.chartTheme().text;
+Chart.defaults.animation = false;
+const chartColors = window.chartTheme();
+const axis = function (title) {
+  return { grid: { color: chartColors.grid }, ticks: { color: chartColors.text },
+           title: { display: true, text: title, color: chartColors.text } };
+};
+let avpChart = null;
+
+// plain words for each part of the equation
+const INFLUENCE_TEXT = {
+  distance_km: { name: 'Distance', text: 'The longer the trip, the more fuel it uses.' },
+  engine_power_kw: { name: 'Engine power', text: 'Vehicles with stronger engines use more fuel.' },
+  distance_x_power: { name: 'Long trips in high-powered vehicles', text: 'Long trips in high-powered vehicles use extra fuel on top of that.' }
+};
+
+function drawAvp(points, line) {
+  if (avpChart) {
+    avpChart.data.datasets[0].data = points;
+    avpChart.data.datasets[1].data = line;
+    avpChart.update();
+    return;
+  }
+  avpChart = new Chart(document.getElementById('avpScatterChart'), {
+    type: 'scatter',
+    data: { datasets: [
+      { label: 'Trips', data: points, borderColor: '#2697ff', backgroundColor: 'rgba(38,151,255,0.45)', pointRadius: 3 },
+      { label: 'Perfect prediction', type: 'line', data: line, borderColor: '#26e5c5',
+        borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+    ] },
+    options: { interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+               plugins: { legend: { display: true }, tooltip: { filter: function (i) { return i.datasetIndex === 0; },
+                 callbacks: { label: function (item) {
+                   return ['Actual: ' + item.raw.x + ' L', 'Predicted: ' + item.raw.y + ' L'];
+                 } } } },
+               scales: { x: axis('Actual Fuel Used (L)'), y: axis('Predicted Fuel (L)') } }
+  });
+}
+
+function drawInfluence(rows) {
+  const el = document.getElementById('influenceList');
+  if (!rows.length) { el.innerHTML = '<p class="text-muted small mb-0">Not available for this model.</p>'; return; }
+  const top = rows[0].share || 1;
+  el.innerHTML = rows.map(function (r, i) {
+    const info = INFLUENCE_TEXT[r.key] || { name: r.key, text: '' };
+    const size = i === 0 ? 'Biggest effect' : 'Smaller effect';
+    return '<div class="influence-item">' +
+      '<div class="d-flex justify-content-between align-items-baseline gap-2"><strong>' + escapeHtml(info.name) + '</strong>' +
+      '<span class="influence-tag">' + size + '</span></div>' +
+      '<div class="influence-bar"><span style="width:' + Math.max(r.share / top * 100, 4).toFixed(1) + '%"></span></div>' +
+      '<div class="influence-text">' + escapeHtml(info.text) + '</div></div>';
+  }).join('');
+}
+
+function drawRecent(rows) {
+  document.getElementById('recentEmpty').hidden = rows.length > 0;
+  document.getElementById('recentWrap').hidden = rows.length === 0;
+  document.getElementById('recentNote').hidden = rows.length === 0;
+  document.getElementById('recentBody').innerHTML = rows.map(function (t) {
+    return '<tr><td>' + escapeHtml(t.vehicle) + '</td><td>' + escapeHtml(t.date) + '</td><td class="text-end">' +
+      escapeHtml(t.predicted) + '</td><td class="text-end">' + escapeHtml(t.actual) + '</td><td class="text-end">' +
+      escapeHtml(t.difference) + '</td></tr>';
+  }).join('');
+}
+
+function setText(sel, v) { document.querySelectorAll(sel).forEach(function (el) { el.textContent = v; }); }
+
+function refreshAccuracy() {
+  return fetch('/api/prediction-accuracy-data').then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.summary) return;
+    const s = d.summary;
+    setText('#paAccuracy, .paAccuracyText', s.accuracy);
+    setText('#paError, .paErrorText', s.typical_error);
+    setText('#paRecords', s.records);
+    setText('#paUpdated', s.updated);
+    drawAvp(d.avp_points, d.avp_line);
+    drawInfluence(d.influence || []);
+    drawRecent(d.recent || []);
+  }).catch(function () { /* retry on the next interval */ });
+}
+refreshAccuracy();
+
+// new model -> refresh right away; recent trips every 30 s
+let knownVersion = {{ summary.model_version|tojson }};
+setInterval(function () {
+  fetch('/api/model-status').then(function (r) { return r.json(); }).then(function (st) {
+    if (st.model_version && st.model_version !== knownVersion) { knownVersion = st.model_version; refreshAccuracy(); }
+  }).catch(function () {});
+}, 5000);
+setInterval(refreshAccuracy, 30000);
+</script>
+{% endif %}
+{% endblock %}

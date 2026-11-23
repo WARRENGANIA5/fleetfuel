@@ -16,9 +16,9 @@ EASIEST WAY (AUTO version):
   3. Runtime > Run all. If a warning appears, click "Run anyway".
   4. Wait 1-2 minutes until every cell has a green check mark.
   5. Section 6 shows R2, MAE, RMSE and the 5-fold CV - the same as the
-     Model Performance page of the web app.
+     Model Diagnostics page of the web app (developer account).
   6. The last cell downloads linear_regression_pipeline.joblib and metrics_colab.json (allow the
-     browser to download multiple files). In the web app, open Model Performance >
+     browser to download multiple files). In the web app, open Model Diagnostics (developer account) >
      Upload Trained Model from Google Colab, choose the two files and click Upload.
      The system then predicts with this model; it never retrains by itself.
 
@@ -26,5 +26,5 @@ The AUTO version contains the data from the day it was made (7,589 trips of Trip
 9 vehicles, 92,402 other online records = 99,991 records + 9 vehicles = 100,000).
 To rebuild the four files from the system's current data: python colab/make_colab_files.py
 For newer records, download the three CSV files again from the web app
-(Model Performance > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
+(Model Diagnostics > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

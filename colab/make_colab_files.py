@@ -36,7 +36,7 @@ The trips are merged with the vehicle records using the plate number; each recor
 **supplementary** (the other online records).'''
 
 AUTO_DATA_TEXT = '''## 1. Data collection — the datasets (built into this notebook)
-This version already contains the data exported from the web application (Model Performance → Upload Trained Model):
+This version already contains the data exported from the web application (Model Diagnostics → Upload Trained Model):
 **trip_records.csv** ({trips:,} trips of Trip Records: {gso:,} from the GSO's Monthly Reports of Official Travel and
 {online:,} online-dataset trips, column `source`), **vehicle_records.csv** ({vehicles} vehicles: plate number, model,
 fuel type, engine power) and **supplementary_data.csv** ({supp:,} other online records). The online records are
@@ -46,7 +46,7 @@ https://doi.org/10.2909/13e6fad9-149c-4b86-9d83-cdf3569ccfee (both CC BY 4.0); e
 The next cell writes the three files, so **Runtime → Run all** trains the model with no file upload.'''
 
 UPLOAD_DATA_TEXT = '''## 1. Data collection — upload the datasets
-Download the three files from the web application: **Model Performance → Upload Trained Model from Google Colab →**
+Download the three files from the web application: **Model Diagnostics → Upload Trained Model from Google Colab →**
 **trip_records.csv**, **vehicle_records.csv** and **supplementary_data.csv**, then upload them when the file picker appears.
 
 * **trip_records.csv** — every trip of Trip Records: date of travel, plate number, distance traveled (km) and fuel
@@ -105,7 +105,7 @@ def main():
             set_cell(nb, 3, AUTO_DATA_TEXT.format(**counts), "markdown")
             set_cell(nb, 4, "\n".join([
                 "# Data exported from the web application. For newer records, download the three CSV files again from",
-                "# Model Performance and use fuel_consumption_linear_regression.ipynb (the upload version).",
+                "# Model Diagnostics and use fuel_consumption_linear_regression.ipynb (the upload version).",
                 'TRIPS_PATH, VEHICLES_PATH, SUPPLEMENTARY_PATH = "trip_records.csv", "vehicle_records.csv", "supplementary_data.csv"',
                 f"TRIPS_CSV = {data['trip_records']!r}",
                 f"VEHICLES_CSV = {data['vehicle_records']!r}",

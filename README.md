@@ -151,14 +151,14 @@ The web application never retrains by itself (Chapter III: Flask loads the saved
 predictions without retraining). Adding or editing trip records changes the data, not the model. To
 train a new model:
 
-1. **Model Performance → Upload Trained Model from Google Colab:** download `trip_records.csv`,
+1. **Model Diagnostics (developer account) → Upload Trained Model from Google Colab:** download `trip_records.csv`,
    `vehicle_records.csv` and `supplementary_data.csv`.
 2. Run `colab/fuel_consumption_linear_regression.ipynb` in Google Colab with those files
    (see `colab/HOW_TO_TRAIN_IN_COLAB.txt`). It downloads `linear_regression_pipeline.joblib` and
    `metrics_colab.json`.
 3. Upload both files on the same card. The system checks that the model is the notebook's Linear
    Regression pipeline and that its predictions follow the equation in the results file, then the
-   Prediction, Dashboard and Model Performance pages switch to it; no restart is needed.
+   Prediction, Dashboard, Prediction Accuracy and Model Diagnostics pages switch to it; no restart is needed.
 
 `python model/train_model.py` runs the same steps on this computer, and `python model/evaluate_model.py`
 regenerates the figures in `reports/figures/`.
@@ -230,7 +230,7 @@ high collinearity), uses **HC3 robust standard errors** for the coefficient p-va
 conditions on the standardized (weighted) residuals: Ramsey RESET (linearity), Durbin-Watson (independence),
 Jarque-Bera (normality), Breusch-Pagan (equal variance) and VIF (multicollinearity). With more than 300 records
 the p-values flag even trivial departures, so linearity, normality and equal variance are decided by effect size:
-Cohen's f² < 0.02, |skewness| ≤ 2 and |excess kurtosis| ≤ 7, and a residual variance ratio ≤ 3. Results appear on **Model Performance** and in the
+Cohen's f² < 0.02, |skewness| ≤ 2 and |excess kurtosis| ≤ 7, and a residual variance ratio ≤ 3. Results appear on **Model Diagnostics** (developer account) and in the
 Colab notebook. `python model/evaluate_model.py` saves print-ready
 figures to `reports/figures/`.
 
