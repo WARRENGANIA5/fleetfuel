@@ -1,5 +1,6 @@
-"""Online-dataset trips (data/trip_records_dataset.csv) shown on the Trip
-Records page alongside the Firestore trips.
+"""Online-dataset trips (data/trip_records_dataset.csv), used with the
+Firestore trips for model training and Prediction Accuracy. The Trip Records
+page shows only live trips logged in the system, not these.
 
 The CSV stays read-only to save Firestore quota. Admin edits/deletes and plate
 changes are stored in Firestore (CHANGES) and applied on top of the file.

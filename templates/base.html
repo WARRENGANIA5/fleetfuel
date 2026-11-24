@@ -43,14 +43,9 @@
       <a href="{{ url_for('trips') }}" class="nav-link {{ 'active' if active=='trips' }}">
         <i class="fa-solid fa-road"></i><span>Trip Records</span>
       </a>
-      {% if is_admin or is_developer %}
+      {% if is_admin %}
       <a href="{{ url_for('prediction_accuracy') }}" class="nav-link {{ 'active' if active=='prediction_accuracy' }}">
         <i class="fa-solid fa-bullseye"></i><span>Prediction Accuracy</span>
-      </a>
-      {% endif %}
-      {% if is_developer %}
-      <a href="{{ url_for('model_diagnostics') }}" class="nav-link {{ 'active' if active=='model_diagnostics' }}">
-        <i class="fa-solid fa-flask"></i><span>Model Diagnostics</span>
       </a>
       {% endif %}
       {% if session.get('role') == 'admin' %}
@@ -151,7 +146,7 @@
 <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/script.js', v=55) }}"></script>
+<script src="{{ url_for('static', filename='js/script.js', v=56) }}"></script>
 <div id="pageScripts" hidden>{% block extra_scripts %}{% endblock %}</div>
 </body>
 </html>

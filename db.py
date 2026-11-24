@@ -26,6 +26,7 @@ COLLECTIONS = ("users", "vehicles", "trip_records", "predictions", "notification
                "trip_dataset_changes")
 COUNTERS = "_counters"
 CHANGES = "_changes"   # write counter doc
+IDS = "_ids"           # highest ID ever given out per collection, so a deleted ID is never reused
 BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
 RECONNECT_SECONDS = 60
 DATE_FIELDS = {"trip_date"}
@@ -148,6 +149,13 @@ class FirestoreBackend:
     def bump(self):
         self.client.collection(COUNTERS).document(CHANGES).set({"n": self._firestore.Increment(1)}, merge=True)
 
+    def last_id(self, coll):
+        snap = self.client.collection(COUNTERS).document(IDS).get()
+        return int((snap.to_dict() or {}).get(coll) or 0) if snap.exists else 0
+
+    def set_last_id(self, coll, value):
+        self.client.collection(COUNTERS).document(IDS).set({coll: int(value)}, merge=True)
+
     def change_mark(self):
         snap = self.client.collection(COUNTERS).document(CHANGES).get()
         return (snap.to_dict() or {}).get("n", 0) if snap.exists else 0
@@ -167,6 +175,7 @@ class MemoryBackend:
     def __init__(self, config=None):
         self.data = {c: {} for c in COLLECTIONS}
         self.changes = 0
+        self.ids = {}
         self.lock = threading.Lock()
 
     def bump(self):
@@ -174,6 +183,12 @@ class MemoryBackend:
 
     def change_mark(self):
         return self.changes
+
+    def last_id(self, coll):
+        return self.ids.get(coll, 0)
+
+    def set_last_id(self, coll, value):
+        self.ids[coll] = int(value)
 
     def load(self, coll):
         return copy.deepcopy(self.data.setdefault(coll, {}))
@@ -214,6 +229,7 @@ class Store:
         self.mark = None          # counter value at last load
         self.offline = None       # backup file in use while Firestore is unreadable
         self.last_try = 0.0
+        self.last_ids = {}        # coll -> highest ID given out (see IDS)
         self.lock = threading.RLock()
 
     def _apply(self, coll, kind, doc_id, data):
@@ -343,8 +359,16 @@ def insert(coll, data):
     """Add a record; returns its new ID."""
     store = _store()
     store.ensure(coll)
+    # Start above both the records that exist and the highest ID ever given
+    # out: a deleted record's ID is never reused, so old fuel requests or trips
+    # that still point to it never show up under a new account or record.
+    try:
+        given = store.backend.last_id(coll)
+    except Exception:
+        given = 0          # read quota used up: fall back to what this server knows
     with store.lock:
-        highest = max((k for k in store.rows.get(coll, {}) if isinstance(k, int)), default=0)
+        highest = max([k for k in store.rows.get(coll, {}) if isinstance(k, int)]
+                      + [given, store.last_ids.get(coll, 0)])
     record = {k: v for k, v in FIELDS[coll].items()}
     record.update(data)
     if "created_at" in record and record["created_at"] is None:
@@ -359,6 +383,12 @@ def insert(coll, data):
     except Exception as e:
         raise DatabaseUnavailable(str(e)) from e
     store._apply(coll, "ADDED", new_id, encoded)
+    with store.lock:
+        store.last_ids[coll] = max(store.last_ids.get(coll, 0), new_id)
+    try:
+        store.backend.set_last_id(coll, new_id)
+    except Exception:
+        pass
     _changed(store)
     return new_id
 
@@ -401,6 +431,15 @@ def update(coll, doc_id, **fields):
 
 def delete(coll, doc_id):
     store = _store()
+    key = _key(doc_id)
+    if isinstance(key, int):
+        try:
+            if key > store.backend.last_id(coll):
+                store.backend.set_last_id(coll, key)
+        except Exception:
+            pass
+        with store.lock:
+            store.last_ids[coll] = max(store.last_ids.get(coll, 0), key)
     try:
         store.backend.delete(coll, doc_id)
     except Exception as e:

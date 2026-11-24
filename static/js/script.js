@@ -718,6 +718,7 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function (me) {
         if (!me) return;
         document.querySelectorAll('.user-name').forEach(function (el) { el.textContent = me.full_name; });
+        document.querySelectorAll('.welcome-username').forEach(function (el) { el.textContent = me.username; });
         document.querySelectorAll('.user-role').forEach(function (el) { el.textContent = me.role; });
         const initial = document.getElementById('topbarAvatarInitial');
         if (initial) {

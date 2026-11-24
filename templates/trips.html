@@ -41,7 +41,7 @@
     <table class="table-fleet" id="tripsTable">
       <thead>
         <tr>
-          <th>No.</th><th>Date of Travel</th><th>Vehicle</th><th>Distance Traveled (km)</th><th>Fuel Consumed (L)</th>{% if is_admin %}<th>Actions</th>{% endif %}
+          <th>No.</th><th>Date of Travel</th><th>Vehicle</th><th>Distance Traveled (km)</th><th>Fuel Consumed (L)</th>{% if is_admin %}<th>Logged By</th>{% endif %}<th>Actions</th>
         </tr>
       </thead>
       <tbody id="tripsBody">
@@ -52,7 +52,7 @@
           <td>{{ t.plate_number }}</td>
           <td>{{ t.distance_km }}</td>
           <td>{% if t.pending %}<span class="badge-recorded" title="Added by a fuel request; filled in when the actual fuel is recorded">Pending</span>{% else %}{{ t.actual_fuel_consumption or '—' }}{% endif %}</td>
-          {% if is_admin %}
+          {% if is_admin %}<td>{{ t.logged_by }}</td>{% endif %}
           <td>
             <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button>
             <form method="POST" action="{{ url_for('delete_trip', trip_id=0)|replace('/0/', '/' ~ t.id ~ '/') }}" class="d-inline" onsubmit="return confirmDelete('Delete this trip record?')">
@@ -60,10 +60,9 @@
               <button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </form>
           </td>
-          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 6 if is_admin else 5 }}" class="text-center text-muted py-4">{{ 'No matching trip records.' if listing.q else 'No trip records yet.' }}</td></tr>
+        <tr><td colspan="{{ 7 if is_admin else 6 }}" class="text-center text-muted py-4">{{ 'No matching trip records.' if listing.q else ('No trip records yet.' if is_admin else 'You have no trip records yet.') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -82,8 +81,7 @@
   </div>
 </div>
 
-{# admin-only edit modal (filled by script.js) #}
-{% if is_admin %}
+{# edit modal (filled by script.js); staff only see, so only edit, their own trips #}
 <div class="modal fade" id="editTripModal" tabindex="-1" data-record-modal>
   <div class="modal-dialog">
     <div class="modal-content">
@@ -100,6 +98,7 @@
   </div>
 </div>
 
+{% if is_admin %}
 <div class="modal fade" id="addTripModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -127,7 +126,7 @@ const TRIP_CSRF = {{ csrf_token()|tojson }};
 const REOPEN = {{ reopen|tojson if reopen else 'null' }};
 
 // reopen the form after a failed save
-if (REOPEN && IS_ADMIN) {
+if (REOPEN && (IS_ADMIN || REOPEN.modal === 'editTripModal')) {
   const modalEl = document.getElementById(REOPEN.modal);
   const form = modalEl.querySelector('form');
   if (REOPEN.trip_id) {
@@ -152,17 +151,18 @@ function tripRow(t) {
   const tr = document.createElement('tr');
   tr.dataset.record = JSON.stringify(t);
   const cells = ['#' + t.num, t.trip_date, t.plate_number, t.distance_km, t.actual_fuel_consumption || '—'];
+  if (IS_ADMIN) cells.push(t.logged_by);
   tr.innerHTML = cells.map(function (c, i) {
       if (i === 4 && t.pending) return '<td><span class="badge-recorded" title="Added by a fuel request; filled in when the actual fuel is recorded">Pending</span></td>';
       return '<td>' + escapeHtml(c) + '</td>';
     }).join('') +
-    (IS_ADMIN ? '<td>' +
+    '<td>' +
       '<button class="action-btn" data-bs-toggle="modal" data-bs-target="#editTripModal" title="Edit"><i class="fa-solid fa-pen"></i></button> ' +
       '<form method="POST" action="' + DELETE_TRIP_URL.replace('/0/', '/' + t.id + '/') + '" class="d-inline" onsubmit="return confirmDelete(\'Delete this trip record?\')">' +
         '<input type="hidden" name="csrf_token" value="' + escapeHtml(TRIP_CSRF) + '">' +
         '<button type="submit" class="action-btn danger" title="Delete"><i class="fa-solid fa-trash"></i></button>' +
       '</form>' +
-    '</td>' : '');
+    '</td>';
   return tr;
 }
 function showPager(d) {
@@ -184,8 +184,8 @@ function showTrips(d) {
   const body = document.getElementById('tripsBody');
   body.innerHTML = '';
   if (!d.trips.length) {
-    body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 6 : 5) + '" class="text-center text-muted py-4">' +
-      (d.q ? 'No matching trip records.' : 'No trip records yet.') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="' + (IS_ADMIN ? 7 : 6) + '" class="text-center text-muted py-4">' +
+      (d.q ? 'No matching trip records.' : (IS_ADMIN ? 'No trip records yet.' : 'You have no trip records yet.')) + '</td></tr>';
   } else {
     const frag = document.createDocumentFragment();
     d.trips.forEach(function (t) { frag.appendChild(tripRow(t)); });

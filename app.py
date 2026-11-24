@@ -175,33 +175,20 @@ _ALLOWED_BEFORE_PW_CHANGE = {"settings", "change_password", "api_me", "api_notif
 
 # Only one admin account (GSO, role "admin"); everyone else is staff.
 # ADMIN_ACCOUNT is its username when init_db.py creates it.
-# "developer" accounts (made by create_developer.py) see the technical Model
-# Diagnostics page and upload trained models; otherwise they act like staff.
 ADMIN_ACCOUNT = "admin1114"
-FIXED_ROLES = ("admin", "developer")  # not editable on the User Accounts page
+FIXED_ROLES = ("admin",)  # not editable on the User Accounts page
 
 
 def effective_role(user):
     return user["role"] if user["role"] in FIXED_ROLES else "staff"
 
 
-def developer_required(view):
-    """Developer-only route: 403 for everyone else, even with the URL typed in."""
-    @wraps(view)
-    @login_required
-    def wrapped(*args, **kwargs):
-        if session.get("role") != "developer":
-            abort(403)
-        return view(*args, **kwargs)
-    return wrapped
-
-
 def accuracy_required(view):
-    """Prediction Accuracy: the administrator and developers."""
+    """Prediction Accuracy: the administrator only."""
     @wraps(view)
     @login_required
     def wrapped(*args, **kwargs):
-        if session.get("role") not in ("admin", "developer"):
+        if session.get("role") != "admin":
             abort(403)
         return view(*args, **kwargs)
     return wrapped
@@ -256,7 +243,6 @@ def inject_globals():
         "org": get_org(),
         "today": today_local().isoformat(),
         "is_admin": session.get("role") == "admin",
-        "is_developer": session.get("role") == "developer",
         "current_year": today_local().year,
         "notif_count": g.get("notif_count", 0),
         "pending_accounts": pending["accounts"],
@@ -488,6 +474,20 @@ def find_user(username):
             or next((u for u in rows if u["username"].lower() == username.lower()), None))
 
 
+# There is no developer account: no username, full name or role (position)
+# may contain the word, also when written with dots, dashes or spaces.
+RESERVED_WORDS = ("developer",)
+
+
+def reserved_word_problem(label, value):
+    """Message when value contains a reserved word, else None."""
+    letters = re.sub(r"[^a-z]", "", (value or "").lower())
+    for word in RESERVED_WORDS:
+        if word in letters:
+            return f"{label} cannot contain the word \u201c{word}\u201d."
+    return None
+
+
 def username_taken(username, except_id=None):
     name = (username or "").strip().lower()
     return any(u["username"].lower() == name and u["id"] != except_id for u in db.records("users"))
@@ -504,6 +504,9 @@ def signup_field_problem(field, value):
     if field == "username":
         if not USERNAME_RE.fullmatch(value):
             return "3-50 characters: letters, numbers, dot, dash or underscore."
+        reserved = reserved_word_problem("Username", value)
+        if reserved:
+            return reserved
         if username_taken(value):
             return f"Username {value} is already taken."
     elif field == "email":
@@ -637,26 +640,25 @@ def logout():
 # DASHBOARD
 # ------------------------------------------------------------------
 def build_dashboard_context():
-    """Admin: all fuel requests, pending approvals and model status.
-    Staff: only their own requests."""
+    """Live records only (the training data is left out), scoped like Trip
+    Records and Fuel Requests. Admin: every live trip and fuel request, pending
+    approvals and model status. Staff: only their own trips and requests."""
     is_admin = session.get("role") == "admin"
     vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
     users_by_id = {u["id"]: u for u in db.records("users")}
-    trips = db.records("trip_records")
-    fuel_trips = [t for t in trips if t["actual_fuel_consumption"] is not None]
     all_predictions = db.records("predictions")
+    requesters = {p["id"]: p["user_id"] for p in all_predictions}
+    trips = [t for t in db.records("trip_records") if is_live_trip(t) and can_manage_trip(t, requesters)]
+    fuel_trips = [t for t in trips if t["actual_fuel_consumption"] is not None]
     scoped = all_predictions if is_admin else [p for p in all_predictions if p["user_id"] == session.get("user_id")]
-    # + online-dataset trips
-    dataset = trip_dataset.summary(v["plate_number"] for v in vehicles_by_id.values())
-    total_vehicles, total_trips = len(vehicles_by_id), len(trips) + dataset["count"]
+    total_vehicles, total_trips = len(vehicles_by_id), len(trips)
     total_predictions = len(scoped)
     requests_summary = {k: sum(p["approval_status"] == k for p in scoped) for k in ("pending", "approved", "rejected")}
 
-    if fuel_trips or dataset["count"]:
-        avg_fuel = ((sum(float(t["actual_fuel_consumption"]) for t in fuel_trips) + dataset["fuel_sum"])
-                    / (len(fuel_trips) + dataset["count"]))
-    elif all_predictions:
-        avg_fuel = sum(float(p["predicted_fuel"]) for p in all_predictions) / len(all_predictions)
+    if fuel_trips:
+        avg_fuel = sum(float(t["actual_fuel_consumption"]) for t in fuel_trips) / len(fuel_trips)
+    elif scoped:
+        avg_fuel = sum(float(p["predicted_fuel"]) for p in scoped) / len(scoped)
     else:
         avg_fuel = None
     avg_fuel = round(float(avg_fuel), 2) if avg_fuel is not None else 0.0
@@ -682,19 +684,18 @@ def build_dashboard_context():
     } for r in recent_predictions_rows]
 
     # monthly fuel for the last 6 months up to the latest month with records
-    latest = max([t["trip_date"] for t in fuel_trips] + [d for _, d in dataset["per_plate"].values()],
-                 default=None) or today_local()
+    latest = max((t["trip_date"] for t in fuel_trips), default=None) or today_local()
     months = []
     y, m = latest.year, latest.month
     for _ in range(6):
         months.append((y, m))
         y, m = (y, m - 1) if m > 1 else (y - 1, 12)
     months.reverse()
-    totals = dict(dataset["monthly"])
+    totals = {}
     for t in fuel_trips:
         ym = t["trip_date"].strftime("%Y-%m")
         totals[ym] = totals.get(ym, 0.0) + float(t["actual_fuel_consumption"])
-    has_fuel_records = bool(fuel_trips or dataset["count"])
+    has_fuel_records = bool(fuel_trips)
     # the current month is not over yet, so its total is still low; say so
     this_month = (today_local().year, today_local().month)
     fuel_trend_labels = [date(y, m, 1).strftime("%b %Y") + (" (so far)" if (y, m) == this_month else "")
@@ -972,7 +973,7 @@ def prediction_history_data(args):
     vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
     users_by_id = {u["id"]: u for u in db.records("users")}
     everything = sorted(db.records("predictions"), key=lambda p: (p["created_at"], p["id"]))
-    # numbered in request order; numbers don't change when filtered or paged
+    # request order, used for sorting (newest first)
     for i, p in enumerate(everything, 1):
         v, u, r = (vehicles_by_id.get(p["vehicle_id"]), users_by_id.get(p["user_id"]),
                    users_by_id.get(p["reviewed_by"]))
@@ -991,7 +992,10 @@ def prediction_history_data(args):
         if status in ("pending", "approved", "rejected") and p["approval_status"] != status:
             return False
         return not mine or p["user_id"] == session.get("user_id")
-    matching = [p for p in everything if keep(p)]
+    # pending requests on top so the admin sees them first, then approved and
+    # rejected; newest first in each
+    matching = sorted((p for p in everything if keep(p)),
+                      key=lambda p: (p["approval_status"] != "pending", -p["request_no"]))
     # predicted range = prediction ± RMSE
     tolerance = float((get_metrics() or {}).get("rmse") or 2.0)
 
@@ -1006,12 +1010,14 @@ def prediction_history_data(args):
     rows = matching[offset:offset + per_page]
 
     records = []
-    for p in rows:
+    # numbered from the top of the list this account sees (#1 = first row),
+    # counting on across pages
+    for num, p in enumerate(rows, offset + 1):
         actual = float(p["actual_fuel"]) if p["actual_fuel"] is not None else None
         predicted = float(p["predicted_fuel"])
         diff = round(predicted - actual, 2) if actual is not None else None
         records.append({
-            "id": p["id"], "num": int(p["request_no"]),
+            "id": p["id"], "num": num,
             "created_at": p["created_at"].strftime("%b %d, %Y %I:%M %p"),
             "created_at_long": p["created_at"].strftime("%B %d, %Y %I:%M %p"),
             "vehicle": p["plate_number"] or "Vehicle deleted", "vehicle_model": p["brand_model"] or "",
@@ -1171,7 +1177,8 @@ def query_vehicles():
     """Vehicles with how many trip records depend on each one and its last trip."""
     _ensure_vehicle_columns()
     trips = db.records("trip_records")
-    rows = sorted(db.records("vehicles"), key=lambda v: v["plate_number"])
+    # newest added first (same time: the one added last first)
+    rows = sorted(db.records("vehicles"), key=lambda v: (v["created_at"] or datetime.min, v["id"]), reverse=True)
     dataset = trip_dataset.summary(v["plate_number"] for v in rows)["per_plate"]  # + online-dataset trips
     for v in rows:
         mine = [t["trip_date"] for t in trips if t["vehicle_id"] == v["id"]]
@@ -1333,22 +1340,72 @@ TRIP_EFFICIENCY_WARN = (3, 60)
 
 TRIPS_PER_PAGE = 50
 TRIP_ROW_FIELDS = ("id", "num", "vehicle_id", "trip_date", "plate_number", "brand_model",
-                   "distance_km", "actual_fuel_consumption", "source", "pending")
+                   "distance_km", "actual_fuel_consumption", "pending", "logged_by")
+TRIP_LISTING_COLUMNS = list(TRIP_ROW_FIELDS) + ["search"]
+
+
+def is_live_trip(t):
+    """A trip logged in the system: added on Trip Records (created_by) or by a
+    fuel request (prediction_id). The training data is not live: the GSO trips
+    imported from the Monthly Report of Official Travel (neither field set) and
+    the online-dataset CSV trips. Model training and Prediction Accuracy still
+    use them; the Trip Records page does not."""
+    return t.get("created_by") is not None or t.get("prediction_id") is not None
+
+
+def trip_owner_ids(t, requesters=None):
+    """Accounts a trip belongs to: whoever logged it and the staff member whose
+    fuel request it came from. `requesters` maps fuel request id -> user id."""
+    if requesters is None:
+        pred = db.get("predictions", t["prediction_id"]) if t.get("prediction_id") is not None else None
+        requester = pred["user_id"] if pred else None
+    else:
+        requester = requesters.get(t.get("prediction_id"))
+    return {i for i in (t.get("created_by"), requester) if i is not None}
+
+
+def can_manage_trip(t, requesters=None):
+    """Admin: every trip. Staff: only live trips of their own account or of
+    their own fuel requests."""
+    if session.get("role") == "admin":
+        return True
+    return is_live_trip(t) and session.get("user_id") in trip_owner_ids(t, requesters)
 
 
 def trip_listing():
-    """All trip records numbered oldest first: system trips plus online-dataset
-    trips (`source` set)."""
+    """The live trip records this user may see, latest first (date of travel,
+    then the time it was logged, so a trip logged today is on top) and
+    numbered from the top (#1 = latest). Admin: every staff member's trips;
+    staff: only their own."""
     _ensure_vehicle_columns()
-    vehicles = db.records("vehicles")
-    vehicles_by_id = {v["id"]: v for v in vehicles}
-    own = []
-    for t in sorted(db.records("trip_records"), key=lambda t: (t["trip_date"], t["id"])):
+    vehicles_by_id = {v["id"]: v for v in db.records("vehicles")}
+    users_by_id = {u["id"]: u for u in db.records("users")}
+    requesters = {p["id"]: p["user_id"] for p in db.records("predictions")}
+    is_admin = session.get("role") == "admin"
+    rows = []
+    trips = sorted((t for t in db.records("trip_records") if is_live_trip(t) and can_manage_trip(t, requesters)),
+                   key=lambda t: (t["trip_date"], t["created_at"] or datetime.min, t["id"]))
+    for t in trips:
         v = vehicles_by_id.get(t["vehicle_id"])
-        if v:
-            t.update(plate_number=v["plate_number"], brand_model=v["brand_model"])
-            own.append(t)
-    return trip_dataset.listing(own, {v["plate_number"]: v for v in vehicles})
+        if not v:
+            continue
+        logger = t.get("created_by") if t.get("created_by") is not None else requesters.get(t.get("prediction_id"))
+        u = users_by_id.get(logger)
+        fuel = t["actual_fuel_consumption"]
+        pending = fuel is None and t.get("prediction_id") is not None   # fuel request waiting for its actual fuel
+        row = {"id": t["id"], "num": len(rows) + 1, "vehicle_id": t["vehicle_id"],
+               "trip_date": t["trip_date"].isoformat(), "plate_number": v["plate_number"],
+               "brand_model": v["brand_model"], "distance_km": str(t["distance_km"]),
+               "actual_fuel_consumption": str(fuel) if fuel is not None else "", "pending": pending,
+               "logged_by": u["full_name"] if u else "System"}
+        row["search"] = " ".join([row["trip_date"], row["plate_number"], row["distance_km"],
+                                  row["actual_fuel_consumption"], "pending" if pending else "",
+                                  row["logged_by"] if is_admin else ""]).lower()
+        rows.append(row)
+    rows.reverse()
+    for num, row in enumerate(rows, 1):
+        row["num"] = num
+    return pd.DataFrame(rows, columns=TRIP_LISTING_COLUMNS)
 
 
 def query_trips(q="", page=1):
@@ -1367,14 +1424,13 @@ def query_trips(q="", page=1):
     chunk = rows.iloc[(page - 1) * TRIPS_PER_PAGE: page * TRIPS_PER_PAGE]
     trips = [{k: r[k] for k in TRIP_ROW_FIELDS} for r in chunk.to_dict("records")]
     for t in trips:
-        t.update(num=int(t["num"]), vehicle_id=int(t["vehicle_id"]), pending=bool(t["pending"]),
-                 id=t["id"] if isinstance(t["id"], str) else int(t["id"]))  # "d…" = online-dataset trip
+        t.update(num=int(t["num"]), vehicle_id=int(t["vehicle_id"]), pending=bool(t["pending"]), id=int(t["id"]))
     return {"trips": trips, "total": total, "matches": int(len(rows)), "page": page, "pages": pages,
             "per_page": TRIPS_PER_PAGE, "q": q}
 
 
 def trip_page_of(trip_id):
-    """The page of Trip Records that shows the system trip `trip_id`."""
+    """The page of Trip Records that shows trip `trip_id`."""
     rows = trip_listing()
     hit = rows.index[rows["id"] == trip_id]
     return int(hit[0]) // TRIPS_PER_PAGE + 1 if len(hit) else 1
@@ -1528,7 +1584,17 @@ def api_trips():
     return query_trips(request.args.get("q", ""), request.args.get("page", 1))
 
 
-# Trip records: staff can view, only the admin can add/edit/delete.
+# Trip records: the admin adds, sees, edits and deletes all live trips; staff
+# see, edit and delete only theirs (their own or from their fuel requests).
+def _require_own_trip(trip_id):
+    """The trip if this user may manage it, else 403. Missing and someone
+    else's trips get the same answer, so staff cannot probe trip IDs."""
+    trip = db.get("trip_records", trip_id)
+    if not trip or not can_manage_trip(trip):
+        abort(403)
+    return trip
+
+
 @app.route("/trips/add", methods=["POST"])
 @admin_required
 def add_trip():
@@ -1551,12 +1617,9 @@ def add_trip():
 
 
 @app.route("/trips/<int:trip_id>/edit", methods=["POST"])
-@admin_required
+@login_required
 def edit_trip(trip_id):
-    trip = db.get("trip_records", trip_id)
-    if not trip:
-        flash("That trip record no longer exists.", "danger")
-        return redirect(url_for("trips"))
+    _require_own_trip(trip_id)
     _ensure_vehicle_columns()
     errors, warnings = validate_trip_form(request.form, trip_id)
     if errors:
@@ -1577,11 +1640,9 @@ def edit_trip(trip_id):
 
 
 @app.route("/trips/<int:trip_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_trip(trip_id):
-    if not db.get("trip_records", trip_id):
-        flash("That trip record no longer exists.", "danger")
-        return redirect(url_for("trips"))
+    _require_own_trip(trip_id)
     try:
         # requests that got actual fuel from this trip lose it (manual stays)
         for p in db.find("predictions", trip_record_id=trip_id):
@@ -1776,7 +1837,7 @@ def start_backup_scheduler():
 
 
 def build_model_charts():
-    """Chart data for Prediction Accuracy and Model Diagnostics, same 80/20 split as training.
+    """Chart data for Prediction Accuracy, same 80/20 split as training.
     Cached per model version."""
     from sklearn.model_selection import train_test_split
     from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, TARGET_COLUMN, clean_data
@@ -1964,13 +2025,6 @@ def model_performance():
     return redirect(url_for("prediction_accuracy"))
 
 
-@app.route("/developer/model-diagnostics")
-@developer_required
-def model_diagnostics():
-    return render_template("model_diagnostics.html", active="model_diagnostics", metrics=get_metrics(),
-                           serverless=app.config["SERVERLESS"], backups=list_model_backups())
-
-
 def training_dataset_csv(name):
     """Training CSV for the Colab notebook: trip_records, vehicle_records or
     supplementary_data (minus rows already in trip records). None if unknown."""
@@ -1994,18 +2048,6 @@ def training_dataset_csv(name):
     return None
 
 
-@app.route("/developer/model-diagnostics/dataset/<name>.csv")
-@developer_required
-def export_training_dataset(name):
-    """Download one of the three CSV files of training_dataset_csv()."""
-    body = training_dataset_csv(name)
-    if body is None:
-        flash("Unknown dataset.", "danger")
-        return redirect(url_for("model_diagnostics"))
-    return Response(body, mimetype="text/csv",  # Flask adds "; charset=utf-8"
-                    headers={"Content-Disposition": f"attachment; filename={name}.csv"})
-
-
 @app.route("/api/model-status")
 @login_required
 def api_model_status():
@@ -2016,255 +2058,6 @@ def api_model_status():
         # "backup" while running from backup data
         "database": "backup" if db.offline_backup() else "live",
     }
-
-
-@app.route("/api/model-diagnostics-data")
-@developer_required
-def api_model_diagnostics_data():
-    return {"metrics": get_metrics(), "charts": build_model_charts()}
-
-
-# Results file the Colab notebook saves with the model.
-UPLOAD_METRICS_KEYS = ("r2_score", "mae", "rmse", "cv_folds", "cv_mean_r2", "cv_std_r2", "cv_mean_mae",
-                       "cv_std_mae", "cv_mean_rmse", "cv_std_rmse", "train_size", "test_size", "total_records",
-                       "equation_terms", "intercept", "coefficients", "centering", "raw_intercept",
-                       "raw_coefficients", "vif", "diagnostics")
-
-
-def check_uploaded_model(pipeline, metrics):
-    """Problems with an uploaded model/results pair (empty if OK). The model
-    must be the notebook's pipeline and match the results equation."""
-    from sklearn.linear_model import LinearRegression
-    from sklearn.pipeline import Pipeline
-    from model.preprocess import MODEL_TERMS, TermEncoder, build_prediction_frame
-    steps = pipeline.named_steps if type(pipeline) is Pipeline else {}
-    if not (list(steps) == ["encoder", "regressor"] and type(steps["encoder"]) is TermEncoder
-            and isinstance(steps["regressor"], LinearRegression)):
-        return ["The model file is not the Linear Regression model saved by the Google Colab notebook "
-                "(linear_regression_pipeline.joblib)."]
-    if not isinstance(metrics, dict):
-        return ["The results file is not the metrics file saved by the Google Colab notebook (metrics_colab.json)."]
-    missing = [k for k in UPLOAD_METRICS_KEYS if k not in metrics]
-    if missing:
-        return ["The results file is missing " + ", ".join(missing) + ". Upload the metrics_colab.json saved by "
-                "the same notebook run."]
-    if list(metrics["equation_terms"]) != MODEL_TERMS:
-        return ["The results file is for a different equation than Distance, Engine Power, Fuel Type and "
-                "Distance × Engine Power."]
-    b0, b = float(metrics["raw_intercept"]), metrics["raw_coefficients"]
-    worst = 0.0
-    for distance in (10, 100, 500):
-        for power in (60, 95, 180):
-            for fuel, code in (("Diesel", 0), ("Gasoline", 1)):
-                frame = build_prediction_frame({"distance_km": distance, "engine_power_kw": power, "fuel_type": fuel})
-                model_value = float(pipeline.predict(frame)[0])
-                equation = (b0 + b["distance_km"] * distance + b["engine_power_kw"] * power
-                            + b["fuel_type_code"] * code + b["distance_x_power"] * distance * power)
-                worst = max(worst, abs(model_value - equation))
-    if not worst < 0.05:
-        return ["The model file and the results file are from different training runs. Upload the two files "
-                "saved by the same run of the notebook."]
-    return []
-
-
-def complete_uploaded_metrics(metrics):
-    """Add input ranges and record counts to the notebook's metrics."""
-    from model.diagnostics import VIF_THRESHOLD
-    from model.preprocess import FEATURE_COLUMNS, MODEL_TERMS, clean_data
-    df = clean_data(load_training_frame())
-    X = df[FEATURE_COLUMNS]
-    stamp = now_local()
-    # round like train_model.py (6 significant digits)
-    sig = lambda v: float(f"{float(v):.6g}")
-    extra = {
-        "intercept": sig(metrics["intercept"]),
-        "coefficients": {t: sig(v) for t, v in metrics["coefficients"].items()},
-        "raw_intercept": sig(metrics["raw_intercept"]),
-        "raw_coefficients": {t: sig(v) for t, v in metrics["raw_coefficients"].items()},
-        "centering": {k: round(float(v), 4) for k, v in metrics["centering"].items()},
-        "model_version": stamp.strftime("v%Y%m%d%H%M%S"),
-        "trained_at": stamp.isoformat(timespec="seconds"),
-        "status": "active",
-        "source": "Google Colab",
-        "vif_threshold": VIF_THRESHOLD,
-        "selected_numeric_features": list(MODEL_TERMS),
-        "selected_categorical_features": [],
-        "data_sources": {k: int(v) for k, v in df["data_source"].value_counts().items()},
-        "feature_ranges": {col: [round(float(X[col].min()), 2), round(float(X[col].max()), 2)]
-                           for col in ("distance_km", "engine_power_kw")},
-        "category_values": {"fuel_type": sorted(X["fuel_type"].astype(str).unique().tolist())},
-        "ranges_by_fuel": {fuel: {col: [round(float(g[col].min()), 2), round(float(g[col].max()), 2)]
-                                  for col in ("distance_km", "engine_power_kw")} | {"records": int(len(g))}
-                           for fuel, g in X.groupby(X["fuel_type"].astype(str))},
-    }
-    return {**metrics, **extra}
-
-
-MODEL_UPLOAD_MAX_BYTES = 1024 * 1024        # a trained pipeline is ~2 KB
-METRICS_UPLOAD_MAX_BYTES = 256 * 1024       # metrics_colab.json is ~5 KB
-MODEL_BACKUPS_KEPT = 10
-ROLLED_BACK_PREFIX = "rolled-back-"         # models replaced by a rollback (kept, never offered again)
-
-
-def model_backup_dir():
-    return os.path.join(os.path.dirname(app.config["MODEL_PATH"]), "backups")
-
-
-def list_model_backups():
-    """Saved previous models, newest first."""
-    root = model_backup_dir()
-    try:
-        names = sorted((n for n in os.listdir(root) if not n.startswith(ROLLED_BACK_PREFIX)
-                        and os.path.isdir(os.path.join(root, n))), reverse=True)
-    except FileNotFoundError:
-        return []
-    out = []
-    for name in names:
-        folder = os.path.join(root, name)
-        try:
-            with open(os.path.join(folder, "metrics.json")) as f:
-                m = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not os.path.exists(os.path.join(folder, "model.joblib")):
-            continue
-        try:
-            trained = datetime.fromisoformat(m["trained_at"]).strftime("%B %d, %Y %I:%M %p")
-        except (KeyError, ValueError, TypeError):
-            trained = m.get("trained_at", "")
-        out.append({"name": name, "version": m.get("model_version", ""), "trained_at": trained,
-                    "r2_score": m.get("r2_score"), "mae": m.get("mae")})
-    return out
-
-
-def backup_current_model(prefix=""):
-    """Copy the active model + metrics into model/backups/<prefix><timestamp>/."""
-    import shutil
-    if not (os.path.exists(app.config["MODEL_PATH"]) and os.path.exists(app.config["METRICS_PATH"])):
-        return None
-    folder = os.path.join(model_backup_dir(), prefix + now_local().strftime("%Y%m%d-%H%M%S"))
-    os.makedirs(folder, exist_ok=True)
-    shutil.copyfile(app.config["MODEL_PATH"], os.path.join(folder, "model.joblib"))
-    shutil.copyfile(app.config["METRICS_PATH"], os.path.join(folder, "metrics.json"))
-    if not prefix:  # keep the newest MODEL_BACKUPS_KEPT
-        for old in list_model_backups()[MODEL_BACKUPS_KEPT:]:
-            shutil.rmtree(os.path.join(model_backup_dir(), old["name"]), ignore_errors=True)
-    return folder
-
-
-def install_model(pipeline, metrics):
-    """Swap in a new model + metrics atomically (re-saved with the local libraries)."""
-    from model.train_model import _replace_with_retry
-    joblib.dump(pipeline, app.config["MODEL_PATH"] + ".tmp")
-    _replace_with_retry(app.config["MODEL_PATH"] + ".tmp", app.config["MODEL_PATH"])
-    with open(app.config["METRICS_PATH"] + ".tmp", "w") as f:
-        json.dump(metrics, f, indent=2)
-    _replace_with_retry(app.config["METRICS_PATH"] + ".tmp", app.config["METRICS_PATH"])
-    _MODEL_CHARTS_CACHE.update(key=None, data=None)
-
-
-def read_limited(file_storage, max_bytes):
-    """File bytes, or None when larger than max_bytes."""
-    data = file_storage.read(max_bytes + 1)
-    return None if len(data) > max_bytes else data
-
-
-@app.route("/developer/model-diagnostics/upload", methods=["POST"])
-@developer_required
-def upload_model():
-    """Upload a model trained in Colab (Joblib + results) to replace the
-    current one. Developer only: a .joblib file is a pickle, so it is read with
-    an allowlist loader (model/safe_load.py) and checked before it is used."""
-    from model.safe_load import UnsafeModelFile, safe_load_joblib
-    back = redirect(url_for("model_diagnostics"))
-    if app.config["SERVERLESS"]:  # read-only file system
-        flash("The online link cannot save files. Upload the trained model on the GSO computer "
-              "(http://127.0.0.1:5000), then deploy it to the online link.", "warning")
-        return back
-    model_file, metrics_file = request.files.get("model_file"), request.files.get("metrics_file")
-    if not (model_file and model_file.filename and metrics_file and metrics_file.filename):
-        flash("Choose both files from Google Colab: linear_regression_pipeline.joblib and metrics_colab.json.", "danger")
-        return back
-    if not model_file.filename.lower().endswith(".joblib"):
-        flash("Model not uploaded: the model file must be a .joblib file (linear_regression_pipeline.joblib).", "danger")
-        return back
-    if not metrics_file.filename.lower().endswith(".json"):
-        flash("Model not uploaded: the results file must be a .json file (metrics_colab.json).", "danger")
-        return back
-    model_bytes = read_limited(model_file, MODEL_UPLOAD_MAX_BYTES)
-    metrics_bytes = read_limited(metrics_file, METRICS_UPLOAD_MAX_BYTES)
-    if model_bytes is None or metrics_bytes is None:
-        flash(f"Model not uploaded: the model file may be at most {MODEL_UPLOAD_MAX_BYTES // 1024} KB and the "
-              f"results file at most {METRICS_UPLOAD_MAX_BYTES // 1024} KB.", "danger")
-        return back
-    try:
-        pipeline = safe_load_joblib(model_bytes)
-    except UnsafeModelFile as e:
-        app.logger.warning("Refused an uploaded model file: %s", e)
-        flash("Model not uploaded: " + str(e) + " Upload the linear_regression_pipeline.joblib saved by the "
-              "Google Colab notebook.", "danger")
-        return back
-    except Exception:
-        app.logger.exception("Uploaded model could not be read")
-        flash("The model file could not be read. Upload the linear_regression_pipeline.joblib saved by the "
-              "Google Colab notebook.", "danger")
-        return back
-    try:
-        metrics = json.loads(metrics_bytes.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        flash("The results file could not be read. Upload the metrics_colab.json saved by the Google Colab notebook.",
-              "danger")
-        return back
-    try:
-        problems = check_uploaded_model(pipeline, metrics)
-    except Exception:
-        app.logger.exception("Checking the uploaded model failed")
-        problems = ["The model file could not make a prediction. Upload the linear_regression_pipeline.joblib "
-                    "saved by the Google Colab notebook."]
-    if problems:
-        flash("Model not uploaded: " + " ".join(problems), "danger")
-        return back
-    metrics = complete_uploaded_metrics(metrics)
-    backup_current_model()
-    install_model(pipeline, metrics)
-    flash(f"Trained model uploaded: R² {metrics['r2_score']}, MAE {metrics['mae']} L, RMSE {metrics['rmse']} L. "
-          "Predictions now use this model. The previous model was backed up.", "success")
-    return back
-
-
-@app.route("/developer/model-diagnostics/rollback", methods=["POST"])
-@developer_required
-def rollback_model():
-    """Restore a backup (the newest unless one is chosen). The model it
-    replaces is kept under model/backups/rolled-back-<time>/."""
-    import shutil
-    from model.safe_load import safe_load_joblib
-    back = redirect(url_for("model_diagnostics"))
-    if app.config["SERVERLESS"]:
-        flash("The online link cannot save files. Roll back on the GSO computer (http://127.0.0.1:5000).", "warning")
-        return back
-    backups = list_model_backups()
-    wanted = request.form.get("backup") or (backups[0]["name"] if backups else "")
-    chosen = next((b for b in backups if b["name"] == wanted), None)
-    if not chosen:
-        flash("There is no saved previous model to roll back to.", "warning")
-        return back
-    folder = os.path.join(model_backup_dir(), chosen["name"])
-    try:
-        with open(os.path.join(folder, "model.joblib"), "rb") as f:
-            pipeline = safe_load_joblib(f.read())
-        with open(os.path.join(folder, "metrics.json")) as f:
-            metrics = json.load(f)
-    except Exception:
-        app.logger.exception("Backup model %s could not be read", chosen["name"])
-        flash("That backup could not be read, so nothing was changed.", "danger")
-        return back
-    backup_current_model(prefix=ROLLED_BACK_PREFIX)
-    install_model(pipeline, metrics)
-    shutil.rmtree(folder, ignore_errors=True)
-    flash(f"Rolled back to model {metrics.get('model_version', '')} (R² {metrics.get('r2_score')}). "
-          "Predictions now use it.", "success")
-    return back
 
 
 # ------------------------------------------------------------------
@@ -2359,12 +2152,18 @@ def update_profile():
     errors = []
     if not USERNAME_RE.fullmatch(username):
         errors.append("Username must be 3-50 characters: letters, numbers, dot, dash or underscore.")
+    elif reserved_word_problem("Username", username):
+        errors.append(reserved_word_problem("Username", username))
     elif username_taken(username, session["user_id"]):
         errors.append(f"Username {username} is already taken.")
     if not 2 <= len(full_name) <= 100:
         errors.append("Full name must be 2 to 100 characters.")
+    elif reserved_word_problem("Full name", full_name):
+        errors.append(reserved_word_problem("Full name", full_name))
     if len(position) > 100:
         errors.append("Role must be at most 100 characters.")
+    elif reserved_word_problem("Role", position):
+        errors.append(reserved_word_problem("Role", position))
     if email:
         if len(email) > 120 or not EMAIL_RE.fullmatch(email):
             errors.append("Please enter a valid email address.")
@@ -2436,7 +2235,9 @@ def user_record(u, num):
 
 
 def query_users():
-    rows = sorted(db.records("users"), key=lambda u: (u["status"] != "pending", u["role"] != "admin", u["full_name"] or ""))
+    # sign-ups waiting for approval on top, then every account; newest first in each
+    rows = sorted(db.records("users"), key=lambda u: (u["status"] == "pending", u["created_at"] or datetime.min, u["id"]),
+                  reverse=True)
     return [user_record(u, i) for i, u in enumerate(rows, 1)]
 
 
@@ -2449,10 +2250,14 @@ def validate_user_form(f, user_id=None):
         username = (f.get("username") or "").strip()
         if not USERNAME_RE.fullmatch(username):
             errors.append("Username must be 3-50 characters: letters, numbers, dot, dash or underscore.")
+        elif reserved_word_problem("Username", username):
+            errors.append(reserved_word_problem("Username", username))
         elif username_taken(username):
             errors.append(f"Username {username} is already taken.")
     if not 2 <= len(full_name) <= 100:
         errors.append("Full name must be 2 to 100 characters.")
+    elif reserved_word_problem("Full name", full_name):
+        errors.append(reserved_word_problem("Full name", full_name))
     if email:
         if len(email) > 120 or not EMAIL_RE.fullmatch(email):
             errors.append("Please enter a valid email address.")

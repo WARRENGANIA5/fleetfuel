@@ -15,16 +15,16 @@ EASIEST WAY (AUTO version):
      fuel_consumption_linear_regression_AUTO.ipynb > Open.
   3. Runtime > Run all. If a warning appears, click "Run anyway".
   4. Wait 1-2 minutes until every cell has a green check mark.
-  5. Section 6 shows R2, MAE, RMSE and the 5-fold CV - the same as the
-     Model Diagnostics page of the web app (developer account).
+  5. Section 6 shows R2, MAE, RMSE and the 5-fold CV - the same as python model/train_model.py
+     gives on the GSO computer.
   6. The last cell downloads linear_regression_pipeline.joblib and metrics_colab.json (allow the
-     browser to download multiple files). In the web app, open Model Diagnostics (developer account) >
-     Upload Trained Model from Google Colab, choose the two files and click Upload.
-     The system then predicts with this model; it never retrains by itself.
+     browser to download multiple files). They record this run. The web app does not take uploaded
+     models: its model is trained on the GSO computer with python model/train_model.py, and it
+     never retrains by itself.
 
 The AUTO version contains the data from the day it was made (7,589 trips of Trip Records = 93 GSO + 7,496 online,
 9 vehicles, 92,402 other online records = 99,991 records + 9 vehicles = 100,000).
 To rebuild the four files from the system's current data: python colab/make_colab_files.py
-For newer records, download the three CSV files again from the web app
-(Model Diagnostics > Upload Trained Model from Google Colab) and use fuel_consumption_linear_regression.ipynb:
+For newer records, rebuild the three CSV files with python colab/make_colab_files.py
+and use fuel_consumption_linear_regression.ipynb:
 Run all, then Choose Files and select all three CSV files.

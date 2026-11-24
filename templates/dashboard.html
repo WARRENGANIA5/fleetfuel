@@ -16,7 +16,7 @@
 
 <div class="welcome-banner mb-4">
   <div>
-    <div class="welcome-title">{{ greeting }}, {{ session.get('full_name') or 'there' }}!</div>
+    <div class="welcome-title">{{ greeting }}, <span class="welcome-username">{{ session.get('username') or 'there' }}</span>!</div>
   </div>
   <div class="welcome-meta">
     <span class="welcome-date"><i class="fa-regular fa-calendar me-1"></i>{{ today_long }}</span>

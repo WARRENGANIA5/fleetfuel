@@ -34,7 +34,7 @@ gov-fleets/
 ├── data/
 │   ├── gso_monthly_travel_SFA4714_2026.csv  Collected trips of SFA 4714 (Monthly Report of Official Travel)
 │   ├── supplementary_data.csv        Online records: 50,508 gasoline trips + 49,390 diesel vans
-│   ├── trip_records_dataset.csv      7,496 online-dataset trips shown in Trip Records
+│   ├── trip_records_dataset.csv      7,496 online-dataset trips (training only, not shown in Trip Records)
 │   ├── cleaned_merged_dataset.csv    Local + online records after cleaning (generated)
 │   ├── historical_fleet_data.csv     Optional extra local trips (same columns)
 │   ├── SUPPLEMENTARY_DATASET_SOURCE.md  Sources, licenses and sampling of the online data
@@ -46,7 +46,6 @@ gov-fleets/
 │   ├── fuel_consumption_linear_regression_AUTO.ipynb  Colab notebook with the data built in
 │   ├── fuel_consumption_linear_regression.ipynb       Colab notebook that asks for the 3 CSV files
 │   ├── trip_records.csv, vehicle_records.csv, supplementary_data.csv  The three training files
-│   ├── example_upload/          Model + results saved by Colab (for Upload Trained Model)
 │   ├── make_colab_files.py      Rebuilds the notebooks and the three training files
 │   └── HOW_TO_TRAIN_IN_COLAB.txt
 ├── templates/                  Jinja2 templates (login, dashboard, ...); _auth_bg.html = login/sign-up background
@@ -149,19 +148,20 @@ Visit **http://127.0.0.1:5000**.
 
 The web application never retrains by itself (Chapter III: Flask loads the saved Joblib model for
 predictions without retraining). Adding or editing trip records changes the data, not the model. To
-train a new model:
+train a new model, run this on the GSO server computer:
 
-1. **Model Diagnostics (developer account) → Upload Trained Model from Google Colab:** download `trip_records.csv`,
-   `vehicle_records.csv` and `supplementary_data.csv`.
-2. Run `colab/fuel_consumption_linear_regression.ipynb` in Google Colab with those files
-   (see `colab/HOW_TO_TRAIN_IN_COLAB.txt`). It downloads `linear_regression_pipeline.joblib` and
-   `metrics_colab.json`.
-3. Upload both files on the same card. The system checks that the model is the notebook's Linear
-   Regression pipeline and that its predictions follow the equation in the results file, then the
-   Prediction, Dashboard, Prediction Accuracy and Model Diagnostics pages switch to it; no restart is needed.
+```bash
+python model/train_model.py
+python model/evaluate_model.py
+```
 
-`python model/train_model.py` runs the same steps on this computer, and `python model/evaluate_model.py`
-regenerates the figures in `reports/figures/`.
+`train_model.py` saves `model/linear_regression_pipeline.joblib` and `model/metrics.json`; the Prediction,
+Dashboard and Prediction Accuracy pages switch to the new model by themselves (no restart is needed).
+`evaluate_model.py` regenerates the figures in `reports/figures/`.
+
+The Google Colab notebooks in `colab/` run the same steps for the paper (see `colab/HOW_TO_TRAIN_IN_COLAB.txt`);
+`python colab/make_colab_files.py` rebuilds their three CSV files from the current data. The web application
+does not take uploaded models.
 
 ## 5a. Database Backups
 
@@ -230,7 +230,7 @@ high collinearity), uses **HC3 robust standard errors** for the coefficient p-va
 conditions on the standardized (weighted) residuals: Ramsey RESET (linearity), Durbin-Watson (independence),
 Jarque-Bera (normality), Breusch-Pagan (equal variance) and VIF (multicollinearity). With more than 300 records
 the p-values flag even trivial departures, so linearity, normality and equal variance are decided by effect size:
-Cohen's f² < 0.02, |skewness| ≤ 2 and |excess kurtosis| ≤ 7, and a residual variance ratio ≤ 3. Results appear on **Model Diagnostics** (developer account) and in the
+Cohen's f² < 0.02, |skewness| ≤ 2 and |excess kurtosis| ≤ 7, and a residual variance ratio ≤ 3. Results are saved in `model/metrics.json` and shown in the
 Colab notebook. `python model/evaluate_model.py` saves print-ready
 figures to `reports/figures/`.
 
